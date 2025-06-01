@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import dataclasses
 
@@ -20,10 +22,9 @@ class GenEdStructure:
 
 # https://stackoverflow.com/a/24105344
 class TypesEnumMeta(enum.EnumMeta):
-    def __call__(cls, value, *args, **kw):
+    def __call__(cls: GenEds, value, *args, **kw):
         if isinstance(value, str):
-            # map strings to enum values, defaults to Unknown
-            for member in cls:
+            for member in cls:  # pylint: disable=E1133
                 if member.value.Name.lower() == value.lower():
                     value = member
                     break
