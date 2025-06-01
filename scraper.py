@@ -1,8 +1,10 @@
 import logging
+import pathlib
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests_cache
+import pathvalidate
 from data_structures import (
     ProgramStub,
     ProgramKind,
@@ -201,15 +203,18 @@ def main():
     try:
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")
-        with pd.ExcelWriter("programs.xlsx") as writer:
-            for prog in programs:
-                if prog.kind == ProgramKind.Bachelor:
-                    try:
-                        scrape_bachelors_courses(prog).to_excel(
-                            writer, sheet_name=trim_titles(prog.name)
+        for prog in programs:
+            if prog.kind == ProgramKind.Bachelor:
+                try:
+                    df = scrape_bachelors_courses(prog)
+                    df.to_pickle(
+                        pathlib.Path("scraped_programs").joinpath(
+                            pathvalidate.sanitize_filename(prog.name).replace(" ", "_")
+                            + ".pkl"
                         )
-                    except Exception as e:
-                        logger.error("An error occurred: %s in %s", e, prog.name)
+                    )
+                except Exception as e:
+                    logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:
         logger.error("An error occurred: %s", e)
         raise

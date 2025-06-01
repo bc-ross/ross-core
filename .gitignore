@@ -1,3 +1,4 @@
 *.sqlite
 __pycache__
 *.xlsx
+scraped_programs
