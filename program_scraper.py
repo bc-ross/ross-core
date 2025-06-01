@@ -29,6 +29,8 @@ requests_cache.install_cache(
 
 EXCEL_DEBUGGING = True  # Trims sheetnames to 31
 
+SITE_URL = "https://coursecatalog.benedictine.edu"
+
 
 def trim_titles(s: str) -> str:
     """Trim titles to 31 characters for Excel compatibility."""
@@ -215,7 +217,8 @@ def to_debug_view(df):
 
 
 def main():
-    url = "https://coursecatalog.benedictine.edu/courses-instruction/#programstext"
+    url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
+
     try:
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")
