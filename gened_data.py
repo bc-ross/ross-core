@@ -7,6 +7,9 @@ GENERIC_ELECTIVE_NAMES = [
     "General Elective (or second major class)",
     "Elective",
     "Electives",
+    "Electives/Minor",
+    "Electives or Foundation",
+    "Electives (depending on internship)",
 ]
 
 

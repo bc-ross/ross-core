@@ -115,6 +115,8 @@ def scrape_bachelors_courses(prog: ProgramStub):
     if not courses_section:
         raise ValueError(f"Could not find courses section for {prog.name}.")
 
+    second_natural_world = False
+
     semesters = {}
     current_semester, current_year, courses = None, None, []
 
@@ -158,6 +160,21 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 hours = tds[1].get_text(strip=True)
                 if hours == "NULL":
                     hours = "0"
+                if "Natural World" in title:
+                    if hours == "3-4":
+                        hours = "3" if second_natural_world else "4"
+                        logger.warning(
+                            "Assuming variable Natural World is %s credits in %s",
+                            hours,
+                            prog.name,
+                        )
+                    second_natural_world = True
+                if "Mathematical Reasoning" in title and hours == "3-4":
+                    logger.warning(
+                        "Assuming Math Reasoning is 3 credits in %s",
+                        prog.name,
+                    )
+                    hours = "3"
                 elif not hours:
                     logger.warning(
                         "Skipping malformed course row: %s in %s", title, prog.name
@@ -187,9 +204,12 @@ def main():
         with pd.ExcelWriter("programs.xlsx") as writer:
             for prog in programs:
                 if prog.kind == ProgramKind.Bachelor:
-                    scrape_bachelors_courses(prog).to_excel(
-                        writer, sheet_name=trim_titles(prog.name)
-                    )
+                    try:
+                        scrape_bachelors_courses(prog).to_excel(
+                            writer, sheet_name=trim_titles(prog.name)
+                        )
+                    except Exception as e:
+                        logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:
         logger.error("An error occurred: %s", e)
         raise
