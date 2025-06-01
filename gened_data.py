@@ -13,6 +13,14 @@ GENERIC_ELECTIVE_NAMES = [
 ]
 
 
+class DefaultGenEdCodes(enum.Enum):
+    ENGLISH_COMPOSITION = ["ENGL-1000", "ENGL-1010", "ENGL-1030"]
+    INTRO_THEOLOGY = ["THEO-1100"]
+    WELLNESS_FOR_LIFE = ["EXSC-1115", "NURS-3200"]
+    NATURAL_PHILOSOPHY = ["PHIL-2100", "PHIL-2310"]
+    FOREIGN_LANGUAGE = ["LATN-1000", "LATN-1020"]
+
+
 class GenEdType(enum.Enum):
     Foundation = "Foundation"
     Core = "Core"  # Treating Fitness as part of the Core
@@ -61,6 +69,12 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
     )
     INTRO_THEOLOGY = GenEdStructure(
         Name="Introduction to Theology",
+        Reqd=1,
+        ReqdIsCredit=False,
+        Type=GenEdType.Core,
+    )
+    ENGLISH_COMPOSITION = GenEdStructure(
+        Name="English Composition",
         Reqd=1,
         ReqdIsCredit=False,
         Type=GenEdType.Core,
@@ -162,7 +176,7 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         ReqdIsCredit=True,
         Type=GenEdType.Foundation,
         ShortName="Natural World",
-        Url="/general-education/understanding-the-natural-world/",
+        Url="/general-education/understanding-natural-world/",
     )
     VISUAL_COMMUNICATION = GenEdStructure(
         Name="Visual Communication",

@@ -13,7 +13,10 @@ from data_structures import (
     GenEdCourse,
     GenEds,
     ElectiveCourse,
+    ElectiveStub,
+    GenEdStub,
     GENERIC_ELECTIVE_NAMES,
+    DefaultGenEdCodes,
 )
 
 # Configure logging
@@ -189,9 +192,9 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 try:
                     gened = GenEds(title)
                 except ValueError:
-                    courses.append(ElectiveCourse(title, hours))
+                    courses.append(ElectiveStub(title, hours))
                 else:
-                    courses.append(GenEdCourse(title, gened, hours))
+                    courses.append(GenEdStub(title, gened, hours))
 
     if current_semester and current_year and courses:
         process_semester_courses(
@@ -216,9 +219,78 @@ def to_debug_view(df):
     return new_df
 
 
+def scrape_gened_courselists():
+    gened_courses = {}
+    for gened in GenEds:
+        enum_name = gened.name
+        gened = gened.value
+        courses = []
+        if gened.Url:
+            # Construct the URL for the GenEd
+            url = requests.compat.urljoin(SITE_URL, gened.Url)
+            soup = fetch_and_parse_url(url)
+            courses_section = soup.find("div", id="textcontainer").find("table")
+            if not courses_section:
+                raise ValueError(f"Could not find courses section for {enum_name}.")
+
+            for tr in courses_section.find_all("tr"):
+                tds = tr.find_all("td")
+                if len(tds) == 3:
+                    code = tds[0].get_text(strip=True)
+                    title = tds[1].get_text(strip=True)
+                    hours = tds[2].get_text(strip=True)
+                    if hours == "NULL":
+                        hours = "0"
+                    elif not hours:
+                        logger.warning(
+                            "Skipping malformed course row: %s in %s", title, enum_name
+                        )
+                        continue
+                    hours = int(hours)
+                    url = tds[0].find("a")["href"]
+                    courses.append(GenEdCourse(title, code, gened, hours, url))
+
+        elif enum_name in [i.name for i in DefaultGenEdCodes]:
+            # Use default codes if no URL is provided
+            for code in DefaultGenEdCodes[enum_name].value:
+                details = course_lookup(code)
+                courses.append(
+                    GenEdCourse(
+                        details["title"],
+                        details["code"],
+                        gened,
+                        details["credits"],
+                        details["url"],
+                    )
+                )
+        gened_courses[enum_name] = courses
+
+    return gened_courses
+
+
+def course_lookup(code: str) -> dict[str]:
+    url = requests.compat.urljoin(SITE_URL, "/search") + "?P=" + code.upper()
+    soup = fetch_and_parse_url(url)
+    course_section = soup.find("div", class_="courseblock")
+    course_code = course_section.find("span", class_="detail-code").get_text(strip=True)
+    title = course_section.find("span", class_="detail-title").get_text(strip=True)
+    credits_raw = course_section.find("span", class_="detail-hours_html").get_text(
+        strip=True
+    )
+    credits = credits_raw.strip("()").split()[0]  # Extract just the number
+
+    return {"code": course_code, "title": title, "credits": int(credits), "url": url}
+
+
 def main():
     url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
-
+    print(
+        {
+            i: j
+            for i, j in scrape_gened_courselists().items()
+            if i in [i.name for i in DefaultGenEdCodes]
+        }
+    )
     try:
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")

@@ -1,6 +1,6 @@
 import enum
 import dataclasses
-from gened_data import GenEds, GENERIC_ELECTIVE_NAMES
+from gened_data import GenEds, GENERIC_ELECTIVE_NAMES, DefaultGenEdCodes
 
 
 class ProgramKind(enum.Enum):
@@ -31,7 +31,7 @@ class DegreeCourse:
 
 
 @dataclasses.dataclass
-class GenEdCourse:
+class GenEdStub:
     name: str
     info: GenEds
     credit: int
@@ -41,9 +41,33 @@ class GenEdCourse:
 
 
 @dataclasses.dataclass
-class ElectiveCourse:
+class GenEdCourse:
+    name: str
+    code: str
+    info: GenEds
+    credit: int
+    url: str
+
+    def __str__(self):
+        return "GENED: " + self.code + f" ({self.name})"
+
+
+@dataclasses.dataclass
+class ElectiveStub:
     name: str
     credit: int
 
     def __str__(self):
         return "ELE: " + self.name
+
+
+@dataclasses.dataclass
+class ElectiveCourse:
+    name: str
+    code: str
+    stub: ElectiveStub
+    credit: int
+    url: str
+
+    def __str__(self):
+        return "ELE: " + self.code + f" ({self.name})"
