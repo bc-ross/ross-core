@@ -2,7 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests_cache
-from data_structures import ProgramStub, ProgramKind
+from data_structures import ProgramStub, ProgramKind, DegreeCourse
 
 # Enable caching
 requests_cache.install_cache(
@@ -93,8 +93,10 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     "Junior Year",
                     "Senior Year",
                 ]:
-                    df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
-                    semesters[current_year + ": " + current_semester] = df
+                    # df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+                    semesters[current_year + ": " + current_semester] = pd.Series(
+                        courses
+                    )
                     courses = []
                 else:
                     print("Skipping non-standard year:", current_year)
@@ -110,8 +112,10 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     "Junior Year",
                     "Senior Year",
                 ]:
-                    df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
-                    semesters[current_year + ": " + current_semester] = df
+                    # df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+                    semesters[current_year + ": " + current_semester] = pd.Series(
+                        courses
+                    )
                     courses = []
                 else:
                     print(
@@ -132,7 +136,8 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 code = tds[0].get_text(strip=True)
                 title = tds[1].get_text(strip=True)
                 hours = tds[2].get_text(strip=True)
-                courses.append([code, title, hours])
+                url = tds[0].find("a")["href"]
+                courses.append(DegreeCourse(title, code, hours, url))
 
     # Add the last semester courses after loop
     if current_semester and current_year and courses:
@@ -142,22 +147,13 @@ def scrape_bachelors_courses(prog: ProgramStub):
             "Junior Year",
             "Senior Year",
         ]:
-            df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
-            semesters[current_year + ": " + current_semester] = df
+            # df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+            semesters[current_year + ": " + current_semester] = pd.Series(courses)
         else:
             print("Skipping non-standard year:", current_year)
 
-    # Show the courses grouped by semester
-    for sem, df in semesters.items():
-        print(f"=== {sem} ===")
-        print(df, "\n")
-
-    # for course in courses_section.find_all("li"):
-    #     course_name = course.get_text(strip=True)
-    #     if course_name:
-    #         courses.append(course_name)
-
-    # return courses
+    sem_df = pd.DataFrame(semesters)
+    return sem_df
 
 
 def main():
@@ -165,10 +161,11 @@ def main():
     try:
         programs = scrape_program_info(url)
         print("Programs and their links:")
-        for prog in programs:
-            if prog.kind == ProgramKind.Bachelor:
-                print(scrape_bachelors_courses(prog))
-                # break
+        with pd.ExcelWriter("programs.xlsx") as writer:
+            for prog in programs:
+                if prog.kind == ProgramKind.Bachelor:
+                    scrape_bachelors_courses(prog).to_excel(writer, prog.name)
+                    # break
     except Exception as e:
         print(f"An error occurred: {e}")
         raise
