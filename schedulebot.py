@@ -9,8 +9,8 @@ requests_cache.install_cache(
 )  # Cache expires after 1 day
 
 
-def scrape_program_links(url):
-    response = requests.get(url)
+def scrape_program_info(url):
+    response = requests.get(url, timeout=10)
     response.raise_for_status()  # Raise an error for bad status codes
     soup = BeautifulSoup(response.text, "html.parser")
     # Check if the response was served from cache
@@ -55,13 +55,38 @@ def scrape_program_links(url):
     return programs
 
 
+def scrape_program_courses(prog: ProgramStub):
+    response = requests.get(prog.url, timeout=10)
+    response.raise_for_status()  # Raise an error for bad status codes
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Check if the response was served from cache
+    if response.from_cache:
+        print(f"Courses for {prog.name} were served from cache.")
+    else:
+        print(f"Courses for {prog.name} were fetched from the server.")
+
+    # Find the courses section
+    courses_section = soup.find("div", id="coursescontainer")
+    if not courses_section:
+        raise ValueError(f"Could not find courses section for {prog.name}.")
+
+    courses = []
+    for course in courses_section.find_all("li"):
+        course_name = course.get_text(strip=True)
+        if course_name:
+            courses.append(course_name)
+
+    return courses
+
+
 def main():
     url = "https://coursecatalog.benedictine.edu/courses-instruction/#programstext"
     try:
-        programs = scrape_program_links(url)
+        programs = scrape_program_info(url)
         print("Programs and their links:")
         for prog in programs:
-            print(prog)
+            print(scrape_program_courses(prog))
     except Exception as e:
         print(f"An error occurred: {e}")
 
