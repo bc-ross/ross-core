@@ -1,6 +1,6 @@
 import enum
 import dataclasses
-from gened_data import GenEds
+from gened_data import GenEds, GENERIC_ELECTIVE_NAMES
 
 
 class ProgramKind(enum.Enum):

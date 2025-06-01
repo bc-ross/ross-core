@@ -10,6 +10,7 @@ from data_structures import (
     GenEdCourse,
     GenEds,
     ElectiveCourse,
+    GENERIC_ELECTIVE_NAMES,
 )
 
 # Configure logging
@@ -22,6 +23,15 @@ logger = logging.getLogger(__name__)
 requests_cache.install_cache(
     "schedulebot_cache", expire_after=86400
 )  # Cache expires after 1 day
+
+EXCEL_DEBUGGING = True  # Trims sheetnames to 31
+
+
+def trim_titles(s: str) -> str:
+    """Trim titles to 31 characters for Excel compatibility."""
+    if EXCEL_DEBUGGING and len(s) > 31:
+        return s[:31]
+    return s
 
 
 def fetch_and_parse_url(url):
@@ -143,7 +153,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 courses.append(DegreeCourse(title, code, hours, url))
             elif len(tds) == 2:
                 title = tds[0].get_text(strip=True)
-                if title in ("Elective", "Electives"):
+                if title in GENERIC_ELECTIVE_NAMES:
                     continue  # Skip generic electives
                 hours = tds[1].get_text(strip=True)
                 if hours == "NULL":
@@ -157,7 +167,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 try:
                     gened = GenEds(title)
                 except ValueError:
-                    courses.append(ElectiveCourse(title, code))
+                    courses.append(ElectiveCourse(title, hours))
                 else:
                     courses.append(GenEdCourse(title, gened, hours))
 
@@ -177,7 +187,9 @@ def main():
         with pd.ExcelWriter("programs.xlsx") as writer:
             for prog in programs:
                 if prog.kind == ProgramKind.Bachelor:
-                    scrape_bachelors_courses(prog).to_excel(writer, prog.name)
+                    scrape_bachelors_courses(prog).to_excel(
+                        writer, sheet_name=trim_titles(prog.name)
+                    )
     except Exception as e:
         logger.error("An error occurred: %s", e)
         raise

@@ -3,6 +3,12 @@ from __future__ import annotations
 import enum
 import dataclasses
 
+GENERIC_ELECTIVE_NAMES = [
+    "General Elective (or second major class)",
+    "Elective",
+    "Electives",
+]
+
 
 class GenEdType(enum.Enum):
     Foundation = "Foundation"
@@ -20,18 +26,23 @@ class GenEdStructure:
     Url: str | None = None
 
 
+def ident_gened(member: GenEdStructure, value: str) -> GenEdStructure:
+    if member.value.Name.lower() == value.lower():
+        return True
+    elif member.value.ShortName and member.value.ShortName.lower() == value.lower():
+        return True
+
+    if value.endswith(" Foundation"):
+        return ident_gened(member, value[:-11])
+    return False
+
+
 # https://stackoverflow.com/a/24105344
 class TypesEnumMeta(enum.EnumMeta):
     def __call__(cls: GenEds, value, *args, **kw):
         if isinstance(value, str):
             for member in cls:  # pylint: disable=E1133
-                if member.value.Name.lower() == value.lower():
-                    value = member
-                    break
-                elif (
-                    member.value.ShortName
-                    and member.value.ShortName.lower() == value.lower()
-                ):
+                if ident_gened(member, value):
                     value = member
                     break
         return super().__call__(value, *args, **kw)
@@ -57,6 +68,13 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         ReqdIsCredit=False,
         Type=GenEdType.Core,
     )
+    EXERCISE_FITNESS = GenEdStructure(
+        Name="Exercise Fitness Course",
+        Reqd=1,
+        ReqdIsCredit=False,
+        Type=GenEdType.Core,
+        ShortName="EXSC Fitness Course",
+    )
     NATURAL_PHILOSOPHY = GenEdStructure(
         Name="Principles of Nature",
         Reqd=1,
@@ -75,6 +93,7 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         ReqdIsCredit=True,
         Type=GenEdType.Foundation,
         Url="/general-education/aesthetic-experience/",
+        ShortName="Aesthetic",
     )
     FAITH = GenEdStructure(
         Name="Faith",
@@ -96,6 +115,7 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         ReqdIsCredit=True,
         Type=GenEdType.Foundation,
         Url="/general-education/historical-inquiry/",
+        ShortName="Historical",
     )
     MATHEMATICAL_REASONING = GenEdStructure(
         Name="Mathematical Reasoning",
