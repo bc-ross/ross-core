@@ -1,3 +1,4 @@
+import logging
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -11,6 +12,12 @@ from data_structures import (
     ElectiveCourse,
 )
 
+# Configure logging
+logging.basicConfig(
+    level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 # Enable caching
 requests_cache.install_cache(
     "schedulebot_cache", expire_after=86400
@@ -23,9 +30,9 @@ def fetch_and_parse_url(url):
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     if response.from_cache:
-        print(f"Response for {url} was served from cache.")
+        logger.info("Response for %s was served from cache.", url)
     else:
-        print(f"Response for {url} was fetched from the server.")
+        logger.info("Response for %s was fetched from the server.", url)
     return soup
 
 
@@ -82,7 +89,11 @@ def process_semester_courses(
     ]:
         semesters[f"{current_year}: {current_semester}"] = pd.Series(courses)
     else:
-        print(f"Skipping non-standard year: {current_year} for program {prog_name}")
+        logger.warning(
+            "Skipping non-standard year: %s for program %s",
+            current_year,
+            prog_name,
+        )
 
 
 def scrape_bachelors_courses(prog: ProgramStub):
@@ -123,7 +134,9 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 if hours == "NULL":
                     hours = "0"
                 elif not hours:
-                    print("Skipping malformed course row:", title, "in", prog.name)
+                    logger.warning(
+                        "Skipping malformed course row: %s in %s", title, prog.name
+                    )
                     continue
                 hours = int(hours)
                 url = tds[0].find("a")["href"]
@@ -136,7 +149,9 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 if hours == "NULL":
                     hours = "0"
                 elif not hours:
-                    print("Skipping malformed course row:", title, "in", prog.name)
+                    logger.warning(
+                        "Skipping malformed course row: %s in %s", title, prog.name
+                    )
                     continue
                 hours = int(hours)
                 try:
@@ -158,13 +173,13 @@ def main():
     url = "https://coursecatalog.benedictine.edu/courses-instruction/#programstext"
     try:
         programs = scrape_program_info(url)
-        print("Programs and their links:")
+        logger.info("Programs and their links:")
         with pd.ExcelWriter("programs.xlsx") as writer:
             for prog in programs:
                 if prog.kind == ProgramKind.Bachelor:
                     scrape_bachelors_courses(prog).to_excel(writer, prog.name)
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error("An error occurred: %s", e)
         raise
 
 
