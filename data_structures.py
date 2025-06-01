@@ -26,6 +26,9 @@ class DegreeCourse:
     credit: int
     url: str
 
+    def __str__(self):
+        return self.code
+
 
 @dataclasses.dataclass
 class GenEdCourse:
@@ -33,8 +36,14 @@ class GenEdCourse:
     info: GenEds
     credit: str
 
+    def __str__(self):
+        return self.name
+
 
 @dataclasses.dataclass
 class ElectiveCourse:
     name: str
     credit: str
+
+    def __str__(self):
+        return self.name
