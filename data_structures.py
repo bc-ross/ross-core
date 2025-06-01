@@ -30,6 +30,7 @@ class DegreeCourse:
 @dataclasses.dataclass
 class GenEdCourse:
     name: str
+    info: GenEds
     credit: str
 
 

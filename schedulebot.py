@@ -2,7 +2,14 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import requests_cache
-from data_structures import ProgramStub, ProgramKind, DegreeCourse
+from data_structures import (
+    ProgramStub,
+    ProgramKind,
+    DegreeCourse,
+    GenEdCourse,
+    GenEds,
+    ElectiveCourse,
+)
 
 # Enable caching
 requests_cache.install_cache(
@@ -112,9 +119,32 @@ def scrape_bachelors_courses(prog: ProgramStub):
             if len(tds) == 3:
                 code = tds[0].get_text(strip=True)
                 title = tds[1].get_text(strip=True)
-                hours = int(tds[2].get_text(strip=True))
+                hours = tds[2].get_text(strip=True)
+                if hours == "NULL":
+                    hours = "0"
+                elif not hours:
+                    print("Skipping malformed course row:", title, "in", prog.name)
+                    continue
+                hours = int(hours)
                 url = tds[0].find("a")["href"]
                 courses.append(DegreeCourse(title, code, hours, url))
+            elif len(tds) == 2:
+                title = tds[0].get_text(strip=True)
+                if title in ("Elective", "Electives"):
+                    continue  # Skip generic electives
+                hours = tds[1].get_text(strip=True)
+                if hours == "NULL":
+                    hours = "0"
+                elif not hours:
+                    print("Skipping malformed course row:", title, "in", prog.name)
+                    continue
+                hours = int(hours)
+                try:
+                    gened = GenEds(title)
+                except ValueError:
+                    courses.append(ElectiveCourse(title, code))
+                else:
+                    courses.append(GenEdCourse(title, gened, hours))
 
     if current_semester and current_year and courses:
         process_semester_courses(
