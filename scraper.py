@@ -3,6 +3,7 @@ import pathlib
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+import numpy as np
 import requests_cache
 import pathvalidate
 from data_structures import (
@@ -198,23 +199,44 @@ def scrape_bachelors_courses(prog: ProgramStub):
     return pd.DataFrame(semesters)
 
 
+def split_course(course) -> pd.Series:
+    """Split course string into components."""
+    if pd.isna(course):
+        return pd.Series(["", np.nan], index=["Course", "Credits"])
+    return pd.Series([str(course), course.credit], index=["Course", "Credits"])
+
+
+def to_debug_view(df):
+    col_dict = {}
+    for col in df:
+        col_dict[col] = df[col].apply(split_course)
+    new_df = pd.concat(col_dict, axis=1)
+    return new_df
+
+
 def main():
     url = "https://coursecatalog.benedictine.edu/courses-instruction/#programstext"
     try:
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")
-        for prog in programs:
-            if prog.kind == ProgramKind.Bachelor:
-                try:
-                    df = scrape_bachelors_courses(prog)
-                    df.to_pickle(
-                        pathlib.Path("scraped_programs").joinpath(
-                            pathvalidate.sanitize_filename(prog.name).replace(" ", "_")
-                            + ".pkl"
+        with pd.ExcelWriter("scraped_programs.xlsx") as writer:
+            for prog in programs:
+                if prog.kind == ProgramKind.Bachelor:
+                    try:
+                        df = scrape_bachelors_courses(prog)
+                        df.to_pickle(
+                            pathlib.Path("scraped_programs").joinpath(
+                                pathvalidate.sanitize_filename(prog.name).replace(
+                                    " ", "_"
+                                )
+                                + ".pkl"
+                            )
                         )
-                    )
-                except Exception as e:
-                    logger.error("An error occurred: %s in %s", e, prog.name)
+                        to_debug_view(df).to_excel(
+                            writer, sheet_name=trim_titles(prog.name)
+                        )
+                    except Exception as e:
+                        logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:
         logger.error("An error occurred: %s", e)
         raise

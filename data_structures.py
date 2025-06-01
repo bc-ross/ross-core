@@ -34,16 +34,16 @@ class DegreeCourse:
 class GenEdCourse:
     name: str
     info: GenEds
-    credit: str
+    credit: int
 
     def __str__(self):
-        return self.name
+        return "GENED: " + self.name
 
 
 @dataclasses.dataclass
 class ElectiveCourse:
     name: str
-    credit: str
+    credit: int
 
     def __str__(self):
-        return self.name
+        return "ELE: " + self.name
