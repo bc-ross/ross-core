@@ -8,16 +8,6 @@ class GenEdType(enum.Enum):
     SkillsPerspectives = "Skills and Perspectives"
 
 
-import enum
-import dataclasses
-
-
-class GenEdType(enum.Enum):
-    Foundation = "Foundation"
-    Core = "Core"  # Treating Fitness as part of the Core
-    SkillsPerspectives = "Skills and Perspectives"
-
-
 @dataclasses.dataclass
 class GenEdStructure:
     Name: str
