@@ -112,7 +112,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
             if len(tds) == 3:
                 code = tds[0].get_text(strip=True)
                 title = tds[1].get_text(strip=True)
-                hours = tds[2].get_text(strip=True)
+                hours = int(tds[2].get_text(strip=True))
                 url = tds[0].find("a")["href"]
                 courses.append(DegreeCourse(title, code, hours, url))
 
