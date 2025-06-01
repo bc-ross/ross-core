@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 import requests_cache
 from data_structures import ProgramStub, ProgramKind
 
@@ -48,14 +49,15 @@ def scrape_program_info(url):
                 ProgramStub(
                     data["Program"],
                     ProgramKind(data["Degree Type"]),
-                    requests.compat.urljoin(url, data["URL"]),
+                    requests.compat.urljoin(url, data["URL"])
+                    + "#suggestedsequencestext",
                     specialization,
                 )
             )
     return programs
 
 
-def scrape_program_courses(prog: ProgramStub):
+def scrape_bachelors_courses(prog: ProgramStub):
     response = requests.get(prog.url, timeout=10)
     response.raise_for_status()  # Raise an error for bad status codes
     soup = BeautifulSoup(response.text, "html.parser")
@@ -66,18 +68,96 @@ def scrape_program_courses(prog: ProgramStub):
     else:
         print(f"Courses for {prog.name} were fetched from the server.")
 
+    courses = []
+
     # Find the courses section
-    courses_section = soup.find("div", id="coursescontainer")
+    courses_section = soup.find("div", id="suggestedsequencestextcontainer").find(
+        "table"
+    )
     if not courses_section:
         raise ValueError(f"Could not find courses section for {prog.name}.")
 
+    semesters = {}
+    current_semester = None
+    current_year = None
     courses = []
-    for course in courses_section.find_all("li"):
-        course_name = course.get_text(strip=True)
-        if course_name:
-            courses.append(course_name)
 
-    return courses
+    for tr in courses_section.find_all("tr"):
+        # Detect semester row by class
+        if "plangridterm" in tr.get("class", []):
+            # Save previous semester courses if any
+            if current_semester and current_year and courses:
+                if current_year in [
+                    "Freshman Year",
+                    "Sophomore Year",
+                    "Junior Year",
+                    "Senior Year",
+                ]:
+                    df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+                    semesters[current_year + ": " + current_semester] = df
+                    courses = []
+                else:
+                    print("Skipping non-standard year:", current_year)
+
+            # Extract semester name (usually in <th>)
+            current_semester = tr.find("th").get_text(strip=True)
+        elif "plangridyear" in tr.get("class", []):
+            # Save previous semester courses if any
+            if current_semester and current_year and courses:
+                if current_year in [
+                    "Freshman Year",
+                    "Sophomore Year",
+                    "Junior Year",
+                    "Senior Year",
+                ]:
+                    df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+                    semesters[current_year + ": " + current_semester] = df
+                    courses = []
+                else:
+                    print(
+                        "Skipping non-standard year:",
+                        current_year,
+                        "for program",
+                        prog.name,
+                    )
+
+            # Extract year name (usually in <th>)
+            current_year = tr.find("th", class_="year").get_text(strip=True)
+        elif "plangridsum" not in tr.get("class", []) and "plangridtotal" not in tr.get(
+            "class", []
+        ):
+            # Normal course rows have 3 <td>
+            tds = tr.find_all("td")
+            if len(tds) == 3:
+                code = tds[0].get_text(strip=True)
+                title = tds[1].get_text(strip=True)
+                hours = tds[2].get_text(strip=True)
+                courses.append([code, title, hours])
+
+    # Add the last semester courses after loop
+    if current_semester and current_year and courses:
+        if current_year in [
+            "Freshman Year",
+            "Sophomore Year",
+            "Junior Year",
+            "Senior Year",
+        ]:
+            df = pd.DataFrame(courses, columns=["Code", "Title", "Credits"])
+            semesters[current_year + ": " + current_semester] = df
+        else:
+            print("Skipping non-standard year:", current_year)
+
+    # Show the courses grouped by semester
+    for sem, df in semesters.items():
+        print(f"=== {sem} ===")
+        print(df, "\n")
+
+    # for course in courses_section.find_all("li"):
+    #     course_name = course.get_text(strip=True)
+    #     if course_name:
+    #         courses.append(course_name)
+
+    # return courses
 
 
 def main():
@@ -86,9 +166,12 @@ def main():
         programs = scrape_program_info(url)
         print("Programs and their links:")
         for prog in programs:
-            print(scrape_program_courses(prog))
+            if prog.kind == ProgramKind.Bachelor:
+                print(scrape_bachelors_courses(prog))
+                # break
     except Exception as e:
         print(f"An error occurred: {e}")
+        raise
 
 
 if __name__ == "__main__":
