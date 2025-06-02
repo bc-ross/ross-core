@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
+import dataclasses
 import requests_cache
 import pathvalidate
 from data_structures import (
@@ -18,6 +19,7 @@ from data_structures import (
     GENERIC_ELECTIVE_NAMES,
     DefaultGenEdCodes,
 )
+from xml_structures import CourseKind, Course
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -102,7 +104,7 @@ def process_semester_courses(semesters, current_year, current_semester, courses,
         "Junior Year",
         "Senior Year",
     ]:
-        semesters[f"{current_year}: {current_semester}"] = pd.Series(courses)
+        semesters[f"{current_year}: {current_semester}"] = pd.DataFrame(courses)
     else:
         logger.warning(
             "Skipping non-standard year: %s for program %s",
@@ -147,7 +149,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     continue
                 hours = int(hours)
                 url = tds[0].find("a")["href"]
-                courses.append(DegreeCourse(title, code, hours, url))
+                courses.append(dataclasses.asdict(Course(CourseKind.DEGREE, title, code, hours, url)))
             elif len(tds) == 2:
                 title = tds[0].get_text(strip=True)
                 if title in GENERIC_ELECTIVE_NAMES:
@@ -177,15 +179,15 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 try:
                     gened = GenEds(title)
                 except ValueError:
-                    courses.append(ElectiveStub(title, hours))
+                    courses.append(dataclasses.asdict(Course(CourseKind.ELECTIVE_STUB, title, hours)))
                 else:
                     if not IGNORE_GENED_STUBS:
-                        courses.append(GenEdStub(title, gened, hours))
+                        courses.append(dataclasses.asdict(Course(CourseKind.GENED_STUB, title, hours, info=gened)))
 
     if current_semester and current_year and courses:
         process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
 
-    return pd.DataFrame(semesters)
+    return pd.concat(semesters, axis=1)
 
 
 def split_course(course) -> pd.Series:
@@ -217,7 +219,16 @@ def extract_gened_course(courses_section, gened):
                 continue
             hours = int(hours)
             url = tds[0].find("a")["href"]
-            yield GenEdCourse(title, code, gened, hours, url)
+            yield dataclasses.asdict(
+                Course(
+                    CourseKind.GENED,
+                    title,
+                    hours,
+                    code,
+                    url,
+                    gened,
+                )
+            )
 
 
 def scrape_gened_courselists():
@@ -238,12 +249,15 @@ def scrape_gened_courselists():
             for code in DefaultGenEdCodes[gened.name].value:
                 details = course_lookup(code)
                 courses.append(
-                    GenEdCourse(
-                        details["title"],
-                        details["code"],
-                        gened,
-                        details["credits"],
-                        details["url"],
+                    dataclasses.asdict(
+                        Course(
+                            CourseKind.GENED,
+                            details["title"],
+                            details["credits"],
+                            details["code"],
+                            details["url"],
+                            gened,
+                        )
                     )
                 )
         elif gened.name == "EXERCISE_FITNESS":
@@ -254,9 +268,9 @@ def scrape_gened_courselists():
                 raise ValueError(f"Could not find courses section for {gened.name}.")
             for i in extract_gened_course(courses_section, gened):
                 courses.append(i)
-        gened_courses[gened.name] = pd.Series(courses)
+        gened_courses[gened.name] = pd.DataFrame(courses)
 
-    return pd.DataFrame(gened_courses)
+    return pd.concat(gened_courses, axis=1)
 
 
 def course_lookup(code: str) -> dict[str]:
@@ -291,7 +305,7 @@ def main():
                                 pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".pkl"
                             )
                         )
-                        to_debug_view(df).to_excel(writer, sheet_name=trim_titles(prog.name))
+                        df.to_excel(writer, sheet_name=trim_titles(prog.name))
                     except Exception as e:
                         logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:

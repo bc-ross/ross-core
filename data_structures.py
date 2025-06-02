@@ -45,6 +45,7 @@ class GenEdBase(ClassBase):
 
 @dataclasses.dataclass
 class DegreeCourse(CourseBase, DegreeBase):
+    # kind: CourseType = dataclasses.field(init=False, default=CourseType.DEGREE) # FIXME add this logic, maybe?
     name: str
     code: str
     credit: int

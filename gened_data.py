@@ -175,7 +175,7 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         Reqd=7,
         ReqdIsCredit=True,
         Type=GenEdType.Foundation,
-        ShortName="Natural World",
+        ShortName="Natural World",  # FIXME Foundation(with lab) breaks
         Url="/general-education/understanding-natural-world/",
     )
     VISUAL_COMMUNICATION = GenEdStructure(
