@@ -44,7 +44,7 @@ class GenEdStub:
 class GenEdCourse:
     name: str
     code: str
-    info: GenEdStructure
+    info: GenEds
     credit: int
     url: str
 
