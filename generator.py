@@ -74,27 +74,22 @@ class CourseSequence:
             ) + gened_dict.get(item.info.name, 0)
         for gened in GenEds:
             if gened.value.Reqd > gened_dict.get(gened.name, 0):
+                gened_codes = set(
+                    obj.code for obj in self.gened_eles[gened.name].dropna()
+                )
                 for item in (
                     degree_df[
-                        degree_df.map(lambda x: x.code if pd.notna(x) else None)
-                        .isin(
-                            self.gened_eles[gened.name].map(
-                                lambda x: x.code if pd.notna(x) else None
-                            )
+                        degree_df.map(
+                            lambda obj: obj.code in gened_codes, na_action="ignore"
                         )
-                        .any(axis=1)
                     ]
                     .stack()
                     .dropna()
                 ):
-                    gened_dict[item.info.name] = (
-                        item.credit if item.info.value.ReqdIsCredit else 1
-                    ) + gened_dict.get(item.info.name, 0)
+                    gened_dict[gened.name] = (
+                        item.credit if gened.value.ReqdIsCredit else 1
+                    ) + gened_dict.get(gened.name, 0)
                 if gened.value.Reqd > gened_dict.get(gened.name, 0):
-                    return False
+                    return False  # TODO: add logging
 
         return True  # TODO: is all checks done? Foundations etc.?
-
-
-x = CourseSequence(["History (BA)", "French (BA)", "Physics (BA)", "Astronomy (BS)"])
-x.gened_validate()
