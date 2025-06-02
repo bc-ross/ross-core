@@ -19,8 +19,32 @@ class ProgramStub:
     is_spec: bool = False
 
 
+class ClassBase:
+    pass
+
+
+class CourseBase(ClassBase):
+    pass
+
+
+class StubBase(ClassBase):
+    pass
+
+
+class DegreeBase(ClassBase):
+    pass
+
+
+class ElectiveBase(ClassBase):
+    pass
+
+
+class GenEdBase(ClassBase):
+    pass
+
+
 @dataclasses.dataclass
-class DegreeCourse:
+class DegreeCourse(CourseBase, DegreeBase):
     name: str
     code: str
     credit: int
@@ -31,7 +55,7 @@ class DegreeCourse:
 
 
 @dataclasses.dataclass
-class GenEdStub:
+class GenEdStub(StubBase, GenEdBase):
     name: str
     info: GenEds
     credit: int
@@ -41,7 +65,7 @@ class GenEdStub:
 
 
 @dataclasses.dataclass
-class GenEdCourse:
+class GenEdCourse(CourseBase, GenEdBase):
     name: str
     code: str
     info: GenEds
@@ -53,7 +77,7 @@ class GenEdCourse:
 
 
 @dataclasses.dataclass
-class ElectiveStub:
+class ElectiveStub(StubBase, ElectiveBase):
     name: str
     credit: int
 
@@ -62,7 +86,7 @@ class ElectiveStub:
 
 
 @dataclasses.dataclass
-class ElectiveCourse:
+class ElectiveCourse(CourseBase, ElectiveBase):
     name: str
     code: str
     stub: ElectiveStub
