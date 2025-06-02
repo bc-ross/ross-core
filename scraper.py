@@ -179,7 +179,8 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 except ValueError:
                     courses.append(ElectiveStub(title, hours))
                 else:
-                    courses.append(GenEdStub(title, gened, hours))
+                    if not IGNORE_GENED_STUBS:
+                        courses.append(GenEdStub(title, gened, hours))
 
     if current_semester and current_year and courses:
         process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
@@ -216,16 +217,16 @@ def extract_gened_course(courses_section, gened):
                 continue
             hours = int(hours)
             url = tds[0].find("a")["href"]
-            yield GenEdCourse(title, code, gened.value, hours, url)
+            yield GenEdCourse(title, code, gened, hours, url)
 
 
 def scrape_gened_courselists():
     gened_courses = {}
     for gened in GenEds:
         courses = []
-        if gened.Url:
+        if gened.value.Url:
             # Construct the URL for the GenEd
-            url = requests.compat.urljoin(SITE_URL, gened.Url)
+            url = requests.compat.urljoin(SITE_URL, gened.value.Url)
             soup = fetch_and_parse_url(url)
             courses_section = soup.find("div", id="textcontainer").find("table")
             if not courses_section:
@@ -272,6 +273,8 @@ def course_lookup(code: str) -> dict[str]:
 
 def main():
     url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
+    if IGNORE_GENED_STUBS:
+        logger.warning("Gened stubs are being ignored, resulting programs will be missing required gened classes")
     try:
         geneds = scrape_gened_courselists()
         geneds.to_pickle(pathlib.Path("scraped_programs").joinpath("General_Education.pkl"))

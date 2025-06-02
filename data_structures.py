@@ -49,7 +49,7 @@ class GenEdCourse:
     url: str
 
     def __str__(self):
-        return "GENED: " + self.code + f" ({self.info.Name})"
+        return "GENED: " + self.code + f" ({self.info.name})"
 
 
 @dataclasses.dataclass
