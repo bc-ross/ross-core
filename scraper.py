@@ -20,17 +20,16 @@ from data_structures import (
 )
 
 # Configure logging
-logging.basicConfig(
-    level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Enable caching
-requests_cache.install_cache(
-    "schedulebot_cache", expire_after=86400
-)  # Cache expires after 1 day
+requests_cache.install_cache("schedulebot_cache", expire_after=86400)  # Cache expires after 1 day
 
 EXCEL_DEBUGGING = True  # Trims sheetnames to 31
+
+IGNORE_GENED_STUBS = True  # Geneds automatically added in validation, so ignore stubs in scraping
+
 
 SITE_URL = "https://coursecatalog.benedictine.edu"
 
@@ -95,9 +94,7 @@ def scrape_program_info(url):
     return programs
 
 
-def process_semester_courses(
-    semesters, current_year, current_semester, courses, prog_name
-):
+def process_semester_courses(semesters, current_year, current_semester, courses, prog_name):
     """Process and save semester courses into the semesters dictionary."""
     if current_year in [
         "Freshman Year",
@@ -117,9 +114,7 @@ def process_semester_courses(
 def scrape_bachelors_courses(prog: ProgramStub):
     """Scrape bachelor's courses for a given program."""
     soup = fetch_and_parse_url(prog.url)
-    courses_section = soup.find("div", id="suggestedsequencestextcontainer").find(
-        "table"
-    )
+    courses_section = soup.find("div", id="suggestedsequencestextcontainer").find("table")
     if not courses_section:
         raise ValueError(f"Could not find courses section for {prog.name}.")
 
@@ -131,21 +126,15 @@ def scrape_bachelors_courses(prog: ProgramStub):
     for tr in courses_section.find_all("tr"):
         if "plangridterm" in tr.get("class", []):  # Semester row
             if current_semester and current_year and courses:
-                process_semester_courses(
-                    semesters, current_year, current_semester, courses, prog.name
-                )
+                process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
                 courses = []
             current_semester = tr.find("th").get_text(strip=True)
         elif "plangridyear" in tr.get("class", []):  # Year row
             if current_semester and current_year and courses:
-                process_semester_courses(
-                    semesters, current_year, current_semester, courses, prog.name
-                )
+                process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
                 courses = []
             current_year = tr.find("th", class_="year").get_text(strip=True)
-        elif "plangridsum" not in tr.get("class", []) and "plangridtotal" not in tr.get(
-            "class", []
-        ):  # Course row
+        elif "plangridsum" not in tr.get("class", []) and "plangridtotal" not in tr.get("class", []):  # Course row
             tds = tr.find_all("td")
             if len(tds) == 3:
                 code = tds[0].get_text(strip=True)
@@ -154,9 +143,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                 if hours == "NULL":
                     hours = "0"
                 elif not hours:
-                    logger.warning(
-                        "Skipping malformed course row: %s in %s", title, prog.name
-                    )
+                    logger.warning("Skipping malformed course row: %s in %s", title, prog.name)
                     continue
                 hours = int(hours)
                 url = tds[0].find("a")["href"]
@@ -184,9 +171,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     )
                     hours = "3"
                 elif not hours:
-                    logger.warning(
-                        "Skipping malformed course row: %s in %s", title, prog.name
-                    )
+                    logger.warning("Skipping malformed course row: %s in %s", title, prog.name)
                     continue
                 hours = int(hours)
                 try:
@@ -197,9 +182,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     courses.append(GenEdStub(title, gened, hours))
 
     if current_semester and current_year and courses:
-        process_semester_courses(
-            semesters, current_year, current_semester, courses, prog.name
-        )
+        process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
 
     return pd.DataFrame(semesters)
 
@@ -229,9 +212,7 @@ def extract_gened_course(courses_section, gened):
             if hours == "NULL":
                 hours = "0"
             elif not hours:
-                logger.warning(
-                    "Skipping malformed course row: %s in %s", title, gened.name
-                )
+                logger.warning("Skipping malformed course row: %s in %s", title, gened.name)
                 continue
             hours = int(hours)
             url = tds[0].find("a")["href"]
@@ -283,9 +264,7 @@ def course_lookup(code: str) -> dict[str]:
     course_section = soup.find("div", class_="courseblock")
     course_code = course_section.find("span", class_="detail-code").get_text(strip=True)
     title = course_section.find("span", class_="detail-title").get_text(strip=True)
-    credits_raw = course_section.find("span", class_="detail-hours_html").get_text(
-        strip=True
-    )
+    credits_raw = course_section.find("span", class_="detail-hours_html").get_text(strip=True)
     credits = credits_raw.strip("()").split()[0]  # Extract just the number
 
     return {"code": course_code, "title": title, "credits": int(credits), "url": url}
@@ -295,9 +274,7 @@ def main():
     url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
     try:
         geneds = scrape_gened_courselists()
-        geneds.to_pickle(
-            pathlib.Path("scraped_programs").joinpath("General_Education.pkl")
-        )
+        geneds.to_pickle(pathlib.Path("scraped_programs").joinpath("General_Education.pkl"))
         geneds.to_excel("scraped_geneds.xlsx")
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")
@@ -308,15 +285,10 @@ def main():
                         df = scrape_bachelors_courses(prog)
                         df.to_pickle(
                             pathlib.Path("scraped_programs").joinpath(
-                                pathvalidate.sanitize_filename(prog.name).replace(
-                                    " ", "_"
-                                )
-                                + ".pkl"
+                                pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".pkl"
                             )
                         )
-                        to_debug_view(df).to_excel(
-                            writer, sheet_name=trim_titles(prog.name)
-                        )
+                        to_debug_view(df).to_excel(writer, sheet_name=trim_titles(prog.name))
                     except Exception as e:
                         logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:
