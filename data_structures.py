@@ -1,6 +1,6 @@
 import enum
 import dataclasses
-from gened_data import GenEds, GENERIC_ELECTIVE_NAMES, DefaultGenEdCodes
+from gened_data import GenEds, GENERIC_ELECTIVE_NAMES, DefaultGenEdCodes, GenEdStructure
 
 
 class ProgramKind(enum.Enum):
@@ -44,12 +44,12 @@ class GenEdStub:
 class GenEdCourse:
     name: str
     code: str
-    info: GenEds
+    info: GenEdStructure
     credit: int
     url: str
 
     def __str__(self):
-        return "GENED: " + self.code + f" ({self.name})"
+        return "GENED: " + self.code + f" ({self.info.Name})"
 
 
 @dataclasses.dataclass
@@ -70,4 +70,4 @@ class ElectiveCourse:
     url: str
 
     def __str__(self):
-        return "ELE: " + self.code + f" ({self.name})"
+        return "ELE: " + self.code + f" ({self.stub.name})"

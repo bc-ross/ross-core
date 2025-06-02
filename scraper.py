@@ -219,6 +219,25 @@ def to_debug_view(df):
     return new_df
 
 
+def extract_gened_course(courses_section, gened, enum_name):
+    for tr in courses_section.find_all("tr"):
+        tds = tr.find_all("td")
+        if len(tds) == 3:
+            code = tds[0].get_text(strip=True)
+            title = tds[1].get_text(strip=True)
+            hours = tds[2].get_text(strip=True)
+            if hours == "NULL":
+                hours = "0"
+            elif not hours:
+                logger.warning(
+                    "Skipping malformed course row: %s in %s", title, enum_name
+                )
+                continue
+            hours = int(hours)
+            url = tds[0].find("a")["href"]
+            yield GenEdCourse(title, code, gened, hours, url)
+
+
 def scrape_gened_courselists():
     gened_courses = {}
     for gened in GenEds:
@@ -232,24 +251,8 @@ def scrape_gened_courselists():
             courses_section = soup.find("div", id="textcontainer").find("table")
             if not courses_section:
                 raise ValueError(f"Could not find courses section for {enum_name}.")
-
-            for tr in courses_section.find_all("tr"):
-                tds = tr.find_all("td")
-                if len(tds) == 3:
-                    code = tds[0].get_text(strip=True)
-                    title = tds[1].get_text(strip=True)
-                    hours = tds[2].get_text(strip=True)
-                    if hours == "NULL":
-                        hours = "0"
-                    elif not hours:
-                        logger.warning(
-                            "Skipping malformed course row: %s in %s", title, enum_name
-                        )
-                        continue
-                    hours = int(hours)
-                    url = tds[0].find("a")["href"]
-                    courses.append(GenEdCourse(title, code, gened, hours, url))
-
+            for i in extract_gened_course(courses_section, gened, enum_name):
+                courses.append(i)
         elif enum_name in [i.name for i in DefaultGenEdCodes]:
             # Use default codes if no URL is provided
             for code in DefaultGenEdCodes[enum_name].value:
@@ -263,9 +266,17 @@ def scrape_gened_courselists():
                         details["url"],
                     )
                 )
-        gened_courses[enum_name] = courses
+        elif enum_name == "EXERCISE_FITNESS":
+            url = requests.compat.urljoin(SITE_URL, "general-education/")
+            soup = fetch_and_parse_url(url)
+            courses_section = soup.find("div", id="textcontainer").find_all("table")[1]
+            if not courses_section:
+                raise ValueError(f"Could not find courses section for {enum_name}.")
+            for i in extract_gened_course(courses_section, gened, enum_name):
+                courses.append(i)
+        gened_courses[enum_name] = pd.Series(courses)
 
-    return gened_courses
+    return pd.DataFrame(gened_courses)
 
 
 def course_lookup(code: str) -> dict[str]:
@@ -284,14 +295,12 @@ def course_lookup(code: str) -> dict[str]:
 
 def main():
     url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
-    print(
-        {
-            i: j
-            for i, j in scrape_gened_courselists().items()
-            if i in [i.name for i in DefaultGenEdCodes]
-        }
-    )
     try:
+        geneds = scrape_gened_courselists()
+        geneds.to_pickle(
+            pathlib.Path("scraped_programs").joinpath("General_Education.pkl")
+        )
+        geneds.to_excel("scraped_geneds.xlsx")
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")
         with pd.ExcelWriter("scraped_programs.xlsx") as writer:
