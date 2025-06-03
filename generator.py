@@ -108,16 +108,23 @@ class CourseSequence:
         return all(prog.validate_plan(self.df) for prog in self.programs) and self.gened_validate()
 
     def gened_validate(self):
-        if int(self.df.loc[:, (slice(None), "credit")].sum().sum()) < MIN_REQD_CREDITS:
+        total_credits = int(self.df.loc[:, (slice(None), "credit")].sum().sum())
+        if total_credits < MIN_REQD_CREDITS:
             return False
 
+        gened_dict = self._calculate_gened_credits()
+        return self._validate_gened_requirements(gened_dict)
+
+    def _calculate_gened_credits(self):
         gened_dict = {}
         gened_df = filter_to_list(self.df, CourseKind.GENED_STUB, CourseKind.GENED)
         degree_df = filter_to_list(self.df, CourseKind.DEGREE, CourseKind.ELECTIVE)
+
         for course_row in gened_df.itertuples(index=False):
             gened_dict[course_row.info] = (
                 course_row.credit if GenEds[course_row.info].value.ReqdIsCredit else 1
             ) + gened_dict.get(course_row.info, 0)
+
         for gened in GenEds:
             if gened.value.Reqd > gened_dict.get(gened.name, 0):
                 for item in (
@@ -128,7 +135,11 @@ class CourseSequence:
                     gened_dict[gened.name] = (item.credit if gened.value.ReqdIsCredit else 1) + gened_dict.get(
                         gened.name, 0
                     )
-                if gened.value.Reqd > gened_dict.get(gened.name, 0):
-                    return False  # TODO: add logging
 
-        return True  # TODO: is all checks done? Foundations etc.?
+        return gened_dict
+
+    def _validate_gened_requirements(self, gened_dict):
+        for gened in GenEds:
+            if gened.value.Reqd > gened_dict.get(gened.name, 0):
+                return False  # TODO: Add logging for unmet requirements
+        return True
