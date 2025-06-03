@@ -357,7 +357,6 @@ def main():
         logger.warning("Gened stubs are being ignored, resulting programs will be missing required gened classes")
     try:
         geneds = scrape_gened_courselists()
-        geneds.to_pickle(pathlib.Path("scraped_programs").joinpath("General_Education.pkl"))
         with open(
             pathlib.Path("scraped_programs").joinpath("General_Education.xml"),
             "w",
@@ -372,11 +371,6 @@ def main():
                 if prog.kind == ProgramKind.Bachelor:
                     try:
                         df = scrape_bachelors_courses(prog)
-                        df.to_pickle(
-                            pathlib.Path("scraped_programs").joinpath(
-                                pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".pkl"
-                            )
-                        )
                         df.to_excel(writer, sheet_name=trim_titles(prog.name))
                         with open(
                             pathlib.Path("scraped_programs").joinpath(
