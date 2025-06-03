@@ -10,6 +10,9 @@ class CourseKind(enum.Enum):
     ELECTIVE = "Elective"
     ELECTIVE_STUB = "ElectiveStub"
 
+    def __str__(self):
+        return self.value
+
 
 @dataclasses.dataclass
 class Course:

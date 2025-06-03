@@ -7,6 +7,7 @@ import numpy as np
 import dataclasses
 import requests_cache
 import pathvalidate
+from lxml import etree
 from data_structures import (
     ProgramStub,
     ProgramKind,
@@ -30,7 +31,7 @@ requests_cache.install_cache("schedulebot_cache", expire_after=86400)  # Cache e
 
 EXCEL_DEBUGGING = True  # Trims sheetnames to 31
 
-IGNORE_GENED_STUBS = True  # Geneds automatically added in validation, so ignore stubs in scraping
+IGNORE_GENED_STUBS = False  # True  # Geneds automatically added in validation, so ignore stubs in scraping
 
 
 SITE_URL = "https://coursecatalog.benedictine.edu"
@@ -156,7 +157,7 @@ def scrape_bachelors_courses(prog: ProgramStub):
                     continue
                 hours = int(hours)
                 url = tds[0].find("a")["href"]
-                courses.append(dataclasses.asdict(Course(CourseKind.DEGREE, title, code, hours, url)))
+                courses.append(dataclasses.asdict(Course(CourseKind.DEGREE, title, hours, code, url)))
             elif len(tds) == 2:
                 title = tds[0].get_text(strip=True)
                 if title in GENERIC_ELECTIVE_NAMES:
@@ -212,6 +213,34 @@ def to_debug_view(df):
         col_dict[col] = df[col].apply(split_course)
     new_df = pd.concat(col_dict, axis=1)
     return new_df
+
+
+def multiindex_df_to_column_grouped_xml(df):
+    root = etree.Element("curriculum")
+
+    # Loop through each semester
+    for sem in df.columns.levels[0]:
+        sem_elem = etree.SubElement(root, "semester", name=sem)
+
+        # Loop through each row for this semester
+        for i in df.index:
+            try:
+                values = df[sem].loc[i]
+            except KeyError:
+                continue  # Skip if semester missing from this row
+
+            if pd.isna(values).all():
+                continue  # Skip entirely empty rows
+
+            course_elem = etree.SubElement(sem_elem, "course")
+            for key, val in values.items():
+                if pd.notna(val):  # Skip NaN values
+                    if isinstance(val, float):
+                        val = int(val)
+                    sub_elem = etree.SubElement(course_elem, key)
+                    sub_elem.text = str(val)
+
+    return etree.tostring(root, pretty_print=True).decode()
 
 
 def extract_gened_course(courses_section, gened):
@@ -315,12 +344,14 @@ def main():
                             )
                         )
                         df.to_excel(writer, sheet_name=trim_titles(prog.name))
-                        df.to_xml(
+                        with open(
                             pathlib.Path("scraped_programs").joinpath(
                                 pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".xml"
                             ),
-                            index=False,
-                        )
+                            "w",
+                            encoding="utf-8",
+                        ) as f:
+                            f.write(multiindex_df_to_column_grouped_xml(df))
                     except Exception as e:
                         logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:

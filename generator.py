@@ -1,4 +1,5 @@
 import pandas as pd
+from lxml import etree
 import pathlib
 import pathvalidate
 from data_structures import (
@@ -10,21 +11,85 @@ from data_structures import (
     GenEdStub,
     ElectiveCourse,
 )
+from xml_structures import Course, CourseKind
 
 MIN_REQD_CREDITS = 128
 
 
+def xml_to_multiindex_df(xml_string):
+    root = etree.fromstring(xml_string)
+
+    semester_data = {}  # key: semester, value: list of dicts (courses)
+
+    for semester_elem in root.findall("semester"):
+        sem_name = semester_elem.attrib["name"]
+        courses = []
+
+        for course_elem in semester_elem.findall("course"):
+            course_data = {}
+            for field in course_elem:
+                course_data[field.tag] = field.text
+            course_data["kind"] = CourseKind(course_data["kind"])
+            course_data["credit"] = int(course_data["credit"])
+            courses.append(course_data)
+
+        semester_data[sem_name] = courses
+
+    # Align courses per semester into a consistent row structure
+    max_rows = max(len(courses) for courses in semester_data.values())
+
+    # Pad shorter lists with empty dicts so all semesters have the same row count
+    for sem in semester_data:
+        courses = semester_data[sem]
+        while len(courses) < max_rows:
+            courses.append({})
+        semester_data[sem] = courses
+
+    # Create DataFrame per semester, then concatenate along columns
+    dfs = []
+    for sem, records in semester_data.items():
+        df = pd.DataFrame(records)
+        df.columns = pd.MultiIndex.from_product([[sem], df.columns])
+        dfs.append(df)
+
+    final_df = pd.concat(dfs, axis=1)
+    return final_df
+
+
 class Program:
     def __init__(self, name: str):
-        self.df = pd.read_pickle(
-            pathlib.Path("current_programs").joinpath(pathvalidate.sanitize_filename(name).replace(" ", "_") + ".pkl")
-        )
+        with open(  # FIXME should be current_programs
+            pathlib.Path("scraped_programs").joinpath(pathvalidate.sanitize_filename(name).replace(" ", "_") + ".xml"),
+            "r",
+            encoding="utf-8",
+        ) as file:
+            self.df = xml_to_multiindex_df(file.read())
 
     def get_courses(self) -> pd.DataFrame:
         return self.df.copy()
 
     def validate_plan(self, course_df):
         return None  # TODO
+
+
+def filter_by_kind(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
+    """Filters the DataFrame by the specified course kind."""
+    semesters_list = []
+    for col in df.columns.get_level_values(0).unique():
+        mask = df[(col, "kind")].isin(kinds)
+        semester_cols = df.loc[:, col]
+        semesters_list.append(semester_cols.where(mask))
+    return pd.concat(semesters_list, axis=1)
+
+
+def filter_to_list(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
+    """Filters the DataFrame by the specified course kind."""
+    semesters_list = []
+    for col in df.columns.get_level_values(0).unique():
+        mask = df[(col, "kind")].isin(kinds)
+        semester_cols = df.loc[:, col]
+        semesters_list.append(semester_cols.where(mask))
+    return pd.concat(semesters_list, ignore_index=True).dropna(how="all")
 
 
 class CourseSequence:
@@ -37,28 +102,31 @@ class CourseSequence:
                 self.programs.append(prog)
                 dfs_list.append(prog.get_courses())
         self.df = pd.concat(dfs_list, ignore_index=True) if dfs_list else pd.DataFrame()
-        self.gened_eles = pd.read_pickle(pathlib.Path("current_programs").joinpath("General_Education.pkl"))
+        self.gened_eles = pd.read_pickle(
+            pathlib.Path("scraped_programs").joinpath("General_Education.pkl")
+        )  # FIXME should be current_programs
 
     def validate(self):
         return all(prog.validate_plan(self.df) for prog in self.programs) and self.gened_validate()
 
     def gened_validate(self):
-        if self.df.map(lambda x: x.credit if not pd.isna(x) else 0).sum().sum() < MIN_REQD_CREDITS:
+        if int(self.df.loc[:, (slice(None), "credit")].sum().sum()) < MIN_REQD_CREDITS:
             return False
 
         gened_dict = {}
-        gened_df = self.df[self.df.map(lambda x: isinstance(x, GenEdStub) or isinstance(x, GenEdCourse))]
-        degree_df = self.df[self.df.map(lambda x: isinstance(x, DegreeCourse) or isinstance(x, ElectiveCourse))]
+        gened_df = filter_to_list(self.df, CourseKind.GENED_STUB, CourseKind.GENED)
+        degree_df = filter_to_list(self.df, CourseKind.DEGREE, CourseKind.ELECTIVE)
         # return degree_df  # HACK
-        for item in gened_df.stack().dropna():
-            gened_dict[item.info.name] = (item.credit if item.info.value.ReqdIsCredit else 1) + gened_dict.get(
-                item.info.name, 0
-            )
+        for course_row in gened_df.itertuples(index=False):
+            gened_dict[course_row.info] = (
+                course_row.credit if GenEds[course_row.info].value.ReqdIsCredit else 1
+            ) + gened_dict.get(course_row.info, 0)
         for gened in GenEds:
             if gened.value.Reqd > gened_dict.get(gened.name, 0):
-                gened_codes = set(obj.code for obj in self.gened_eles[gened.name].dropna())
                 for item in (
-                    degree_df[degree_df.map(lambda obj: obj.code in gened_codes, na_action="ignore")].stack().dropna()
+                    degree_df[degree_df["code"].isin(self.gened_eles[(gened.name, "code")])]
+                    .dropna(how="all")
+                    .itertuples(index=False)
                 ):
                     gened_dict[gened.name] = (item.credit if gened.value.ReqdIsCredit else 1) + gened_dict.get(
                         gened.name, 0

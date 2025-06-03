@@ -193,6 +193,9 @@ class GenEds(enum.Enum, metaclass=TypesEnumMeta):
         Url="/general-education/western-perspective/",
     )
 
+    def __str__(self):
+        return self.name
+
 
 if __name__ == "__main__":
     print(GenEds("Principles of Nature"))
