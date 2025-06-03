@@ -68,7 +68,7 @@ class Program:
 
 
 def filter_by_kind(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
-    """Filters the DataFrame by the specified course kind."""
+    """Filters the DataFrame by the specified course kinds."""
     semesters_list = []
     for col in df.columns.get_level_values(0).unique():
         mask = df[(col, "kind")].isin(kinds)
@@ -78,7 +78,7 @@ def filter_by_kind(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
 
 
 def filter_to_list(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
-    """Filters the DataFrame by the specified course kind."""
+    """Filters the DataFrame by the specified course kinds."""
     semesters_list = []
     for col in df.columns.get_level_values(0).unique():
         mask = df[(col, "kind")].isin(kinds)
