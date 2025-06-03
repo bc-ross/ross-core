@@ -96,7 +96,7 @@ def scrape_program_info(url):
     return programs
 
 
-def process_semester_courses(semesters, current_year, current_semester, courses, prog_name):
+def process_semester_courses(semesters, semester_idx, current_year, current_semester, courses, prog_name):
     """Process and save semester courses into the semesters dictionary."""
     if current_year in [
         "Freshman Year",
@@ -104,7 +104,9 @@ def process_semester_courses(semesters, current_year, current_semester, courses,
         "Junior Year",
         "Senior Year",
     ]:
-        semesters[f"{current_year}: {current_semester}"] = pd.DataFrame(courses)
+        semesters[f"semester-{semester_idx}"] = pd.DataFrame(courses)
+        semester_idx += 1
+        return semester_idx
     else:
         logger.warning(
             "Skipping non-standard year: %s for program %s",
@@ -124,16 +126,21 @@ def scrape_bachelors_courses(prog: ProgramStub):
 
     semesters = {}
     current_semester, current_year, courses = None, None, []
+    semester_idx = 1
 
     for tr in courses_section.find_all("tr"):
         if "plangridterm" in tr.get("class", []):  # Semester row
             if current_semester and current_year and courses:
-                process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
+                semester_idx = process_semester_courses(
+                    semesters, semester_idx, current_year, current_semester, courses, prog.name
+                )
                 courses = []
             current_semester = tr.find("th").get_text(strip=True)
         elif "plangridyear" in tr.get("class", []):  # Year row
             if current_semester and current_year and courses:
-                process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
+                semester_idx = process_semester_courses(
+                    semesters, semester_idx, current_year, current_semester, courses, prog.name
+                )
                 courses = []
             current_year = tr.find("th", class_="year").get_text(strip=True)
         elif "plangridsum" not in tr.get("class", []) and "plangridtotal" not in tr.get("class", []):  # Course row
@@ -185,7 +192,9 @@ def scrape_bachelors_courses(prog: ProgramStub):
                         courses.append(dataclasses.asdict(Course(CourseKind.GENED_STUB, title, hours, info=gened)))
 
     if current_semester and current_year and courses:
-        process_semester_courses(semesters, current_year, current_semester, courses, prog.name)
+        semester_idx = process_semester_courses(
+            semesters, semester_idx, current_year, current_semester, courses, prog.name
+        )
 
     return pd.concat(semesters, axis=1)
 
@@ -306,6 +315,12 @@ def main():
                             )
                         )
                         df.to_excel(writer, sheet_name=trim_titles(prog.name))
+                        df.to_xml(
+                            pathlib.Path("scraped_programs").joinpath(
+                                pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".xml"
+                            ),
+                            index=False,
+                        )
                     except Exception as e:
                         logger.error("An error occurred: %s in %s", e, prog.name)
     except Exception as e:
