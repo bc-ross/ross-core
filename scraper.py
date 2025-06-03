@@ -243,6 +243,34 @@ def multiindex_df_to_column_grouped_xml(df):
     return etree.tostring(root, pretty_print=True).decode()
 
 
+def gened_df_to_xml(df):
+    root = etree.Element("requirements")
+
+    # Loop through each semester
+    for sem in df.columns.levels[0]:
+        sem_elem = etree.SubElement(root, "gened", name=sem)
+
+        # Loop through each row for this semester
+        for i in df.index:
+            try:
+                values = df[sem].loc[i]
+            except KeyError:
+                continue  # Skip if semester missing from this row
+
+            if pd.isna(values).all():
+                continue  # Skip entirely empty rows
+
+            course_elem = etree.SubElement(sem_elem, "course")
+            for key, val in values.items():
+                if pd.notna(val):  # Skip NaN values
+                    if isinstance(val, float):
+                        val = int(val)
+                    sub_elem = etree.SubElement(course_elem, key)
+                    sub_elem.text = str(val)
+
+    return etree.tostring(root, pretty_print=True).decode()
+
+
 def extract_gened_course(courses_section, gened):
     for tr in courses_section.find_all("tr"):
         tds = tr.find_all("td")
@@ -330,6 +358,12 @@ def main():
     try:
         geneds = scrape_gened_courselists()
         geneds.to_pickle(pathlib.Path("scraped_programs").joinpath("General_Education.pkl"))
+        with open(
+            pathlib.Path("scraped_programs").joinpath("General_Education.xml"),
+            "w",
+            encoding="utf-8",
+        ) as file:
+            file.write(gened_df_to_xml(geneds))
         geneds.to_excel("scraped_geneds.xlsx")
         programs = scrape_program_info(url)
         logger.info("Programs and their links:")

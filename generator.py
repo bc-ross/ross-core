@@ -56,6 +56,46 @@ def xml_to_multiindex_df(xml_string):
     return final_df
 
 
+def xml_to_gened_df(xml_string):
+    root = etree.fromstring(xml_string)
+
+    semester_data = {}  # key: semester, value: list of dicts (courses)
+
+    for semester_elem in root.findall("gened"):
+        sem_name = semester_elem.attrib["name"]
+        courses = []
+
+        for course_elem in semester_elem.findall("course"):
+            course_data = {}
+            for field in course_elem:
+                course_data[field.tag] = field.text
+            course_data["kind"] = CourseKind(course_data["kind"])
+            course_data["credit"] = int(course_data["credit"])
+            courses.append(course_data)
+
+        semester_data[sem_name] = courses
+
+    # Align courses per semester into a consistent row structure
+    max_rows = max(len(courses) for courses in semester_data.values())
+
+    # Pad shorter lists with empty dicts so all semesters have the same row count
+    for sem in semester_data:
+        courses = semester_data[sem]
+        while len(courses) < max_rows:
+            courses.append({})
+        semester_data[sem] = courses
+
+    # Create DataFrame per semester, then concatenate along columns
+    dfs = []
+    for sem, records in semester_data.items():
+        df = pd.DataFrame(records)
+        df.columns = pd.MultiIndex.from_product([[sem], df.columns])
+        dfs.append(df)
+
+    final_df = pd.concat(dfs, axis=1)
+    return final_df
+
+
 class Program:
     def __init__(self, name: str):
         with open(  # FIXME should be current_programs
@@ -102,9 +142,12 @@ class CourseSequence:
                 self.programs.append(prog)
                 dfs_list.append(prog.get_courses())
         self.df = pd.concat(dfs_list, ignore_index=True) if dfs_list else pd.DataFrame()
-        self.gened_eles = pd.read_pickle(
-            pathlib.Path("scraped_programs").joinpath("General_Education.pkl")
-        )  # FIXME should be current_programs
+        with open(
+            pathlib.Path("scraped_programs").joinpath("General_Education.xml"),  # FIXME should be current_programs
+            "r",
+            encoding="utf-8",
+        ) as file:
+            self.gened_eles = xml_to_gened_df(file.read())
 
     def validate(self):
         return all(prog.validate_plan(self.df) for prog in self.programs) and self.gened_validate()
@@ -116,7 +159,6 @@ class CourseSequence:
         gened_dict = {}
         gened_df = filter_to_list(self.df, CourseKind.GENED_STUB, CourseKind.GENED)
         degree_df = filter_to_list(self.df, CourseKind.DEGREE, CourseKind.ELECTIVE)
-        # return degree_df  # HACK
         for course_row in gened_df.itertuples(index=False):
             gened_dict[course_row.info] = (
                 course_row.credit if GenEds[course_row.info].value.ReqdIsCredit else 1
