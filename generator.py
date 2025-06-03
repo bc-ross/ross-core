@@ -16,7 +16,7 @@ from xml_structures import Course, CourseKind
 MIN_REQD_CREDITS = 128
 
 
-def parse_and_convert_xml(xml_string, root_tag, course_tag):
+def parse_and_convert_xml(xml_string, root_tag):
     """Parses XML and converts it into a MultiIndex DataFrame."""
     root = etree.fromstring(xml_string)
     semester_data = {}
@@ -25,7 +25,7 @@ def parse_and_convert_xml(xml_string, root_tag, course_tag):
         sem_name = semester_elem.attrib["name"]
         courses = []
 
-        for course_elem in semester_elem.findall(course_tag):
+        for course_elem in semester_elem.findall("course"):
             course_data = {field.tag: field.text for field in course_elem}
             course_data["kind"] = CourseKind(course_data["kind"])
             course_data["credit"] = int(course_data["credit"])
@@ -57,7 +57,7 @@ class Program:
             pathvalidate.sanitize_filename(name).replace(" ", "_") + ".xml"
         )
         with open(file_path, "r", encoding="utf-8") as file:
-            self.df = parse_and_convert_xml(file.read(), "semester", "course")
+            self.df = parse_and_convert_xml(file.read(), "semester")
 
     def get_courses(self) -> pd.DataFrame:
         return self.df.copy()
@@ -102,7 +102,7 @@ class CourseSequence:
 
         gened_file_path = pathlib.Path("scraped_programs").joinpath("General_Education.xml")
         with open(gened_file_path, "r", encoding="utf-8") as file:
-            self.gened_eles = parse_and_convert_xml(file.read(), "gened", "course")
+            self.gened_eles = parse_and_convert_xml(file.read(), "gened")
 
     def validate(self):
         return all(prog.validate_plan(self.df) for prog in self.programs) and self.gened_validate()
