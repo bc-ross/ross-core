@@ -88,7 +88,7 @@ def filter_to_list(df: pd.DataFrame, *kinds: CourseKind) -> pd.DataFrame:
 
 
 class CourseSequence:
-    def __init__(self, program_names: list[str] | None = None):
+    def __init__(self, *program_names: str):
         self.programs = []
         dfs_list = []
 

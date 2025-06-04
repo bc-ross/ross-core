@@ -1,26 +1,23 @@
+import dataclasses
 import logging
 import pathlib
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
+
 import numpy as np
-import dataclasses
-import requests_cache
+import pandas as pd
 import pathvalidate
+import requests
+import requests_cache
+from bs4 import BeautifulSoup
 from lxml import etree
+
 from data_structures import (
-    ProgramStub,
-    ProgramKind,
-    DegreeCourse,
-    GenEdCourse,
-    GenEds,
-    ElectiveCourse,
-    ElectiveStub,
-    GenEdStub,
     GENERIC_ELECTIVE_NAMES,
     DefaultGenEdCodes,
+    GenEds,
+    ProgramKind,
+    ProgramStub,
 )
-from xml_structures import CourseKind, Course
+from xml_structures import Course, CourseKind
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s - %(levelname)s - %(message)s")

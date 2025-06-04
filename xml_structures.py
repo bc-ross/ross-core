@@ -1,6 +1,9 @@
-import enum, dataclasses
+from __future__ import annotations
 
-from gened_data import GenEds, GenEdStructure
+import dataclasses
+import enum
+
+from gened_data import GenEds
 
 
 class CourseKind(enum.Enum):

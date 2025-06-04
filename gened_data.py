@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import enum
 import dataclasses
+import enum
 
 GENERIC_ELECTIVE_NAMES = [
     "General Elective (or second major class)",
