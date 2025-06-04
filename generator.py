@@ -1,17 +1,13 @@
-import pandas as pd
-from lxml import etree
 import pathlib
+
+import pandas as pd
 import pathvalidate
+from lxml import etree
+
 from data_structures import (
-    ProgramStub,
-    ProgramKind,
-    DegreeCourse,
-    GenEdCourse,
     GenEds,
-    GenEdStub,
-    ElectiveCourse,
 )
-from xml_structures import Course, CourseKind
+from xml_structures import CourseKind
 
 MIN_REQD_CREDITS = 128
 

@@ -1,6 +1,7 @@
-import enum
 import dataclasses
-from gened_data import GenEds, GENERIC_ELECTIVE_NAMES, DefaultGenEdCodes, GenEdStructure
+import enum
+
+from gened_data import GenEds
 
 
 class ProgramKind(enum.Enum):
