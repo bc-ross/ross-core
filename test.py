@@ -6,94 +6,98 @@ import zipfile
 import mutablezip
 
 
-def embed_file_as_invisible_ole(base_xlsx, file_to_embed, object_name="HiddenObject"):
-    # Normalize name
-    embed_name = pathlib.Path(file_to_embed).name
-    embedded_path = f"xl/embeddings/{embed_name}"
+def embed_hidden_ole(base_xlsx, file_path, sheet="xl/worksheets/sheet1.xml"):
+    file_name = pathlib.Path(file_path).name
+    embed_path = f"xl/embeddings/{file_name}"
 
     with mutablezip.MutableZipFile(base_xlsx, "a", compression=zipfile.ZIP_DEFLATED) as zf:
-        # 1. Write file to embeddings/
-        with open(file_to_embed, "rb") as f:
-            zf.writestr(embedded_path, f.read())
+        # 1. Embed file
+        with open(file_path, "rb") as f:
+            zf.writestr(embed_path, f.read())
 
         # 2. Update [Content_Types].xml
         ct_tree = ET.parse(io.BytesIO(zf.read("[Content_Types].xml")))
         ct_root = ct_tree.getroot()
         ns_ct = "http://schemas.openxmlformats.org/package/2006/content-types"
         ET.register_namespace("", ns_ct)
+        if not any(e.attrib.get("PartName") == "/" + embed_path for e in ct_root.findall(f"{{{ns_ct}}}Override")):
+            ET.SubElement(
+                ct_root,
+                f"{{{ns_ct}}}Override",
+                {
+                    "PartName": "/" + embed_path,
+                    "ContentType": "application/vnd.openxmlformats-officedocument.oleObject",
+                },
+            )
+        out = io.BytesIO()
+        ct_tree.write(out, encoding="utf-8", xml_declaration=True)
+        zf.writestr("[Content_Types].xml", out.getvalue())
 
-        mime_type = "application/octet-stream"
-        if not any(el.attrib.get("PartName") == "/" + embedded_path for el in ct_root.findall(f"{{{ns_ct}}}Override")):
-            ET.SubElement(ct_root, f"{{{ns_ct}}}Override", {"PartName": "/" + embedded_path, "ContentType": mime_type})
-
-        out_ct = io.BytesIO()
-        ct_tree.write(out_ct, xml_declaration=True, encoding="utf-8")
-        zf.writestr("[Content_Types].xml", out_ct.getvalue())
-
-        # 3. Update xl/_rels/workbook.xml.rels
-        rels_path = "xl/_rels/workbook.xml.rels"
+        # 3. Update sheet1.xml.rels to link to the embedded file
+        rels_path = sheet.replace("worksheets/", "worksheets/_rels/") + ".rels"
         if rels_path in zf.namelist():
             rels_tree = ET.parse(io.BytesIO(zf.read(rels_path)))
         else:
             rels_tree = ET.ElementTree(
                 ET.Element("Relationships", xmlns="http://schemas.openxmlformats.org/package/2006/relationships")
             )
-
         rels_root = rels_tree.getroot()
+
         next_rid = 1 + max(
-            (
-                int(rel.attrib["Id"][3:])
-                for rel in rels_root.findall("Relationship")
-                if rel.attrib["Id"].startswith("rId")
-            ),
-            default=0,
+            [int(r.attrib["Id"][3:]) for r in rels_root.findall("Relationship") if r.attrib["Id"].startswith("rId")]
+            or [0]
         )
+        rel_id = f"rId{next_rid}"
         ET.SubElement(
             rels_root,
             "Relationship",
             {
-                "Id": f"rId{next_rid}",
+                "Id": rel_id,
                 "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject",
-                "Target": f"embeddings/{embed_name}",
+                "Target": f"../embeddings/{file_name}",
             },
         )
         rels_out = io.BytesIO()
-        rels_tree.write(rels_out, xml_declaration=True, encoding="utf-8")
+        rels_tree.write(rels_out, encoding="utf-8", xml_declaration=True)
         zf.writestr(rels_path, rels_out.getvalue())
 
-        # 4. Update xl/workbook.xml (refer to object but not draw it)
-        wb_path = "xl/workbook.xml"
-        wb_tree = ET.parse(io.BytesIO(zf.read(wb_path)))
-        wb_root = wb_tree.getroot()
-        ns_wb = {"": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-        ET.register_namespace("", ns_wb[""])
+        # 4. Update sheet1.xml to contain an invisible oleObject
+        sheet_tree = ET.parse(io.BytesIO(zf.read(sheet)))
+        sheet_root = sheet_tree.getroot()
+        ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        ns_r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+        ET.register_namespace("", ns_main)
+        ET.register_namespace("r", ns_r)
 
-        # Add dummy oleObjects section if it doesn't exist
-        ole_tag = ET.Element("oleObjects")
-        ole_object = ET.SubElement(
-            ole_tag,
-            "oleObject",
+        ole_objects = sheet_root.find(f".//{{{ns_main}}}oleObjects")
+        if ole_objects is None:
+            ole_objects = ET.Element(f"{{{ns_main}}}oleObjects")
+            sheet_root.append(ole_objects)
+
+        ET.SubElement(
+            ole_objects,
+            f"{{{ns_main}}}oleObject",
             {
                 "progId": "Package",
-                "r:id": f"rId{next_rid}",
-                "name": object_name,
+                f"{{{ns_r}}}id": rel_id,
                 "dvAspect": "DVASPECT_CONTENT",
                 "objectId": "_123456",
+                "link": "false",
+                "oleUpdate": "Embed",
             },
         )
-        wb_root.append(ole_tag)
 
-        wb_out = io.BytesIO()
-        wb_tree.write(wb_out, xml_declaration=True, encoding="utf-8")
-        zf.writestr(wb_path, wb_out.getvalue())
+        sheet_out = io.BytesIO()
+        sheet_tree.write(sheet_out, encoding="utf-8", xml_declaration=True)
+        zf.writestr(sheet, sheet_out.getvalue())
 
-    print(f"✅ Successfully embedded file {file_to_embed} invisibly in {base_xlsx}")
+    print(f"✅ Embedded {file_name} invisibly in {base_xlsx}")
 
 
 import pandas as pd
 
 pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]}).to_excel("test1.xlsx", index=False)
-# embed_file_as_invisible_ole("test1.xlsx", "test.xml")
+embed_hidden_ole("test1.xlsx", "test.xml")
 
 import shutil
 import subprocess
