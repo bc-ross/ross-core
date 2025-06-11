@@ -5,3 +5,4 @@ scraped_programs
 current_programs
 *.xml
 *.pkl
+*.zip
