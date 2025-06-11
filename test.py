@@ -93,4 +93,11 @@ def embed_file_as_invisible_ole(base_xlsx, file_to_embed, object_name="HiddenObj
 import pandas as pd
 
 pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6]}).to_excel("test1.xlsx", index=False)
-embed_file_as_invisible_ole("test1.xlsx", "test.xml")
+# embed_file_as_invisible_ole("test1.xlsx", "test.xml")
+
+import shutil
+import subprocess
+
+shutil.copyfile("test1.xlsx", "test1.zip")
+subprocess.run(["explorer", "test1.xlsx"])
+subprocess.run(["explorer", "test1.zip"])
