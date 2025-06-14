@@ -6,3 +6,4 @@ current_programs
 *.xml
 *.pkl
 *.zip
+*.db
