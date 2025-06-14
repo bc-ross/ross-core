@@ -7,3 +7,8 @@ current_programs
 *.pkl
 *.zip
 *.db
+
+
+# Added by cargo
+
+/target
