@@ -36,24 +36,20 @@ def extract_ole10native_clean(bin_path, output_file=None):
     file_size = struct.unpack("<I", data[offset : offset + 4])[0]
     offset += 4
 
-    raw_file_data = data[offset : offset + file_size]
+    print(offset)
+    raw_file_data = data[offset:file_size]
 
     # 2) Robustly strip redundant path header, if present
     def peel_extra_header(data):
         # If it starts with backslash or drive letter, likely extra path
         data_alt = data.lstrip(b"\x00")
-        print(data_alt[:5])
         if not (data_alt.startswith(b"\\") or data_alt[1:3] == b":\\"):
-            print("Sadge")
             return data
         # Look for double null to end the path block
-        double_null = data_alt.find(b"\x00\x00")
+        double_null = data_alt.find(b"\x00\x000\x00\x00")
         if double_null == -1:
-            print("Double sadge")
             return data  # fallback: no double null found
-        print(data_alt[double_null : double_null + 8])
-        payload = data_alt[double_null + 2 :]
-        print("Oopsie")
+        payload = data_alt[double_null + 5 :]
         return payload
 
     clean_payload = peel_extra_header(raw_file_data)
