@@ -267,7 +267,30 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
 /// Write a Polars DataFrame to an xlsxwriter worksheet.
 fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     let semesters = df.get_column_names().len() / Course::FIELD_NAMES_AS_ARRAY.len();
-    let keys = ["name", "credit"];
+    let lf = df.clone().lazy();
+    let exprs = (0..semesters)
+        .map(|x| {
+            when(
+                col(&format!("semester-{}_code", x + 1))
+                    .is_not_null()
+                    .and(col(&format!("semester-{}_code", x + 1)).neq(lit(""))),
+            )
+            .then(col(&format!("semester-{}_code", x + 1)))
+            .otherwise(
+                when(
+                    col(&format!("semester-{}_info", x + 1))
+                        .is_not_null()
+                        .and(col(&format!("semester-{}_info", x + 1)).neq(lit(""))),
+                )
+                .then(col(&format!("semester-{}_info", x + 1)))
+                .otherwise(col(&format!("semester-{}_name", x + 1))),
+            )
+            .alias(&format!("semester-{}_prettyname", x + 1))
+        })
+        .collect::<Vec<_>>();
+    let df = lf.with_columns(exprs).collect().unwrap();
+
+    let keys = ["prettyname", "credit"];
     for (col_idx, field) in df
         .select((0..semesters).flat_map(|x| {
             keys.iter()
@@ -285,7 +308,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
         // dbg!(&field);
         let field = field.rechunk();
         // dbg!(field.iter().collect::<Vec<_>>());
-        for (row_idx, val) in field.iter().enumerate() {
+        for (row_idx, val) in field.iter().filter(|x| !x.is_null()).enumerate() {
             // dbg!(&row_idx, &val);
             match val {
                 AnyValue::String(v) => sheet
@@ -300,7 +323,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
                 AnyValue::Float64(v) => sheet
                     .write_number((row_idx + 1) as u32, col_idx as u16, v)
                     .unwrap(),
-                AnyValue::Null => sheet,
+                // AnyValue::Null => sheet,
                 _ => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, &val.to_string())
                     .unwrap(),
@@ -309,3 +332,30 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     }
     Ok(())
 }
+
+// use polars::prelude::*;
+
+// fn main() -> PolarsResult<()> {
+//     // Example DataFrame
+//     let mut df = df! [
+//         "a-code" => &[Some("A123"), None, Some("C789"), None],
+//         "a-kind" => &[Some("X"), Some("Y"), None, Some("Z")]
+//     ]?;
+//     let prefs = ["a"];
+
+//     // Use coalesce to get first non-null from code or kind
+//     let lf = df.lazy();
+//     let exprs = prefs
+//         .iter()
+//         .map(|x| {
+//             when(col(&format!("{}-code", x)).is_not_null())
+//                 .then(col(&format!("{}-code", x)))
+//                 .otherwise(col(&format!("{}-kind", x)))
+//                 .alias(&format!("{}-result", x))
+//         })
+//         .collect::<Vec<_>>();
+//     let new_df = lf.with_columns(exprs);
+//     println!("{}", new_df.collect().unwrap());
+
+//     Ok(())
+// }
