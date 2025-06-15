@@ -1,5 +1,5 @@
 [package]
-name = "xml_to_excel"
+name = "schedulebot"
 version = "0.1.0"
 edition = "2021"
 
