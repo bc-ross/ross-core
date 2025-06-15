@@ -316,10 +316,10 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
         .iter()
         .enumerate()
     {
-        // Write rows
-        // dbg!(&field);
-        let field = field.rechunk();
-        // dbg!(field.iter().collect::<Vec<_>>());
+        let max_len = field.iter().map(|s| s.to_string().len()).max().unwrap_or(0); // FIXME ignores number format
+        sheet.set_column_width(col_idx as u16, max_len as f64 - 2.0)?; // Might have to tweak manual adjustments
+
+        // let field = field.rechunk(); // iter() panics otherwise?
         for (row_idx, val) in field.iter().filter(|x| !x.is_null()).enumerate() {
             // dbg!(&row_idx, &val);
             match val {
