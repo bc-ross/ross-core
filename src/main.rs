@@ -5,7 +5,7 @@ use polars::functions::concat_df_horizontal;
 use polars::prelude::concat as concat_df;
 use polars::prelude::*;
 use quick_xml::de::from_str;
-use rust_xlsxwriter::{Workbook, Worksheet};
+use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -290,15 +290,20 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
         .collect::<Vec<_>>();
     let df = lf.with_columns(exprs).collect().unwrap();
 
+    let mut format = Format::new();
+    format = format.set_align(FormatAlign::Center);
+
+    // Merge a range of cells: first row, first col, last row, last col.
     for col_idx in 0..semesters {
         // Write header
-        sheet
-            .write_string(
-                0,
-                (col_idx * 2) as u16,
-                format!("Semester {}", col_idx + 1),
-            )
-            .unwrap();
+        sheet.merge_range(
+            0,
+            (col_idx * 2) as u16,
+            0,
+            ((col_idx * 2) + 1) as u16,
+            &format!("Semester {}", col_idx + 1),
+            &format,
+        )?;
     }
     let keys = ["prettyname", "credit"];
     for (col_idx, field) in df
