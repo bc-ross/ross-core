@@ -1,11 +1,12 @@
 use anyhow::Result;
 use glob::glob;
+use polars::functions::concat_df_horizontal;
 use polars::prelude::concat as concat_df;
 use polars::prelude::*;
 use quick_xml::de::from_str;
 use rust_xlsxwriter::{Workbook, Worksheet};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 /// Define your CourseKind — adjust as needed.
 #[derive(Debug, Deserialize)]
@@ -53,41 +54,50 @@ struct Root {
 // use std::collections::HashMap;
 
 fn semester_to_dataframe(semester: &Semester) -> DataFrame {
-    let mut columns: HashMap<&str, Vec<String>> = HashMap::new();
+    let mut columns: HashMap<String, Vec<String>> = HashMap::new();
 
     let keys = ["kind", "credit", "name", "code", "url", "info"];
 
     for key in &keys {
-        columns.insert(key, Vec::new());
+        columns.insert(format!("{}_{}", semester.name, key), Vec::new());
     }
 
     for course in &semester.courses {
-        columns.get_mut("kind").unwrap().push(course.kind.clone());
+        // let mut col_name = format!("{}_kind", semester.name);
         columns
-            .get_mut("credit")
+            .get_mut(&format!("{}_kind", semester.name))
+            .unwrap()
+            .push(course.kind.clone());
+        columns
+            .get_mut(&format!("{}_credit", semester.name))
             .unwrap()
             .push(course.credit.to_string());
         columns
-            .get_mut("name")
+            .get_mut(&format!("{}_name", semester.name))
             .unwrap()
             .push(course.name.clone().unwrap_or_default());
         columns
-            .get_mut("code")
+            .get_mut(&format!("{}_code", semester.name))
             .unwrap()
             .push(course.code.clone().unwrap_or_default());
         columns
-            .get_mut("url")
+            .get_mut(&format!("{}_url", semester.name))
             .unwrap()
             .push(course.url.clone().unwrap_or_default());
         columns
-            .get_mut("info")
+            .get_mut(&format!("{}_info", semester.name))
             .unwrap()
             .push(course.info.clone().unwrap_or_default());
     }
 
     let series: Vec<Series> = keys
         .iter()
-        .map(|key| Series::new(*key, &columns[key]))
+        .map(|key| {
+            Series::new(
+                &format!("{}_{}", semester.name, key),
+                &columns[&format!("{}_{}", semester.name, key)],
+            )
+        })
         .collect();
 
     DataFrame::new(series).unwrap()
@@ -104,10 +114,10 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame>
     }
     // dbg!(_root_tag);
     // dbg!(&semester_dfs);
-    let semester_dfs: Vec<LazyFrame> = semester_dfs.into_iter().map(|x| x.lazy()).collect();
+    // let semester_dfs: Vec<LazyFrame> = semester_dfs.into_iter().map(|x| x.lazy()).collect();
 
-    let df = concat_df(&semester_dfs, UnionArgs::default()).unwrap();
-    Ok(df.collect().unwrap())
+    let df = concat_df_horizontal(&semester_dfs).unwrap();
+    Ok(df)
 }
 
 /// Trim title to Excel sheet name max length.
@@ -155,7 +165,37 @@ fn main() -> Result<()> {
     for df in dataframes.values() {
         full_df_list.push(df.clone());
     }
-    let full_df_list: Vec<LazyFrame> = full_df_list.into_iter().map(|x| x.lazy()).collect();
+    // dbg!(&full_df_list);
+
+    // 1️⃣ Find union of all column names
+    let mut all_columns: HashMap<String, DataType> = HashMap::new();
+    for df in &full_df_list {
+        all_columns.extend(
+            df.get_column_names()
+                .iter()
+                .map(|x| (*x).to_owned())
+                .zip(df.dtypes()),
+        );
+    }
+
+    let mut dfs_aligned = vec![];
+
+    // 2️⃣ For each df, add missing columns with nulls
+    for df in full_df_list {
+        let mut df = df;
+        for (col, dtype) in &all_columns {
+            if !df.get_column_names().contains(&col.as_str()) {
+                // Add Series of nulls, same length as df height
+                let s = Series::full_null(col, df.height(), dtype);
+                df.with_column(s)?;
+            }
+        }
+        // Optional: sort columns to match union order
+        let df = df.select(&all_columns.iter().map(|x| x.0).collect::<Vec<_>>())?;
+        dfs_aligned.push(df);
+    }
+
+    let full_df_list: Vec<LazyFrame> = dfs_aligned.into_iter().map(|x| x.lazy()).collect();
     let full_df = concat_df(&full_df_list, UnionArgs::default())
         .unwrap()
         .collect()
