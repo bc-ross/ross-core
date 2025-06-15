@@ -190,9 +190,11 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
         sheet.write_string(0, col_idx as u16, field.name()).unwrap();
 
         // Write rows
-        dbg!(&field);
+        // dbg!(&field);
+        let field = field.rechunk();
+        // dbg!(field.iter().collect::<Vec<_>>());
         for (row_idx, val) in field.iter().enumerate() {
-            dbg!(&row_idx, &val);
+            // dbg!(&row_idx, &val);
             match val {
                 AnyValue::String(v) => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, v)
