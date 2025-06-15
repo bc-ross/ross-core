@@ -10,3 +10,5 @@ serde = { version = "1.0", features = ["derive"] }
 glob = "0.3"
 rust_xlsxwriter = "0.67"
 anyhow = "1.0"
+indexmap = "2.9.0"
+struct-field-names-as-array = "0.3.0"

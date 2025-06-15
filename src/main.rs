@@ -1,5 +1,6 @@
 use anyhow::Result;
 use glob::glob;
+use indexmap::IndexMap;
 use polars::functions::concat_df_horizontal;
 use polars::prelude::concat as concat_df;
 use polars::prelude::*;
@@ -8,6 +9,7 @@ use rust_xlsxwriter::{Workbook, Worksheet};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use struct_field_names_as_array::FieldNamesAsArray;
 /// Define your CourseKind — adjust as needed.
 #[derive(Debug, Deserialize)]
 // #[serde(rename_all = "lowercase")]
@@ -20,14 +22,14 @@ enum CourseKind {
     ElectiveStub,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, FieldNamesAsArray)]
 struct Course {
     kind: String,
     credit: i32,
+    name: Option<String>,
     code: Option<String>,
     url: Option<String>,
     info: Option<String>,
-    name: Option<String>,
 }
 
 /// A semester block in the XML
@@ -50,13 +52,15 @@ struct Root {
 
 // Make separate gened!
 
+// const KEYS: = ["kind", "credit", "name", "code", "url", "info"];
+
 // use polars::prelude::*;
 // use std::collections::HashMap;
 
 fn semester_to_dataframe(semester: &Semester) -> DataFrame {
     let mut columns: HashMap<String, Vec<String>> = HashMap::new();
 
-    let keys = ["kind", "credit", "name", "code", "url", "info"];
+    let keys = Course::FIELD_NAMES_AS_ARRAY; // ["kind", "credit", "name", "code", "url", "info"];
 
     for key in &keys {
         columns.insert(format!("{}_{}", semester.name, key), Vec::new());
@@ -168,7 +172,7 @@ fn main() -> Result<()> {
     // dbg!(&full_df_list);
 
     // 1️⃣ Find union of all column names
-    let mut all_columns: HashMap<String, DataType> = HashMap::new();
+    let mut all_columns: IndexMap<String, DataType> = IndexMap::new();
     for df in &full_df_list {
         all_columns.extend(
             df.get_column_names()
@@ -177,6 +181,7 @@ fn main() -> Result<()> {
                 .zip(df.dtypes()),
         );
     }
+    // all_columns = all_columns.into_iter().sort
 
     let mut dfs_aligned = vec![];
 
@@ -202,7 +207,7 @@ fn main() -> Result<()> {
         .unwrap();
 
     let mut schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
-    write_df_to_sheet(&full_df, &mut schedule_sheet).unwrap();
+    pretty_print_df_to_sheet(&full_df, &mut schedule_sheet).unwrap();
     schedule_sheet.protect();
 
     // Add each sheet + protect + hide
@@ -249,6 +254,53 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
                 AnyValue::Float64(v) => sheet
                     .write_number((row_idx + 1) as u32, col_idx as u16, v)
                     .unwrap(),
+                AnyValue::Null => sheet,
+                _ => sheet
+                    .write_string((row_idx + 1) as u32, col_idx as u16, &val.to_string())
+                    .unwrap(),
+            };
+        }
+    }
+    Ok(())
+}
+
+/// Write a Polars DataFrame to an xlsxwriter worksheet.
+fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
+    let semesters = df.get_column_names().len() / Course::FIELD_NAMES_AS_ARRAY.len();
+    let keys = ["name", "credit"];
+    for (col_idx, field) in df
+        .select((0..semesters).flat_map(|x| {
+            keys.iter()
+                .map(move |y| format!("semester-{}_{}", x + 1, y))
+        }))
+        .unwrap()
+        .get_columns()
+        .iter()
+        .enumerate()
+    {
+        // Write header
+        sheet.write_string(0, col_idx as u16, field.name()).unwrap();
+
+        // Write rows
+        // dbg!(&field);
+        let field = field.rechunk();
+        // dbg!(field.iter().collect::<Vec<_>>());
+        for (row_idx, val) in field.iter().enumerate() {
+            // dbg!(&row_idx, &val);
+            match val {
+                AnyValue::String(v) => sheet
+                    .write_string((row_idx + 1) as u32, col_idx as u16, v)
+                    .unwrap(),
+                AnyValue::Int32(v) => sheet
+                    .write_number((row_idx + 1) as u32, col_idx as u16, v as f64)
+                    .unwrap(),
+                AnyValue::Int64(v) => sheet
+                    .write_number((row_idx + 1) as u32, col_idx as u16, v as f64)
+                    .unwrap(),
+                AnyValue::Float64(v) => sheet
+                    .write_number((row_idx + 1) as u32, col_idx as u16, v)
+                    .unwrap(),
+                AnyValue::Null => sheet,
                 _ => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, &val.to_string())
                     .unwrap(),
