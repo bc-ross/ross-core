@@ -102,8 +102,8 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame>
     for semester in &root.semesters {
         semester_dfs.push(semester_to_dataframe(semester));
     }
-    dbg!(_root_tag);
-    dbg!(&semester_dfs);
+    // dbg!(_root_tag);
+    // dbg!(&semester_dfs);
     let semester_dfs: Vec<LazyFrame> = semester_dfs.into_iter().map(|x| x.lazy()).collect();
 
     let df = concat_df(&semester_dfs, UnionArgs::default()).unwrap();
@@ -190,7 +190,9 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
         sheet.write_string(0, col_idx as u16, field.name()).unwrap();
 
         // Write rows
+        dbg!(&field);
         for (row_idx, val) in field.iter().enumerate() {
+            dbg!(&row_idx, &val);
             match val {
                 AnyValue::String(v) => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, v)
