@@ -290,6 +290,16 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
         .collect::<Vec<_>>();
     let df = lf.with_columns(exprs).collect().unwrap();
 
+    for col_idx in 0..semesters {
+        // Write header
+        sheet
+            .write_string(
+                0,
+                (col_idx * 2) as u16,
+                format!("Semester {}", col_idx + 1),
+            )
+            .unwrap();
+    }
     let keys = ["prettyname", "credit"];
     for (col_idx, field) in df
         .select((0..semesters).flat_map(|x| {
@@ -301,9 +311,6 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
         .iter()
         .enumerate()
     {
-        // Write header
-        sheet.write_string(0, col_idx as u16, field.name()).unwrap();
-
         // Write rows
         // dbg!(&field);
         let field = field.rechunk();
