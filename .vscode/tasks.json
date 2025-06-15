@@ -16,18 +16,27 @@
         {
             "label": "rust: run debug",
             "type": "shell",
-            "command": "${workspaceFolder}/target/debug/your_binary_name",
+            "command": "$(cygpath -u \"${workspaceFolder}/target/debug/schedulebot.exe\")",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
             "presentation": {
-                "echo": true,
+                "echo": false,
                 "reveal": "always",
-                "panel": "shared"
+                "panel": "shared",
+                "clear": false,
+                "revealProblems": "onProblem",
             },
-            "problemMatcher": [],
-            "dependsOn": "rust: cargo build"
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "dependsOn": "rust: cargo build",
+            "options": {
+                "env": {
+                    "RUST_BACKTRACE": "1"
+                }
+            }
         }
     ]
 }

@@ -351,7 +351,7 @@ def course_lookup(code: str) -> dict[str]:
 
 
 def inject(mode="debug"):
-    with zipfile.ZipFile("scraped_programs/temp.zip", "w") as zf:
+    with zipfile.ZipFile("scraped_programs/temp.zip", "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
         for i in glob.glob("scraped_programs/*.xml"):
             zf.write(i, i)
     with open(f"target/{mode}/schedulebot.exe", "ab") as exe, open("scraped_programs/temp.zip", "rb") as zipobj:
