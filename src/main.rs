@@ -163,6 +163,7 @@ fn main() -> Result<()> {
 
     let mut schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
     write_df_to_sheet(&full_df, &mut schedule_sheet).unwrap();
+    schedule_sheet.protect();
 
     // Add each sheet + protect + hide
     for (name, df) in &dataframes {
@@ -173,7 +174,7 @@ fn main() -> Result<()> {
         // let options = ProtectionOptions::new().with_password(password);
         sheet.protect();
 
-        sheet.set_hidden(true);
+        // sheet.set_hidden(true); // FIXME
     }
 
     // Save workbook
