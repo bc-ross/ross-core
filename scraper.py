@@ -1,6 +1,8 @@
 import dataclasses
+import glob
 import logging
 import pathlib
+import zipfile
 
 import numpy as np
 import pandas as pd
@@ -348,6 +350,15 @@ def course_lookup(code: str) -> dict[str]:
     return {"code": course_code, "title": title, "credits": int(credits), "url": url}
 
 
+def inject(mode="debug"):
+    with zipfile.ZipFile("scraped_programs/temp.zip", "w") as zf:
+        for i in glob.glob("scraped_programs/*.xml"):
+            zf.write(i, i)
+    with open(f"target/{mode}/schedulebot.exe", "ab") as exe, open("scraped_programs/temp.zip", "rb") as zipobj:
+        # exe.seek(0, os.SEEK_END)
+        exe.write(zipobj.read())
+
+
 def main():
     url = requests.compat.urljoin(SITE_URL, "/courses-instruction") + "#programstext"
     if IGNORE_GENED_STUBS:
@@ -382,7 +393,9 @@ def main():
     except Exception as e:
         logger.error("An error occurred: %s", e)
         raise
+    # inject()
 
 
 if __name__ == "__main__":
-    main()
+    # main()
+    inject()

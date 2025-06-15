@@ -1,7 +1,7 @@
 import dataclasses
 import enum
 
-from gened_data import GenEds
+from gened_data import GENERIC_ELECTIVE_NAMES, DefaultGenEdCodes, GenEds  # noqa: F401
 
 
 class ProgramKind(enum.Enum):

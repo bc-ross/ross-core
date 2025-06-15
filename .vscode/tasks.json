@@ -3,7 +3,10 @@
     "tasks": [
         {
             "type": "cargo",
-            "command": "build",
+            "command": "post",
+            "args": [
+                "build"
+            ],
             "problemMatcher": [
                 "$rustc"
             ],
@@ -11,21 +14,20 @@
             "label": "rust: cargo build"
         },
         {
-            "type": "cargo",
-            "command": "run",
-            "options": {
-                "env": {
-                    "RUST_BACKTRACE": "1",
-                }
-            },
-            "problemMatcher": [
-                "$rustc"
-            ],
-            "label": "rust: cargo run",
+            "label": "rust: run debug",
+            "type": "shell",
+            "command": "${workspaceFolder}/target/debug/your_binary_name",
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": [],
+            "dependsOn": "rust: cargo build"
         }
     ]
 }
