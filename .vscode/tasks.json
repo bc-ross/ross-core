@@ -9,6 +9,18 @@
             ],
             "group": "build",
             "label": "rust: cargo build"
+        },
+        {
+            "type": "cargo",
+            "command": "run",
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "label": "rust: cargo run",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         }
     ]
 }

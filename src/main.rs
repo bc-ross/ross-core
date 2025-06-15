@@ -47,6 +47,8 @@ struct Root {
     semesters: Vec<Semester>,
 }
 
+// Make separate gened!
+
 // use polars::prelude::*;
 // use std::collections::HashMap;
 
@@ -100,6 +102,8 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame>
     for semester in &root.semesters {
         semester_dfs.push(semester_to_dataframe(semester));
     }
+    dbg!(_root_tag);
+    dbg!(&semester_dfs);
     let semester_dfs: Vec<LazyFrame> = semester_dfs.into_iter().map(|x| x.lazy()).collect();
 
     let df = concat_df(&semester_dfs, UnionArgs::default()).unwrap();
@@ -132,6 +136,10 @@ fn main() -> Result<()> {
         } else {
             "semester"
         };
+
+        if (root_tag == "gened") {
+            continue; // FIXME
+        }
 
         let xml_content = fs::read_to_string(file).unwrap();
         let df = parse_and_convert_xml(&xml_content, root_tag).unwrap();
