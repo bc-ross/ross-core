@@ -1,7 +1,7 @@
 use anyhow::Result;
 use polars::prelude::*;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 use struct_field_names_as_array::FieldNamesAsArray;
 
 use crate::read_self_zip::Course;
@@ -122,7 +122,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     Ok(())
 }
 
-pub fn save_schedule(sched_df: &DataFrame, programs: &HashMap<String, DataFrame>) {
+pub fn save_schedule(fname: &PathBuf, sched_df: &DataFrame, programs: &HashMap<String, DataFrame>) {
     let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
@@ -138,5 +138,5 @@ pub fn save_schedule(sched_df: &DataFrame, programs: &HashMap<String, DataFrame>
         sheet.protect();
     }
 
-    workbook.save("test_hidden2.xlsx").unwrap();
+    workbook.save(fname).unwrap();
 }

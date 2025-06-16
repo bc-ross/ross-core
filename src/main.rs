@@ -1,7 +1,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use polars::prelude::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, path::Path};
 
 mod read_self_zip;
 mod write_excel_file;
@@ -48,10 +48,12 @@ fn generate_schedule_df(dfs: &HashMap<String, DataFrame>) -> DataFrame {
 }
 
 fn main() -> Result<()> {
+    const FNAME: &str = "schedulebot_test.xlsx";
+
     let dataframes = load_programs();
     let full_df = generate_schedule_df(&dataframes);
-    save_schedule(&full_df, &dataframes);
+    save_schedule(&Path::new(FNAME).to_path_buf(), &full_df, &dataframes);
 
-    println!("Excel file created: test_hidden2.xlsx");
+    println!("Excel file created: {}", FNAME);
     Ok(())
 }
