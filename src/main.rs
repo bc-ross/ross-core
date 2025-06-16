@@ -130,11 +130,8 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     Ok(())
 }
 
-fn main() -> Result<()> {
-    let dataframes = load_programs();
-
-    let mut workbook = Workbook::new();
-    let full_df_list: Vec<DataFrame> = dataframes.values().cloned().collect();
+fn generate_schedule_df(dfs: &HashMap<String, DataFrame>) -> DataFrame {
+    let full_df_list: Vec<DataFrame> = dfs.values().cloned().collect();
 
     let mut all_columns: IndexMap<String, DataType> = IndexMap::new();
     for df in &full_df_list {
@@ -160,7 +157,7 @@ fn main() -> Result<()> {
         })
         .collect();
 
-    let full_df = concat(
+    concat(
         dfs_aligned
             .into_iter()
             .map(|x| x.lazy())
@@ -169,7 +166,14 @@ fn main() -> Result<()> {
     )
     .unwrap()
     .collect()
-    .unwrap();
+    .unwrap()
+}
+
+fn main() -> Result<()> {
+    let dataframes = load_programs();
+    let full_df = generate_schedule_df(&dataframes);
+
+    let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
     pretty_print_df_to_sheet(&full_df, schedule_sheet).unwrap();
