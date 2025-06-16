@@ -1,5 +1,4 @@
 use anyhow::Result;
-use glob::glob;
 use indexmap::IndexMap;
 use polars::functions::concat_df_horizontal;
 use polars::prelude::concat as concat_df;
@@ -8,17 +7,12 @@ use quick_xml::de::from_str;
 use rc_zip_sync::ReadZip;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
-use std::io;
-use std::io::{Cursor, Read};
-use std::{env, fs, path};
+use std::{env, path};
 use struct_field_names_as_array::FieldNamesAsArray;
-use tempfile::tempdir;
 
-/// Define your CourseKind — adjust as needed.
 #[derive(Debug, Deserialize)]
-// #[serde(rename_all = "lowercase")]
 #[serde(rename_all = "PascalCase")]
 enum CourseKind {
     Degree,
@@ -38,7 +32,6 @@ struct Course {
     info: Option<String>,
 }
 
-/// A semester block in the XML
 #[derive(Debug, Deserialize)]
 struct Semester {
     #[serde(rename = "@name")]
@@ -48,7 +41,6 @@ struct Semester {
     courses: Vec<Course>,
 }
 
-/// Root XML container
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
 struct Root {
@@ -58,22 +50,16 @@ struct Root {
 
 // Make separate gened!
 
-// const KEYS: = ["kind", "credit", "name", "code", "url", "info"];
-
-// use polars::prelude::*;
-// use std::collections::HashMap;
-
 fn semester_to_dataframe(semester: &Semester) -> DataFrame {
     let mut columns: HashMap<String, Vec<String>> = HashMap::new();
 
-    let keys = Course::FIELD_NAMES_AS_ARRAY; // ["kind", "credit", "name", "code", "url", "info"];
+    let keys = Course::FIELD_NAMES_AS_ARRAY;
 
     for key in &keys {
         columns.insert(format!("{}_{}", semester.name, key), Vec::new());
     }
 
     for course in &semester.courses {
-        // let mut col_name = format!("{}_kind", semester.name);
         columns
             .get_mut(&format!("{}_kind", semester.name))
             .unwrap()
@@ -113,7 +99,6 @@ fn semester_to_dataframe(semester: &Semester) -> DataFrame {
     DataFrame::new(series).unwrap()
 }
 
-/// Parses XML and builds a Polars DataFrame for this file
 fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame> {
     let root: Root = from_str(xml_string).unwrap();
 
@@ -122,15 +107,11 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame>
     for semester in &root.semesters {
         semester_dfs.push(semester_to_dataframe(semester));
     }
-    // dbg!(_root_tag);
-    // dbg!(&semester_dfs);
-    // let semester_dfs: Vec<LazyFrame> = semester_dfs.into_iter().map(|x| x.lazy()).collect();
 
     let df = concat_df_horizontal(&semester_dfs).unwrap();
     Ok(df)
 }
 
-/// Trim title to Excel sheet name max length.
 fn trim_titles(s: &str) -> String {
     if s.len() > 31 {
         s[..31].to_string()
@@ -140,8 +121,6 @@ fn trim_titles(s: &str) -> String {
 }
 
 fn main() -> Result<()> {
-    let password = "plzdontgraduate";
-    let extract_dir = tempdir().unwrap();
     let zip_path = env::current_exe().unwrap();
 
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
@@ -165,7 +144,7 @@ fn main() -> Result<()> {
             "semester"
         };
 
-        if (root_tag == "gened") {
+        if root_tag == "gened" {
             continue; // FIXME
         }
         let xml_content = String::from_utf8_lossy(&contents);
@@ -174,17 +153,12 @@ fn main() -> Result<()> {
         dataframes.insert(trim_titles(&file_stem), df);
     }
 
-    // Create Excel workbook
     let mut workbook = Workbook::new();
-
-    // Create combined "Schedule" sheet
     let mut full_df_list = Vec::new();
     for df in dataframes.values() {
         full_df_list.push(df.clone());
     }
-    // dbg!(&full_df_list);
 
-    // 1️⃣ Find union of all column names
     let mut all_columns: IndexMap<String, DataType> = IndexMap::new();
     for df in &full_df_list {
         all_columns.extend(
@@ -194,11 +168,9 @@ fn main() -> Result<()> {
                 .zip(df.dtypes()),
         );
     }
-    // all_columns = all_columns.into_iter().sort
 
     let mut dfs_aligned = vec![];
 
-    // 2️⃣ For each df, add missing columns with nulls
     for df in full_df_list {
         let mut df = df;
         for (col, dtype) in &all_columns {
@@ -208,9 +180,9 @@ fn main() -> Result<()> {
                 df.with_column(s).unwrap();
             }
         }
-        // Optional: sort columns to match union order
+        // Sort columns to match union order
         let df = df
-            .select(&all_columns.iter().map(|x| x.0).collect::<Vec<_>>())
+            .select(all_columns.iter().map(|x| x.0).collect::<Vec<_>>())
             .unwrap();
         dfs_aligned.push(df);
     }
@@ -221,17 +193,13 @@ fn main() -> Result<()> {
         .collect()
         .unwrap();
 
-    let mut schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
-    pretty_print_df_to_sheet(&full_df, &mut schedule_sheet).unwrap();
+    let schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();
+    pretty_print_df_to_sheet(&full_df, schedule_sheet).unwrap();
     schedule_sheet.protect();
 
-    // Add each sheet + protect + hide
     for (name, df) in &dataframes {
-        let mut sheet = workbook.add_worksheet().set_name(name).unwrap();
-
-        write_df_to_sheet(df, &mut sheet).unwrap();
-
-        // let options = ProtectionOptions::new().with_password(password);
+        let sheet = workbook.add_worksheet().set_name(name).unwrap();
+        write_df_to_sheet(df, sheet).unwrap();
         sheet.protect();
 
         // sheet.set_hidden(true); // FIXME
@@ -244,18 +212,14 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-/// Write a Polars DataFrame to an xlsxwriter worksheet.
 fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     for (col_idx, field) in df.get_columns().iter().enumerate() {
         // Write header
         sheet.write_string(0, col_idx as u16, field.name()).unwrap();
 
-        // Write rows
-        // dbg!(&field);
         let field = field.rechunk();
         // dbg!(field.iter().collect::<Vec<_>>());
         for (row_idx, val) in field.iter().enumerate() {
-            // dbg!(&row_idx, &val);
             match val {
                 AnyValue::String(v) => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, v)
@@ -271,7 +235,7 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
                     .unwrap(),
                 AnyValue::Null => sheet,
                 _ => sheet
-                    .write_string((row_idx + 1) as u32, col_idx as u16, &val.to_string())
+                    .write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())
                     .unwrap(),
             };
         }
@@ -279,7 +243,6 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     Ok(())
 }
 
-/// Write a Polars DataFrame to an xlsxwriter worksheet.
 fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     let semesters = df.get_column_names().len() / Course::FIELD_NAMES_AS_ARRAY.len();
     let lf = df.clone().lazy();
@@ -308,7 +271,6 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     let mut format = Format::new();
     format = format.set_align(FormatAlign::Center);
 
-    // Merge a range of cells: first row, first col, last row, last col.
     for col_idx in 0..semesters {
         // Write header
         sheet
@@ -340,7 +302,6 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
 
         // let field = field.rechunk(); // iter() panics otherwise.unwrap()
         for (row_idx, val) in field.iter().filter(|x| !x.is_null()).enumerate() {
-            // dbg!(&row_idx, &val);
             match val {
                 AnyValue::String(v) => sheet
                     .write_string((row_idx + 1) as u32, col_idx as u16, v)
@@ -356,53 +317,10 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
                     .unwrap(),
                 // AnyValue::Null => sheet,
                 _ => sheet
-                    .write_string((row_idx + 1) as u32, col_idx as u16, &val.to_string())
+                    .write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())
                     .unwrap(),
             };
         }
     }
     Ok(())
 }
-
-// use polars::prelude::*;
-
-// fn main() -> PolarsResult<()> {
-//     // Example DataFrame
-//     let mut df = df! [
-//         "a-code" => &[Some("A123"), None, Some("C789"), None],
-//         "a-kind" => &[Some("X"), Some("Y"), None, Some("Z")]
-//     ].unwrap();
-//     let prefs = ["a"];
-
-//     // Use coalesce to get first non-null from code or kind
-//     let lf = df.lazy();
-//     let exprs = prefs
-//         .iter()
-//         .map(|x| {
-//             when(col(&format!("{}-code", x)).is_not_null())
-//                 .then(col(&format!("{}-code", x)))
-//                 .otherwise(col(&format!("{}-kind", x)))
-//                 .alias(&format!("{}-result", x))
-//         })
-//         .collect::<Vec<_>>();
-//     let new_df = lf.with_columns(exprs);
-//     println!("{}", new_df.collect().unwrap());
-
-//     Ok(())
-// }
-
-// fn main() -> io::Result<()> {
-//     // Example: read a file with junk + ZIP
-//     let data = fs::read(std::env::current_exe().unwrap())?;
-//     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
-//     for (key, value) in scan_zip_entries(&data) {
-//         hashmap_from_tuples.insert(key, value);
-//     }
-
-//     for entry in scan_zip_entries(&data) {
-//         let (name, contents) = entry?;
-//         println!("Found: {} ({} bytes)", name, contents.len());
-//     }
-
-//     Ok(())
-// }
