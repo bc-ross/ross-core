@@ -5,6 +5,7 @@ use polars::functions::concat_df_horizontal;
 use polars::prelude::concat as concat_df;
 use polars::prelude::*;
 use quick_xml::de::from_str;
+use rc_zip_sync::ReadZip;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -14,7 +15,7 @@ use std::io::{Cursor, Read};
 use std::{env, fs, path};
 use struct_field_names_as_array::FieldNamesAsArray;
 use tempfile::tempdir;
-use zip_extract::extract as extract_zip;
+
 /// Define your CourseKind — adjust as needed.
 #[derive(Debug, Deserialize)]
 // #[serde(rename_all = "lowercase")]
@@ -141,32 +142,23 @@ fn trim_titles(s: &str) -> String {
 fn main() -> Result<()> {
     let password = "plzdontgraduate";
     let extract_dir = tempdir().unwrap();
-    dbg!(&extract_dir);
     let zip_path = env::current_exe().unwrap();
 
-    let mut zip_buf = Vec::new();
-    File::open(zip_path)
-        .unwrap()
-        .read_to_end(&mut zip_buf)
-        .unwrap();
-    extract_zip(Cursor::new(zip_buf), extract_dir.path(), true).unwrap();
-
-    let xml_files: Vec<_> = glob(
-        extract_dir
-            .path()
-            .join("scraped_programs/*.xml")
-            .as_os_str()
-            .to_string_lossy()
-            .as_ref(),
-    )
-    .unwrap()
-    .filter_map(Result::ok)
-    .collect();
+    let mut files: HashMap<String, Vec<u8>> = HashMap::new();
+    {
+        let zipf = File::open(zip_path).unwrap();
+        for entry in zipf.read_zip().unwrap().entries() {
+            files.insert(entry.name.clone(), entry.bytes().unwrap());
+        }
+    }
 
     let mut dataframes: HashMap<String, DataFrame> = HashMap::new();
 
-    for file in &xml_files {
-        let file_stem = file.file_stem().unwrap().to_string_lossy();
+    for (file, contents) in files {
+        let file_stem = path::Path::new(&file)
+            .file_stem()
+            .unwrap()
+            .to_string_lossy();
         let root_tag = if file_stem == "General_Education" {
             "gened"
         } else {
@@ -176,8 +168,7 @@ fn main() -> Result<()> {
         if (root_tag == "gened") {
             continue; // FIXME
         }
-
-        let xml_content = fs::read_to_string(file).unwrap();
+        let xml_content = String::from_utf8_lossy(&contents);
         let df = parse_and_convert_xml(&xml_content, root_tag).unwrap();
 
         dataframes.insert(trim_titles(&file_stem), df);
