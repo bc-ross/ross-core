@@ -1,4 +1,3 @@
-use ::zip::ZipArchive;
 use anyhow::Result;
 use glob::glob;
 use indexmap::IndexMap;
@@ -9,12 +8,13 @@ use quick_xml::de::from_str;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::fs::File;
+use std::io;
 use std::io::{Cursor, Read};
 use std::{env, fs, path};
 use struct_field_names_as_array::FieldNamesAsArray;
-mod clutter_zip;
-use clutter_zip::scan_zip_entries;
-use std::io;
+use tempfile::tempdir;
+use zip_extract::extract as extract_zip;
 /// Define your CourseKind — adjust as needed.
 #[derive(Debug, Deserialize)]
 // #[serde(rename_all = "lowercase")]
@@ -138,47 +138,27 @@ fn trim_titles(s: &str) -> String {
     }
 }
 
-/// Scan backward for the EOCD signature.
-fn extract_zip_slice_from_end(data: &[u8]) -> Option<&[u8]> {
-    let sig = [0x50, 0x4B, 0x05, 0x06];
-    // The EOCD can have a variable comment, so we search a window at the end.
-    let tail = &data[data.len().saturating_sub(66000)..]; // ZIP spec: max comment length is 64 KB
-    tail.windows(4).rev().position(|w| w == sig).map(|pos| {
-        let eocd_offset = tail.len() - pos - 4;
-        &data[..(data.len() - tail.len() + eocd_offset + 22)] // 22 = min EOCD size
-    })
-}
-
 fn main() -> Result<()> {
     let password = "plzdontgraduate";
-
+    let extract_dir = tempdir().unwrap();
     let zip_path = env::current_exe().unwrap();
-    dbg!(&zip_path);
-    // let data = fs::read(zip_path).unwrap();
-    // let zip_data = extract_zip_slice_from_end(&data).expect("No ZIP found!");
-    // let reader = Cursor::new(zip_data);
-    // let mut zip = ZipArchive::new(reader).unwrap();
-    // let xml_files: Vec<_> = zip
-    //     .file_names()
-    //     .filter(|x| x.ends_with(".xml"))
-    //     .map(|x| x.to_owned())
-    //     .collect();
 
-    let data = fs::read(zip_path)?;
-    let mut files: HashMap<String, Vec<u8>> = HashMap::new();
-    for entry in scan_zip_entries(&data) {
-        let (key, value) = entry.unwrap();
-        dbg!(&key);
-        files.insert(key, value);
-    }
+    let mut zip_buf = Vec::new();
+    File::open(zip_path)
+        .unwrap()
+        .read_to_end(&mut zip_buf)
+        .unwrap();
+    extract_zip(Cursor::new(zip_buf), extract_dir.path(), true).unwrap();
+
+    let xml_files: Vec<_> = glob("scraped_programs/*.xml")
+        .unwrap()
+        .filter_map(Result::ok)
+        .collect();
 
     let mut dataframes: HashMap<String, DataFrame> = HashMap::new();
 
-    for (file, contents) in files {
-        let file_stem = path::Path::new(&file)
-            .file_stem()
-            .unwrap()
-            .to_string_lossy();
+    for file in &xml_files {
+        let file_stem = file.file_stem().unwrap().to_string_lossy();
         let root_tag = if file_stem == "General_Education" {
             "gened"
         } else {
@@ -188,19 +168,12 @@ fn main() -> Result<()> {
         if (root_tag == "gened") {
             continue; // FIXME
         }
-        let xml_content = String::from_utf8_lossy(&contents);
-        // let mut xml_content: String = String::new();
-        // zip.by_name(&file)
-        //     .unwrap()
-        //     .read_to_string(&mut xml_content)
-        //     .unwrap();
-        // let xml_content = fs::read_to_string(file).unwrap();
+
+        let xml_content = fs::read_to_string(file).unwrap();
         let df = parse_and_convert_xml(&xml_content, root_tag).unwrap();
 
         dataframes.insert(trim_titles(&file_stem), df);
     }
-
-    drop(data);
 
     // Create Excel workbook
     let mut workbook = Workbook::new();
