@@ -141,6 +141,7 @@ fn trim_titles(s: &str) -> String {
 fn main() -> Result<()> {
     let password = "plzdontgraduate";
     let extract_dir = tempdir().unwrap();
+    dbg!(&extract_dir);
     let zip_path = env::current_exe().unwrap();
 
     let mut zip_buf = Vec::new();
@@ -150,10 +151,17 @@ fn main() -> Result<()> {
         .unwrap();
     extract_zip(Cursor::new(zip_buf), extract_dir.path(), true).unwrap();
 
-    let xml_files: Vec<_> = glob("scraped_programs/*.xml")
-        .unwrap()
-        .filter_map(Result::ok)
-        .collect();
+    let xml_files: Vec<_> = glob(
+        extract_dir
+            .path()
+            .join("scraped_programs/*.xml")
+            .as_os_str()
+            .to_string_lossy()
+            .as_ref(),
+    )
+    .unwrap()
+    .filter_map(Result::ok)
+    .collect();
 
     let mut dataframes: HashMap<String, DataFrame> = HashMap::new();
 
