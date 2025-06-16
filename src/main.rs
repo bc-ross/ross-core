@@ -1,15 +1,7 @@
 use anyhow::Result;
 use indexmap::IndexMap;
-use polars::functions::concat_df_horizontal;
 use polars::prelude::*;
-use quick_xml::de::from_str;
-use rc_zip_sync::ReadZip;
-use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
-use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::File;
-use std::{env, path};
-use struct_field_names_as_array::FieldNamesAsArray;
 
 mod read_self_zip;
 mod write_excel_file;

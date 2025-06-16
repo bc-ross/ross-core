@@ -1,14 +1,7 @@
 use anyhow::Result;
-use indexmap::IndexMap;
-use polars::functions::concat_df_horizontal;
 use polars::prelude::*;
-use quick_xml::de::from_str;
-use rc_zip_sync::ReadZip;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
-use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::File;
-use std::{env, path};
 use struct_field_names_as_array::FieldNamesAsArray;
 
 use crate::read_self_zip::Course;
@@ -129,7 +122,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     Ok(())
 }
 
-pub fn save_schedule(sched_df: &DataFrame, programs: &HashMap<String, DataFrame>) -> () {
+pub fn save_schedule(sched_df: &DataFrame, programs: &HashMap<String, DataFrame>) {
     let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule").unwrap();

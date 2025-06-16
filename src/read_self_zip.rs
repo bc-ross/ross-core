@@ -1,11 +1,8 @@
 use anyhow::Result;
-use indexmap::IndexMap;
 use polars::functions::concat_df_horizontal;
-use polars::prelude::*;
 use polars::prelude::*;
 use quick_xml::de::from_str;
 use rc_zip_sync::ReadZip;
-use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
@@ -136,5 +133,5 @@ pub fn load_programs() -> HashMap<String, DataFrame> {
         let df = parse_and_convert_xml(&xml_content, root_tag).unwrap();
         dataframes.insert(file_stem.to_string(), df);
     }
-    return dataframes;
+    dataframes
 }
