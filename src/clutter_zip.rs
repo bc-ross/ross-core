@@ -48,15 +48,8 @@ impl<'a> Iterator for ZipEntryIterator<'a> {
             )));
         }
 
-        let file_name = match String::from_utf8(self.data[name_start..name_end].to_vec()) {
-            Ok(s) => s,
-            Err(_) => {
-                return Some(Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid UTF-8 filename",
-                )))
-            }
-        };
+        // Robust, safe fallback:
+        let file_name = String::from_utf8_lossy(&self.data[name_start..name_end]).into_owned();
 
         let data_start = name_end + extra_len;
 
