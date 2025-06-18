@@ -10,7 +10,7 @@ use std::fs::File;
 use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone, Eq, Hash, PartialEq)]
 #[serde(rename_all = "PascalCase")]
 pub enum CourseKind {
     Degree,
@@ -20,9 +20,15 @@ pub enum CourseKind {
     ElectiveStub,
 }
 
+impl std::fmt::Display for CourseKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!("{:?}", self))
+    }
+}
+
 #[derive(Debug, Deserialize, FieldNamesAsArray)]
 pub struct Course {
-    kind: String,
+    kind: CourseKind,
     credit: i32,
     name: Option<String>,
     code: Option<String>,
@@ -46,47 +52,59 @@ struct Root {
     semesters: Vec<Semester>,
 }
 
-fn semester_to_dataframe(semester: &Semester) -> DataFrame {
+fn semester_to_dataframe(semester: Semester) -> DataFrame {
+    let Semester {
+        name: sem_name,
+        courses,
+    } = semester;
     let mut columns: HashMap<String, Vec<String>> = HashMap::new();
     let keys = Course::FIELD_NAMES_AS_ARRAY;
 
     for key in &keys {
-        columns.insert(format!("{}_{}", semester.name, key), Vec::new());
+        columns.insert(format!("{}_{}", sem_name, key), Vec::new());
     }
 
-    for course in &semester.courses {
+    for course in courses {
+        let Course {
+            kind,
+            credit,
+            name,
+            code,
+            url,
+            info,
+        } = course;
         columns
-            .get_mut(&format!("{}_kind", semester.name))
+            .get_mut(&format!("{}_kind", sem_name))
             .unwrap()
-            .push(course.kind.clone());
+            .push(kind.to_string());
         columns
-            .get_mut(&format!("{}_credit", semester.name))
+            .get_mut(&format!("{}_credit", sem_name))
             .unwrap()
-            .push(course.credit.to_string());
+            .push(credit.to_string());
         columns
-            .get_mut(&format!("{}_name", semester.name))
+            .get_mut(&format!("{}_name", sem_name))
             .unwrap()
-            .push(course.name.clone().unwrap_or_default());
+            .push(name.unwrap_or_default());
         columns
-            .get_mut(&format!("{}_code", semester.name))
+            .get_mut(&format!("{}_code", sem_name))
             .unwrap()
-            .push(course.code.clone().unwrap_or_default());
+            .push(code.unwrap_or_default());
         columns
-            .get_mut(&format!("{}_url", semester.name))
+            .get_mut(&format!("{}_url", sem_name))
             .unwrap()
-            .push(course.url.clone().unwrap_or_default());
+            .push(url.unwrap_or_default());
         columns
-            .get_mut(&format!("{}_info", semester.name))
+            .get_mut(&format!("{}_info", sem_name))
             .unwrap()
-            .push(course.info.clone().unwrap_or_default());
+            .push(info.unwrap_or_default());
     }
 
     let series: Vec<Series> = keys
         .iter()
         .map(|key| {
             Series::new(
-                &format!("{}_{}", semester.name, key),
-                &columns[&format!("{}_{}", semester.name, key)],
+                &format!("{}_{}", sem_name, key),
+                &columns[&format!("{}_{}", sem_name, key)],
             )
         })
         .collect();
@@ -96,7 +114,11 @@ fn semester_to_dataframe(semester: &Semester) -> DataFrame {
 
 fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame> {
     let root: Root = from_str(xml_string).unwrap();
-    let semester_dfs: Vec<DataFrame> = root.semesters.iter().map(semester_to_dataframe).collect();
+    let semester_dfs: Vec<DataFrame> = root
+        .semesters
+        .into_iter()
+        .map(semester_to_dataframe)
+        .collect();
 
     Ok(concat_df_horizontal(&semester_dfs).unwrap())
 }
