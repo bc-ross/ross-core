@@ -3,8 +3,10 @@ use indexmap::IndexMap;
 use polars::prelude::*;
 use std::{collections::HashMap, path::Path};
 
+mod read_excel_file;
 mod read_self_zip;
 mod write_excel_file;
+use read_excel_file::read_file;
 use read_self_zip::load_programs;
 use write_excel_file::save_schedule;
 
@@ -55,5 +57,8 @@ fn main() -> Result<()> {
     save_schedule(&Path::new(FNAME).to_path_buf(), &full_df, &dataframes);
 
     println!("Excel file created: {}", FNAME);
+
+    let new_df = read_file(&Path::new(FNAME).to_path_buf()).unwrap();
+    println!("Read file: {}", FNAME);
     Ok(())
 }

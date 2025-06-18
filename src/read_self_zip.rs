@@ -12,7 +12,7 @@ use struct_field_names_as_array::FieldNamesAsArray;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-enum CourseKind {
+pub enum CourseKind {
     Degree,
     GenEd,
     GenEdStub,
