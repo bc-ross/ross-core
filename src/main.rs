@@ -54,14 +54,14 @@ fn main() -> Result<()> {
 
     let dataframes = load_programs()?;
     let full_df = generate_schedule_df(&dataframes);
-    save_schedule(&Path::new(FNAME).to_path_buf(), &full_df, &dataframes);
+    save_schedule(&Path::new(FNAME).to_path_buf(), &full_df, &dataframes)?;
 
     println!("Excel file created: {}", FNAME);
 
     let new_df = read_file(&Path::new(FNAME).to_path_buf()).unwrap();
     println!("Read file: {}", FNAME);
 
-    save_schedule(&Path::new("output.xlsx").to_path_buf(), &full_df, &new_df);
+    save_schedule(&Path::new("output.xlsx").to_path_buf(), &full_df, &new_df)?;
 
     println!("Excel file created: output.xlsx");
     Ok(())
