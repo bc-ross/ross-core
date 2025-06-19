@@ -7,11 +7,7 @@ use struct_field_names_as_array::FieldNamesAsArray;
 use crate::read_self_zip::Course;
 
 fn trim_titles(s: &str) -> String {
-    if s.len() > 31 {
-        s[..31].to_string()
-    } else {
-        s.to_string()
-    }
+    s.chars().take(31).collect()
 }
 
 fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
@@ -82,16 +78,15 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     }
 
     let keys = ["prettyname", "credit"];
-    for (col_idx, field) in df
-        .select((0..semesters).flat_map(|x| {
+    let selected_columns = (0..semesters)
+        .flat_map(|x| {
             keys.iter()
                 .map(move |y| format!("semester-{}_{}", x + 1, y))
-        }))
-        .unwrap()
-        .get_columns()
-        .iter()
-        .enumerate()
-    {
+        })
+        .collect::<Vec<_>>();
+    let selected_df = df.select(selected_columns)?;
+
+    for (col_idx, field) in selected_df.get_columns().iter().enumerate() {
         let max_len = field.iter().map(|s| s.to_string().len()).max().unwrap_or(0);
         sheet.set_column_width(col_idx as u16, max_len as f64 - 2.0)?;
 
@@ -109,11 +104,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
                 AnyValue::Float64(v) => {
                     sheet.write_number((row_idx + 1) as u32, col_idx as u16, v)?
                 }
-                _ => sheet.write_string(
-                    (row_idx + 1) as u32,
-                    col_idx as u16,
-                    dbg!(val).to_string(),
-                )?,
+                _ => sheet.write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())?,
             };
         }
     }
