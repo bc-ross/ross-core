@@ -34,7 +34,7 @@ impl std::fmt::Display for CourseKind {
 
 impl CourseKind {
     #[inline]
-    pub fn as_u32(self) -> u32 {
+    pub fn into_u32(self) -> u32 {
         self as u32
     }
 
@@ -76,7 +76,7 @@ impl CourseColumns {
     }
 
     fn push(&mut self, x: Course) -> anyhow::Result<()> {
-        self.kind.push(x.kind.as_u32());
+        self.kind.push(x.kind.into_u32());
         self.credit.push(x.credit);
         self.name.push(x.name);
         self.code.push(x.code);
@@ -85,7 +85,7 @@ impl CourseColumns {
         Ok(())
     }
 
-    fn to_df(self, sem_name: &str) -> anyhow::Result<DataFrame> {
+    fn into_df(self, sem_name: &str) -> anyhow::Result<DataFrame> {
         Ok(DataFrame::new(vec![
             Series::new(&format!("{}_kind", sem_name), self.kind),
             Series::new(&format!("{}_credit", sem_name), self.credit),
@@ -123,7 +123,7 @@ fn semester_to_dataframe(semester: Semester) -> DataFrame {
     for course in courses {
         cols.push(course).unwrap();
     }
-    cols.to_df(&sem_name).unwrap()
+    cols.into_df(&sem_name).unwrap()
 }
 
 fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame> {

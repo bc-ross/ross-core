@@ -63,6 +63,6 @@ fn main() -> Result<()> {
 
     save_schedule(&Path::new("output.xlsx").to_path_buf(), &full_df, &new_df);
 
-    println!("Excel file created: {}", "output.xlsx");
+    println!("Excel file created: output.xlsx");
     Ok(())
 }

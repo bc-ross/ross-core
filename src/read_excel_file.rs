@@ -1,14 +1,14 @@
 use anyhow::anyhow;
-use calamine::{open_workbook_auto, Data, DataType, Reader};
+use calamine::{open_workbook_auto, Data, Reader};
 use polars::prelude::*;
-use std::{collections::HashMap, hash::Hash, iter::once, path::PathBuf};
+use std::{collections::HashMap, iter::once, path::PathBuf};
 
 pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> {
     // Open workbook (auto detects xlsx or xls)
     let mut workbook = open_workbook_auto(fname)?;
     let mut df_map = HashMap::new();
     // For each sheet (or pick by name)
-    for sheet_name in workbook.sheet_names().to_owned() {
+    for sheet_name in workbook.sheet_names() {
         if sheet_name == "Schedule" {
             continue; // Skips cover sheet
         }
