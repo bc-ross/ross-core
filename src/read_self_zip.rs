@@ -72,12 +72,12 @@ trait Unzip6<A, B, C, D, E, F> {
 impl<I, A, B, C, D, E, F> Unzip6<A, B, C, D, E, F> for I
 where
     I: Iterator<Item = (A, B, C, D, E, F)>,
-    Series: NamedFromOwned<Vec<A>>,
-    Series: NamedFromOwned<Vec<B>>,
-    Series: NamedFromOwned<Vec<C>>,
-    Series: NamedFromOwned<Vec<D>>,
-    Series: NamedFromOwned<Vec<E>>,
-    Series: NamedFromOwned<Vec<F>>,
+    Vec<A>: IntoSeries,
+    Vec<B>: IntoSeries,
+    Vec<C>: IntoSeries,
+    Vec<D>: IntoSeries,
+    Vec<E>: IntoSeries,
+    Vec<F>: IntoSeries,
 {
     fn unzip6(
         self,
@@ -103,12 +103,12 @@ where
             f.push(z);
         }
         (
-            Series::from_vec(a_name, a),
-            Series::from_vec(b_name, b),
-            Series::from_vec(c_name, c),
-            Series::from_vec(d_name, d),
-            Series::from_vec(e_name, e),
-            Series::from_vec(f_name, f),
+            Series::new(a_name, a),
+            Series::new(b_name, b),
+            Series::new(c_name, c),
+            Series::new(d_name, d),
+            Series::new(e_name, e),
+            Series::new(f_name, f),
         )
     }
 }
@@ -194,7 +194,7 @@ fn semester_to_dataframe(semester: Semester) -> DataFrame {
                 info.unwrap_or_default(),
             )
         })
-        .unzip6();
+        .unzip6("", "", "", "", "", "");
 
     let series: Vec<Series> = keys
         .iter()
