@@ -27,6 +27,9 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
                 AnyValue::Int32(v) => sheet
                     .write_number((row_idx + 1) as u32, col_idx as u16, v as f64)
                     .unwrap(),
+                AnyValue::UInt32(v) => sheet
+                    .write_number((row_idx + 1) as u32, col_idx as u16, v as f64)
+                    .unwrap(),
                 AnyValue::Int64(v) => sheet
                     .write_number((row_idx + 1) as u32, col_idx as u16, v as f64)
                     .unwrap(),
@@ -35,7 +38,7 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
                     .unwrap(),
                 AnyValue::Null => sheet,
                 _ => sheet
-                    .write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())
+                    .write_string((row_idx + 1) as u32, col_idx as u16, dbg!(val).to_string())
                     .unwrap(),
             };
         }
@@ -114,7 +117,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
                     .write_number((row_idx + 1) as u32, col_idx as u16, v)
                     .unwrap(),
                 _ => sheet
-                    .write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())
+                    .write_string((row_idx + 1) as u32, col_idx as u16, dbg!(val).to_string())
                     .unwrap(),
             };
         }
