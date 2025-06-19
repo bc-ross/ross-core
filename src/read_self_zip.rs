@@ -7,30 +7,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
+use std::hash::Hash;
 use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
 use strum_macros::EnumString;
-
-#[derive(Debug)]
-pub enum ColumnSeed {
-    Kind(Vec<CourseKind>),
-    String(Vec<String>),
-    Int(Vec<i32>),
-}
-
-impl ColumnSeed {
-    fn kind() -> Self {
-        Self::Kind(Vec::new())
-    }
-
-    fn string() -> Self {
-        Self::String(Vec::new())
-    }
-
-    fn int() -> Self {
-        Self::Int(Vec::new())
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString)]
 #[serde(rename_all = "PascalCase")]
@@ -58,6 +38,9 @@ pub struct Course {
     info: Option<String>,
 }
 
+const KIND_COLS: [&str; 1] = ["kind"];
+const INT_COLS: [&str; 1] = ["credit"];
+
 #[derive(Debug, Deserialize)]
 struct Semester {
     #[serde(rename = "@name")]
@@ -74,60 +57,144 @@ struct Root {
     semesters: Vec<Semester>,
 }
 
+trait Unzip6<A, B, C, D, E, F> {
+    fn unzip6(
+        self,
+        a_name: &str,
+        b_name: &str,
+        c_name: &str,
+        d_name: &str,
+        e_name: &str,
+        f_name: &str,
+    ) -> (Series, Series, Series, Series, Series, Series);
+}
+
+impl<I, A, B, C, D, E, F> Unzip6<A, B, C, D, E, F> for I
+where
+    I: Iterator<Item = (A, B, C, D, E, F)>,
+    Series: NamedFromOwned<Vec<A>>,
+    Series: NamedFromOwned<Vec<B>>,
+    Series: NamedFromOwned<Vec<C>>,
+    Series: NamedFromOwned<Vec<D>>,
+    Series: NamedFromOwned<Vec<E>>,
+    Series: NamedFromOwned<Vec<F>>,
+{
+    fn unzip6(
+        self,
+        a_name: &str,
+        b_name: &str,
+        c_name: &str,
+        d_name: &str,
+        e_name: &str,
+        f_name: &str,
+    ) -> (Series, Series, Series, Series, Series, Series) {
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        let mut c = Vec::new();
+        let mut d = Vec::new();
+        let mut e = Vec::new();
+        let mut f = Vec::new();
+        for (u, v, w, x, y, z) in self {
+            a.push(u);
+            b.push(v);
+            c.push(w);
+            d.push(x);
+            e.push(y);
+            f.push(z);
+        }
+        (
+            Series::from_vec(a_name, a),
+            Series::from_vec(b_name, b),
+            Series::from_vec(c_name, c),
+            Series::from_vec(d_name, d),
+            Series::from_vec(e_name, e),
+            Series::from_vec(f_name, f),
+        )
+    }
+}
+
 fn semester_to_dataframe(semester: Semester) -> DataFrame {
     let Semester {
         name: sem_name,
         courses,
     } = semester;
-    let mut columns: HashMap<String, ColumnSeed> = HashMap::new();
+    let mut str_cols: HashMap<String, Vec<String>> = HashMap::new();
+    let mut int_cols: HashMap<String, Vec<i32>> = HashMap::new();
+    let mut kind_cols: HashMap<String, Vec<CourseKind>> = HashMap::new();
+
     let keys = Course::FIELD_NAMES_AS_ARRAY;
 
-    for key in &keys {
-        columns.insert(
-            format!("{}_{}", sem_name, key),
-            match *key {
-                "kind" => ColumnSeed::kind(),
-                "credit" => ColumnSeed::int(),
-                _ => ColumnSeed::string(),
-            },
-        );
-    }
+    let mut columns: HashMap<String, Vec<String>> = HashMap::new();
 
-    for course in courses {
-        let Course {
-            kind,
-            credit,
-            name,
-            code,
-            url,
-            info,
-        } = course;
-        columns
-            .get_mut(&format!("{}_kind", sem_name))
-            .unwrap()
-            .0
-            .push(kind.to_string());
-        columns
-            .get_mut(&format!("{}_credit", sem_name))
-            .unwrap()
-            .push(credit.to_string());
-        columns
-            .get_mut(&format!("{}_name", sem_name))
-            .unwrap()
-            .push(name.unwrap_or_default());
-        columns
-            .get_mut(&format!("{}_code", sem_name))
-            .unwrap()
-            .push(code.unwrap_or_default());
-        columns
-            .get_mut(&format!("{}_url", sem_name))
-            .unwrap()
-            .push(url.unwrap_or_default());
-        columns
-            .get_mut(&format!("{}_info", sem_name))
-            .unwrap()
-            .push(info.unwrap_or_default());
-    }
+    // for key in &keys {
+    //     if KIND_COLS.contains(key) {
+    //         kind_cols
+    //     } else if INT_COLS.contains(key) {
+    //         int_cols
+    //     } else {
+    //         str_cols
+    //     }
+    //     .insert(format!("{}_{}", sem_name, key), Vec::new());
+    // }
+
+    // for course in courses {
+    //     let Course {
+    //         kind,
+    //         credit,
+    //         name,
+    //         code,
+    //         url,
+    //         info,
+    //     } = course;
+    //     columns
+    //         .get_mut(&format!("{}_kind", sem_name))
+    //         .unwrap()
+    //         .0
+    //         .push(kind.to_string());
+    //     columns
+    //         .get_mut(&format!("{}_credit", sem_name))
+    //         .unwrap()
+    //         .push(credit.to_string());
+    //     columns
+    //         .get_mut(&format!("{}_name", sem_name))
+    //         .unwrap()
+    //         .push(name.unwrap_or_default());
+    //     columns
+    //         .get_mut(&format!("{}_code", sem_name))
+    //         .unwrap()
+    //         .push(code.unwrap_or_default());
+    //     columns
+    //         .get_mut(&format!("{}_url", sem_name))
+    //         .unwrap()
+    //         .push(url.unwrap_or_default());
+    //     columns
+    //         .get_mut(&format!("{}_info", sem_name))
+    //         .unwrap()
+    //         .push(info.unwrap_or_default());
+    // }
+    // Series::from_iter(iter);
+
+    courses
+        .into_iter()
+        .map(|x| {
+            let Course {
+                kind,
+                credit,
+                name,
+                code,
+                url,
+                info,
+            } = x;
+            (
+                kind.to_string(),
+                credit,
+                name.unwrap_or_default(),
+                code.unwrap_or_default(),
+                url.unwrap_or_default(),
+                info.unwrap_or_default(),
+            )
+        })
+        .unzip6();
 
     let series: Vec<Series> = keys
         .iter()
