@@ -85,17 +85,26 @@ where
             }
             Data::String(_) => {
                 if col_name.ends_with("_kind") {
-                    dbg!("Hey");
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::String(s) => Some(s.as_str()),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
+                } else {
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::String(s) => Some(s.as_str()),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
                 }
-                let v = once(dtype)
-                    .chain(values)
-                    .map(|d| match d {
-                        Data::String(s) => Some(s.as_str()),
-                        Data::Empty => None,
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
             }
             Data::Error(_) => {
                 // If you want, handle as string

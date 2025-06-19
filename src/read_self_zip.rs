@@ -3,21 +3,43 @@ use polars::functions::concat_df_horizontal;
 use polars::prelude::*;
 use quick_xml::de::from_str;
 use rc_zip_sync::ReadZip;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
+use strum_macros::EnumString;
 
-#[derive(Debug, Deserialize, Clone, Eq, Hash, PartialEq)]
+#[derive(Debug)]
+pub enum ColumnSeed {
+    Kind(Vec<CourseKind>),
+    String(Vec<String>),
+    Int(Vec<i32>),
+}
+
+impl ColumnSeed {
+    fn kind() -> Self {
+        Self::Kind(Vec::new())
+    }
+
+    fn string() -> Self {
+        Self::String(Vec::new())
+    }
+
+    fn int() -> Self {
+        Self::Int(Vec::new())
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString)]
 #[serde(rename_all = "PascalCase")]
 pub enum CourseKind {
-    Degree,
-    GenEd,
-    GenEdStub,
-    Elective,
-    ElectiveStub,
+    Degree = 0,
+    GenEd = 1,
+    GenEdStub = 3,
+    Elective = 4,
+    ElectiveStub = 5,
 }
 
 impl std::fmt::Display for CourseKind {
@@ -57,11 +79,18 @@ fn semester_to_dataframe(semester: Semester) -> DataFrame {
         name: sem_name,
         courses,
     } = semester;
-    let mut columns: HashMap<String, Vec<String>> = HashMap::new();
+    let mut columns: HashMap<String, ColumnSeed> = HashMap::new();
     let keys = Course::FIELD_NAMES_AS_ARRAY;
 
     for key in &keys {
-        columns.insert(format!("{}_{}", sem_name, key), Vec::new());
+        columns.insert(
+            format!("{}_{}", sem_name, key),
+            match *key {
+                "kind" => ColumnSeed::kind(),
+                "credit" => ColumnSeed::int(),
+                _ => ColumnSeed::string(),
+            },
+        );
     }
 
     for course in courses {
@@ -76,6 +105,7 @@ fn semester_to_dataframe(semester: Semester) -> DataFrame {
         columns
             .get_mut(&format!("{}_kind", sem_name))
             .unwrap()
+            .0
             .push(kind.to_string());
         columns
             .get_mut(&format!("{}_credit", sem_name))
