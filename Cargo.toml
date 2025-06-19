@@ -18,6 +18,7 @@ rc-zip-sync = "4.3.0"
 calamine = "0.27.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
+num_enum = "0.7.3"
 
 # calamine breaks due to https://github.com/zip-rs/zip2/issues/337
 [patch.crates-io]

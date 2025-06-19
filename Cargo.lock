@@ -1619,6 +1619,7 @@ dependencies = [
  "calamine",
  "glob",
  "indexmap",
+ "num_enum",
  "polars",
  "quick-xml 0.31.0",
  "rc-zip-sync",
