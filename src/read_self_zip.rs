@@ -7,15 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
-use std::hash::Hash;
 use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
 use strum_macros::EnumString;
 
 #[repr(u32)]
-#[derive(
-    Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString, TryFromPrimitive,
-)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString, TryFromPrimitive)]
 #[serde(rename_all = "PascalCase")]
 pub enum CourseKind {
     Degree = 0,
@@ -36,11 +33,6 @@ impl CourseKind {
     pub fn into_u32(self) -> u32 {
         self as u32
     }
-
-    // #[inline]
-    // pub fn as_u32(self) -> u32 {
-    //     self.as_u8().into()
-    // }
 }
 
 #[derive(Debug, Deserialize, FieldNamesAsArray)]
@@ -74,13 +66,13 @@ impl CourseColumns {
         }
     }
 
-    fn push(&mut self, x: Course) -> anyhow::Result<()> {
-        self.kind.push(x.kind.into_u32());
-        self.credit.push(x.credit);
-        self.name.push(x.name);
-        self.code.push(x.code);
-        self.url.push(x.url);
-        self.info.push(x.info);
+    fn push(&mut self, course: Course) -> anyhow::Result<()> {
+        self.kind.push(course.kind.into_u32());
+        self.credit.push(course.credit);
+        self.name.push(course.name);
+        self.code.push(course.code);
+        self.url.push(course.url);
+        self.info.push(course.info);
         Ok(())
     }
 
@@ -113,16 +105,11 @@ struct Root {
 }
 
 fn semester_to_dataframe(semester: Semester) -> anyhow::Result<DataFrame> {
-    let Semester {
-        name: sem_name,
-        courses,
-    } = semester;
-
-    let mut cols = CourseColumns::new();
-    for course in courses {
-        cols.push(course)?;
+    let mut columns = CourseColumns::new();
+    for course in semester.courses {
+        columns.push(course)?;
     }
-    cols.into_df(&sem_name)
+    columns.into_df(&semester.name)
 }
 
 fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> anyhow::Result<DataFrame> {
@@ -141,8 +128,8 @@ pub fn load_programs() -> anyhow::Result<HashMap<String, DataFrame>> {
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
 
     {
-        let zipf = File::open(zip_path)?;
-        for entry in zipf.read_zip()?.entries() {
+        let zip_file = File::open(zip_path)?;
+        for entry in zip_file.read_zip()?.entries() {
             files.insert(entry.name.clone(), entry.bytes()?);
         }
     }
@@ -168,5 +155,6 @@ pub fn load_programs() -> anyhow::Result<HashMap<String, DataFrame>> {
         let df = parse_and_convert_xml(&xml_content, root_tag)?;
         dataframes.insert(file_stem.to_string(), df);
     }
+
     Ok(dataframes)
 }
