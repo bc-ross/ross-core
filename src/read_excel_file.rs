@@ -51,26 +51,52 @@ where
 
         match dtype {
             Data::Int(_) => {
-                let v = once(dtype)
-                    .chain(values)
-                    .map(|d| match d {
-                        Data::Int(i) => Some(*i),
-                        Data::Empty => None,
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
+                if col_name.ends_with("_kind") {
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::Int(i) => Some(*i),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .map(|x| x.map(|v| (v as u8) as u32))
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
+                } else {
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::Int(i) => Some(*i),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
+                }
             }
             Data::Float(_) => {
-                let v = once(dtype)
-                    .chain(values)
-                    .map(|d| match d {
-                        Data::Float(f) => Some(*f),
-                        Data::Empty => None,
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
+                if col_name.ends_with("_kind") {
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::Float(i) => Some(*i),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .map(|x| x.map(|v| (v as u8) as u32))
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
+                } else {
+                    let v = once(dtype)
+                        .chain(values)
+                        .map(|d| match d {
+                            Data::Float(f) => Some(*f),
+                            Data::Empty => None,
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>();
+                    Ok(Series::new(col_name, v))
+                }
             }
             Data::Bool(_) => {
                 let v = once(dtype)
@@ -84,27 +110,15 @@ where
                 Ok(Series::new(col_name, v))
             }
             Data::String(_) => {
-                if col_name.ends_with("_kind") {
-                    let v = once(dtype)
-                        .chain(values)
-                        .map(|d| match d {
-                            Data::String(s) => Some(s.as_str()),
-                            Data::Empty => None,
-                            _ => None,
-                        })
-                        .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
-                } else {
-                    let v = once(dtype)
-                        .chain(values)
-                        .map(|d| match d {
-                            Data::String(s) => Some(s.as_str()),
-                            Data::Empty => None,
-                            _ => None,
-                        })
-                        .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
-                }
+                let v = once(dtype)
+                    .chain(values)
+                    .map(|d| match d {
+                        Data::String(s) => Some(s.as_str()),
+                        Data::Empty => None,
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                Ok(Series::new(col_name, v))
             }
             Data::Error(_) => {
                 // If you want, handle as string
