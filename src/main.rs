@@ -60,5 +60,9 @@ fn main() -> Result<()> {
 
     let new_df = read_file(&Path::new(FNAME).to_path_buf()).unwrap();
     println!("Read file: {}", FNAME);
+
+    save_schedule(&Path::new("output.xlsx").to_path_buf(), &full_df, &new_df);
+
+    println!("Excel file created: {}", "output.xlsx");
     Ok(())
 }
