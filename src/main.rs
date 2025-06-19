@@ -52,7 +52,7 @@ fn generate_schedule_df(dfs: &HashMap<String, DataFrame>) -> DataFrame {
 fn main() -> Result<()> {
     const FNAME: &str = "schedulebot_test.xlsx";
 
-    let dataframes = load_programs();
+    let dataframes = load_programs()?;
     let full_df = generate_schedule_df(&dataframes);
     save_schedule(&Path::new(FNAME).to_path_buf(), &full_df, &dataframes);
 

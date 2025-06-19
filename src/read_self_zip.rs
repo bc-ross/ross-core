@@ -1,4 +1,3 @@
-use anyhow::Result;
 use num_enum::TryFromPrimitive;
 use polars::functions::concat_df_horizontal;
 use polars::prelude::*;
@@ -113,7 +112,7 @@ struct Root {
     semesters: Vec<Semester>,
 }
 
-fn semester_to_dataframe(semester: Semester) -> DataFrame {
+fn semester_to_dataframe(semester: Semester) -> anyhow::Result<DataFrame> {
     let Semester {
         name: sem_name,
         courses,
@@ -121,30 +120,30 @@ fn semester_to_dataframe(semester: Semester) -> DataFrame {
 
     let mut cols = CourseColumns::new();
     for course in courses {
-        cols.push(course).unwrap();
+        cols.push(course)?;
     }
-    cols.into_df(&sem_name).unwrap()
+    cols.into_df(&sem_name)
 }
 
-fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> Result<DataFrame> {
-    let root: Root = from_str(xml_string).unwrap();
-    let semester_dfs: Vec<DataFrame> = root
+fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> anyhow::Result<DataFrame> {
+    let root: Root = from_str(xml_string)?;
+    let semester_dfs: anyhow::Result<Vec<DataFrame>> = root
         .semesters
         .into_iter()
         .map(semester_to_dataframe)
         .collect();
 
-    Ok(concat_df_horizontal(&semester_dfs).unwrap())
+    Ok(concat_df_horizontal(&semester_dfs?)?)
 }
 
-pub fn load_programs() -> HashMap<String, DataFrame> {
-    let zip_path = env::current_exe().unwrap();
+pub fn load_programs() -> anyhow::Result<HashMap<String, DataFrame>> {
+    let zip_path = env::current_exe()?;
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
 
     {
-        let zipf = File::open(zip_path).unwrap();
-        for entry in zipf.read_zip().unwrap().entries() {
-            files.insert(entry.name.clone(), entry.bytes().unwrap());
+        let zipf = File::open(zip_path)?;
+        for entry in zipf.read_zip()?.entries() {
+            files.insert(entry.name.clone(), entry.bytes()?);
         }
     }
 
@@ -153,7 +152,7 @@ pub fn load_programs() -> HashMap<String, DataFrame> {
     for (file, contents) in files {
         let file_stem = path::Path::new(&file)
             .file_stem()
-            .unwrap()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get file stem"))?
             .to_string_lossy();
         let root_tag = if file_stem == "General_Education" {
             "gened"
@@ -166,8 +165,8 @@ pub fn load_programs() -> HashMap<String, DataFrame> {
         }
 
         let xml_content = String::from_utf8_lossy(&contents);
-        let df = parse_and_convert_xml(&xml_content, root_tag).unwrap();
+        let df = parse_and_convert_xml(&xml_content, root_tag)?;
         dataframes.insert(file_stem.to_string(), df);
     }
-    dataframes
+    Ok(dataframes)
 }
