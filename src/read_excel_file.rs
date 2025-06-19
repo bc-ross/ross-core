@@ -14,8 +14,6 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> 
         }
 
         if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-            println!("Processing sheet: {sheet_name}");
-
             let rows: Vec<Vec<&Data>> = range.rows().map(|row| row.iter().collect()).collect();
 
             let (header, data) = rows.split_first().unwrap();
