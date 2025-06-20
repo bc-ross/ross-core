@@ -11,8 +11,12 @@ use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
 use strum_macros::EnumString;
 
+use crate::schedule::Catalog;
+
 #[repr(u32)]
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString, TryFromPrimitive)]
+#[derive(
+    Debug, Serialize, Deserialize, Clone, Eq, Hash, PartialEq, EnumString, TryFromPrimitive,
+)]
 #[serde(rename_all = "PascalCase")]
 pub enum CourseKind {
     Degree = 0,
@@ -123,7 +127,7 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> anyhow::Result<Da
     Ok(concat_df_horizontal(&semester_dfs?)?)
 }
 
-pub fn load_programs() -> anyhow::Result<HashMap<String, DataFrame>> {
+pub fn load_catalog() -> anyhow::Result<Catalog> {
     let zip_path = env::current_exe()?;
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
 
@@ -156,5 +160,7 @@ pub fn load_programs() -> anyhow::Result<HashMap<String, DataFrame>> {
         dataframes.insert(file_stem.to_string(), df);
     }
 
-    Ok(dataframes)
+    Ok(Catalog {
+        programs: dataframes,
+    })
 }

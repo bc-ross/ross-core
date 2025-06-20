@@ -1,21 +1,37 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use polars::prelude::*;
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fmt, path::Path};
 
-pub struct Schedule {
-    pub df: DataFrame,
-    pub programs: Vec<String>,
-    pub catalog: HashMap<String, DataFrame>,
+#[derive(Debug, Clone)]
+pub struct Catalog {
+    pub programs: HashMap<String, DataFrame>,
+    // pub geneds: HashMap<String, DataFrame>,
+    // pub low_year: u32,
 }
 
-pub fn generate_schedule(
-    programs: Vec<&str>,
-    catalog: &HashMap<String, DataFrame>,
-) -> Result<Schedule> {
+// impl fmt::Display for Catalog {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         f.write_fmt(format_args!(
+//             "<BC {}-{} Catalog>",
+//             self.low_year,
+//             self.low_year + 1
+//         ))
+//     }
+// }
+
+#[derive(Debug, Clone)]
+pub struct Schedule<'a> {
+    pub df: DataFrame,
+    pub programs: Vec<String>,
+    pub catalog: &'a Catalog,
+}
+
+pub fn generate_schedule<'k>(programs: Vec<&str>, catalog: &'k Catalog) -> Result<Schedule<'k>> {
     // (catalog: )
     let full_df_list: Vec<DataFrame> = catalog
-        .into_iter()
+        .programs
+        .iter()
         .filter_map(|(k, v)| programs.contains(&k.as_str()).then_some(v))
         .cloned()
         .collect();
@@ -53,6 +69,6 @@ pub fn generate_schedule(
         )?
         .collect()?,
         programs: programs.into_iter().map(|v| v.to_string()).collect(),
-        catalog: catalog.clone(),
+        catalog,
     })
 }
