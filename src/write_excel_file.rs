@@ -117,6 +117,9 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
     pretty_print_df_to_sheet(&sched.df, schedule_sheet)?;
 
+    let gened_sheet = workbook.add_worksheet().set_name("General_Education")?;
+    write_df_to_sheet(&sched.catalog.geneds, gened_sheet)?;
+
     for (name, df) in &sched.catalog.programs {
         let sheet = workbook.add_worksheet().set_name(trim_titles(name))?;
         write_df_to_sheet(df, sheet)?;

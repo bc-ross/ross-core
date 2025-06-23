@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use num_enum::TryFromPrimitive;
 use polars::functions::concat_df_horizontal;
 use polars::prelude::*;
@@ -103,9 +104,25 @@ struct Semester {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "lowercase")]
-struct Root {
+struct ProgramRoot {
     #[serde(rename = "semester", default)]
     semesters: Vec<Semester>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Gened {
+    #[serde(rename = "@name")]
+    name: String,
+
+    #[serde(rename = "course", default)]
+    courses: Vec<Course>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+struct GenedRoot {
+    #[serde(rename = "gened", default)]
+    geneds: Vec<Gened>,
 }
 
 fn semester_to_dataframe(semester: Semester) -> anyhow::Result<DataFrame> {
@@ -116,8 +133,8 @@ fn semester_to_dataframe(semester: Semester) -> anyhow::Result<DataFrame> {
     columns.into_df(&semester.name)
 }
 
-fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> anyhow::Result<DataFrame> {
-    let root: Root = from_str(xml_string)?;
+fn parse_and_convert_xml_prog(xml_string: &str, _root_tag: &str) -> anyhow::Result<DataFrame> {
+    let root: ProgramRoot = from_str(xml_string)?;
     let semester_dfs: anyhow::Result<Vec<DataFrame>> = root
         .semesters
         .into_iter()
@@ -125,6 +142,22 @@ fn parse_and_convert_xml(xml_string: &str, _root_tag: &str) -> anyhow::Result<Da
         .collect();
 
     Ok(concat_df_horizontal(&semester_dfs?)?)
+}
+
+fn gened_to_dataframe(gened: Gened) -> anyhow::Result<DataFrame> {
+    let mut columns = CourseColumns::new();
+    for course in gened.courses {
+        columns.push(course)?;
+    }
+    columns.into_df(&gened.name)
+}
+
+fn parse_and_convert_xml_edreq(xml_string: &str, _root_tag: &str) -> anyhow::Result<DataFrame> {
+    let root: GenedRoot = from_str(xml_string)?;
+    let gened_dfs: anyhow::Result<Vec<DataFrame>> =
+        root.geneds.into_iter().map(gened_to_dataframe).collect();
+
+    Ok(concat_df_horizontal(&gened_dfs?)?)
 }
 
 pub fn load_catalog() -> anyhow::Result<Catalog> {
@@ -139,28 +172,31 @@ pub fn load_catalog() -> anyhow::Result<Catalog> {
     }
 
     let mut dataframes: HashMap<String, DataFrame> = HashMap::new();
+    let mut geneds = None;
 
     for (file, contents) in files {
         let file_stem = path::Path::new(&file)
             .file_stem()
             .ok_or_else(|| anyhow::anyhow!("Failed to get file stem"))?
             .to_string_lossy();
-        let root_tag = if file_stem == "General_Education" {
-            "gened"
-        } else {
-            "semester"
-        };
-
-        if root_tag == "gened" {
-            continue;
-        }
 
         let xml_content = String::from_utf8_lossy(&contents);
-        let df = parse_and_convert_xml(&xml_content, root_tag)?;
-        dataframes.insert(file_stem.to_string(), df);
+
+        if file_stem == "General_Education" {
+            let df = parse_and_convert_xml_edreq(&xml_content, "gened")?;
+            geneds = Some(df);
+        } else {
+            let df = parse_and_convert_xml_prog(&xml_content, "semester")?;
+            dataframes.insert(file_stem.to_string(), df);
+        };
+
+        // if root_tag == "gened" {
+        //     continue;
+        // }
     }
 
     Ok(Catalog {
         programs: dataframes,
+        geneds: geneds.ok_or(anyhow!("no gened manifest for course catalog"))?,
     })
 }

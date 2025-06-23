@@ -6,7 +6,7 @@ use std::{collections::HashMap, fmt, path::Path};
 #[derive(Debug, Clone)]
 pub struct Catalog {
     pub programs: HashMap<String, DataFrame>,
-    // pub geneds: HashMap<String, DataFrame>,
+    pub geneds: DataFrame,
     // pub low_year: u32,
 }
 
