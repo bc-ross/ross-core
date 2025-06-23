@@ -1,7 +1,6 @@
 import dataclasses
 import glob
 import logging
-import os
 import pathlib
 import zipfile
 
@@ -357,15 +356,16 @@ def inject(mode="debug"):
     with zipfile.ZipFile(
         f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "w", compression=zipfile.ZIP_STORED
     ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:
-        for i in glob.glob("scraped_programs/*.xml"):
-            zf.write(i, i)
+        for i in glob.glob(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/*.xml"):
+            pth = pathlib.Path(i)
+            zf.write(i, pathlib.Path(*pth.parts[:-3], *pth.parts[-2:]))
     with (
         open(f"target/{mode}/schedulebot.exe", "ab") as exe,
         open(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "rb") as zipobj,
     ):
         # exe.seek(0, os.SEEK_END)
         exe.write(zipobj.read())
-    os.remove(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip")
+    # os.remove(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip")
 
 
 def main():

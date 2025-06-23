@@ -7,7 +7,7 @@ use std::{collections::HashMap, fmt, path::Path};
 pub struct Catalog {
     pub programs: HashMap<String, DataFrame>,
     pub geneds: DataFrame,
-    // pub low_year: u32,
+    pub low_year: u32,
 }
 
 // impl fmt::Display for Catalog {

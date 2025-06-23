@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
+use std::hash::Hash;
 use std::path;
 use struct_field_names_as_array::FieldNamesAsArray;
 use strum_macros::EnumString;
@@ -160,7 +161,7 @@ fn parse_and_convert_xml_edreq(xml_string: &str, _root_tag: &str) -> anyhow::Res
     Ok(concat_df_horizontal(&gened_dfs?)?)
 }
 
-pub fn load_catalog() -> anyhow::Result<Catalog> {
+pub fn load_catalogs() -> anyhow::Result<Vec<Catalog>> {
     let zip_path = env::current_exe()?;
     let mut files: HashMap<String, Vec<u8>> = HashMap::new();
 
@@ -171,6 +172,39 @@ pub fn load_catalog() -> anyhow::Result<Catalog> {
         }
     }
 
+    let mut cat_files: HashMap<u32, HashMap<String, Vec<u8>>> = HashMap::new();
+    for (name, data) in files {
+        let pth = path::Path::new(&name);
+        let low_year: u32 = pth
+            .parent()
+            .ok_or(anyhow::anyhow!("Failed to get parent"))?
+            .file_name()
+            .ok_or(anyhow::anyhow!("Failed to get parent name"))?
+            .to_string_lossy()
+            .split_once('-')
+            .ok_or(anyhow!("malformed folder name"))?
+            .0
+            .parse()?;
+
+        (if let Some(x) = cat_files.get_mut(&low_year) {
+            x
+        } else {
+            cat_files.insert(low_year, HashMap::new());
+            cat_files
+                .get_mut(&low_year)
+                .ok_or(anyhow!("cpould not retrieve catalog"))?
+        })
+        .insert(name, data);
+    }
+    let mut catalogs: Vec<Catalog> = Vec::new();
+
+    for (low_year, files) in cat_files {
+        catalogs.push(create_catalog(low_year, files)?);
+    }
+    Ok(catalogs)
+}
+
+fn create_catalog(low_year: u32, files: HashMap<String, Vec<u8>>) -> anyhow::Result<Catalog> {
     let mut dataframes: HashMap<String, DataFrame> = HashMap::new();
     let mut geneds = None;
 
@@ -194,9 +228,9 @@ pub fn load_catalog() -> anyhow::Result<Catalog> {
         //     continue;
         // }
     }
-
     Ok(Catalog {
         programs: dataframes,
         geneds: geneds.ok_or(anyhow!("no gened manifest for course catalog"))?,
+        low_year,
     })
 }
