@@ -1,6 +1,7 @@
 import dataclasses
 import glob
 import logging
+import os
 import pathlib
 import zipfile
 
@@ -34,6 +35,8 @@ IGNORE_GENED_STUBS = False  # True  # Geneds automatically added in validation, 
 
 
 SITE_URL = "https://coursecatalog.benedictine.edu"
+
+LOW_YEAR = 2024
 
 
 def trim_titles(s: str) -> str:
@@ -352,13 +355,17 @@ def course_lookup(code: str) -> dict[str]:
 
 def inject(mode="debug"):
     with zipfile.ZipFile(
-        "scraped_programs/temp.zip", "w", compression=zipfile.ZIP_STORED
+        f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "w", compression=zipfile.ZIP_STORED
     ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:
         for i in glob.glob("scraped_programs/*.xml"):
             zf.write(i, i)
-    with open(f"target/{mode}/schedulebot.exe", "ab") as exe, open("scraped_programs/temp.zip", "rb") as zipobj:
+    with (
+        open(f"target/{mode}/schedulebot.exe", "ab") as exe,
+        open(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "rb") as zipobj,
+    ):
         # exe.seek(0, os.SEEK_END)
         exe.write(zipobj.read())
+    os.remove(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip")
 
 
 def main():
@@ -368,7 +375,7 @@ def main():
     try:
         geneds = scrape_gened_courselists()
         with open(
-            pathlib.Path("scraped_programs").joinpath("General_Education.xml"),
+            pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").joinpath("General_Education.xml"),
             "w",
             encoding="utf-8",
         ) as file:
@@ -383,9 +390,9 @@ def main():
                         df = scrape_bachelors_courses(prog)
                         df.to_excel(writer, sheet_name=trim_titles(prog.name))
                         with open(
-                            pathlib.Path("scraped_programs").joinpath(
-                                pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".xml"
-                            ),
+                            pathlib.Path("scraped_programs")
+                            .joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}")
+                            .joinpath(pathvalidate.sanitize_filename(prog.name).replace(" ", "_") + ".xml"),
                             "w",
                             encoding="utf-8",
                         ) as f:
@@ -399,5 +406,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if not pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").is_dir():
+        pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").mkdir()
     # main()
     inject()
