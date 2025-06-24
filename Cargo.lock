@@ -274,8 +274,9 @@ dependencies = [
 
 [[package]]
 name = "calamine"
-version = "0.27.0"
-source = "git+https://github.com/prophittcorey/calamine?branch=fix%2Fzip-3.0#18629d465f3166c03ab5b454dd5d72851ed99141"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15e02a18e79de779a78b0a6ec84a3deed1ff0607dd970a11369f993263f99f1a"
 dependencies = [
  "atoi_simd",
  "byteorder",
@@ -283,9 +284,9 @@ dependencies = [
  "encoding_rs",
  "fast-float2",
  "log",
- "quick-xml 0.37.5",
+ "quick-xml",
  "serde",
- "zip 4.1.0",
+ "zip",
 ]
 
 [[package]]
@@ -1295,18 +1296,19 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e613fc340b2220f734a8595782c551f1250e969d87d3be1ae0579e8d4065179"
+checksum = "a973b4e44ce6cad84ce69d797acf9a044532e4184c4f267913d1b546a0727b7a"
 dependencies = [
  "num_enum_derive",
+ "rustversion",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.7.3"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af1844ef2428cc3e1cb900be36181049ef3d3193c63e43026cfe202983b27a56"
+checksum = "77e878c846a8abae00dd069496dbe8751b16ac1c3d6bd2a7283a938e8228f90d"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1342,7 +1344,7 @@ dependencies = [
  "itertools",
  "parking_lot",
  "percent-encoding",
- "quick-xml 0.37.5",
+ "quick-xml",
  "rand 0.9.1",
  "reqwest",
  "ring",
@@ -2087,16 +2089,6 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1004a344b30a54e2ee58d66a71b32d2db2feb0a31f9a2d302bf0536f15de2a33"
-dependencies = [
- "memchr",
- "serde",
-]
-
-[[package]]
-name = "quick-xml"
 version = "0.37.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "331e97a1af0bf59823e6eadffe373d7b27f485be8748f71471c662c1f269b7fb"
@@ -2444,12 +2436,11 @@ dependencies = [
 
 [[package]]
 name = "rust_xlsxwriter"
-version = "0.67.0"
+version = "0.88.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05208955a4ca51dfad36960bdae24d9d257d43225711c6f70ed15c5115478384"
+checksum = "11a9ee3bdc80c80c012e551066a1963a1e550690d186372f33fe3e0a8b3f7661"
 dependencies = [
- "regex",
- "zip 2.4.2",
+ "zip",
 ]
 
 [[package]]
@@ -2577,7 +2568,7 @@ dependencies = [
  "indexmap",
  "num_enum",
  "polars",
- "quick-xml 0.31.0",
+ "quick-xml",
  "rc-zip-sync",
  "rust_xlsxwriter",
  "serde",
@@ -3642,23 +3633,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "zip"
-version = "2.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
-dependencies = [
- "arbitrary",
- "crc32fast",
- "crossbeam-utils",
- "displaydoc",
- "flate2",
- "indexmap",
- "memchr",
- "thiserror 2.0.12",
- "zopfli",
 ]
 
 [[package]]
