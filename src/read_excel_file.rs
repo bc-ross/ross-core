@@ -9,24 +9,26 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> 
     let mut df_map = HashMap::new();
     // For each sheet (or pick by name)
     for sheet_name in workbook.sheet_names() {
-        if sheet_name == "Schedule" {
-            continue; // Skips cover sheet
-        }
+        match sheet_name.as_str() {
+            "Schedule" => (),
+            _ => {
+                if let Ok(range) = workbook.worksheet_range(&sheet_name) {
+                    let rows: Vec<Vec<&Data>> =
+                        range.rows().map(|row| row.iter().collect()).collect();
 
-        if let Ok(range) = workbook.worksheet_range(&sheet_name) {
-            let rows: Vec<Vec<&Data>> = range.rows().map(|row| row.iter().collect()).collect();
+                    let (header, data) = rows.split_first().unwrap();
 
-            let (header, data) = rows.split_first().unwrap();
+                    let columns: Vec<Column> = header
+                        .iter()
+                        .enumerate()
+                        .map(|(i, name)| build_typed_series(name, data.iter().map(|row| row[i])))
+                        .collect::<Result<Vec<_>, _>>()?;
 
-            let columns: Vec<Column> = header
-                .iter()
-                .enumerate()
-                .map(|(i, name)| build_typed_series(name, data.iter().map(|row| row[i])))
-                .collect::<Result<Vec<_>, _>>()?;
+                    let df = DataFrame::new(columns)?;
 
-            let df = DataFrame::new(columns)?;
-
-            df_map.insert(sheet_name, df);
+                    df_map.insert(sheet_name, df);
+                }
+            }
         }
     }
 
