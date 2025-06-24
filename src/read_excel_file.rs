@@ -11,6 +11,7 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> 
     for sheet_name in workbook.sheet_names() {
         match sheet_name.as_str() {
             "Schedule" => (),
+            "Metadata" | "General_Education" => todo!(),
             _ => {
                 if let Ok(range) = workbook.worksheet_range(&sheet_name) {
                     let rows: Vec<Vec<&Data>> =
