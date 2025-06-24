@@ -115,14 +115,28 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
 }
 
 pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
-    let meta_df = DataFrame::new_with_height(
-        sched.programs.len(),
-        vec![
-            Column::new("Programs".into(), &sched.programs),
-            Column::new("Catalog".into(), vec![sched.catalog.low_year]),
-            Column::new("Schedulebot".into(), vec![VERSION]),
-        ],
-    )?;
+    let pad_col = Column::full_null(
+        "PadColumn".into(),
+        sched.programs.len() - 1,
+        &DataType::String,
+    );
+    let mut cat_col = Column::new(
+        "Catalog".into(),
+        vec![format!(
+            "{}-{}",
+            sched.catalog.low_year,
+            sched.catalog.low_year + 1
+        )],
+    );
+    let mut sched_col = Column::new("Schedulebot".into(), vec![VERSION]);
+    cat_col.append(&pad_col)?;
+    sched_col.append(&pad_col)?;
+
+    let meta_df = DataFrame::new(vec![
+        Column::new("Programs".into(), &sched.programs),
+        cat_col,
+        sched_col,
+    ])?;
 
     let mut workbook = Workbook::new();
 
