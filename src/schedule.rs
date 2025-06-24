@@ -10,15 +10,15 @@ pub struct Catalog {
     pub low_year: u32,
 }
 
-// impl fmt::Display for Catalog {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.write_fmt(format_args!(
-//             "<BC {}-{} Catalog>",
-//             self.low_year,
-//             self.low_year + 1
-//         ))
-//     }
-// }
+impl fmt::Display for Catalog {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_fmt(format_args!(
+            "<BC {}-{} Catalog>",
+            self.low_year,
+            self.low_year + 1
+        ))
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Schedule<'a> {

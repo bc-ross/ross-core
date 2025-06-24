@@ -29,6 +29,7 @@ fn main() -> Result<()> {
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
     println!("Excel file created: {}", FNAME);
+    println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
     let new_df = read_file(&Path::new(FNAME).to_path_buf())?;
     println!("Read file: {}", FNAME);
