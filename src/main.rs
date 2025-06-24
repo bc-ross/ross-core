@@ -12,6 +12,8 @@ use read_self_zip::load_catalogs;
 use schedule::generate_schedule;
 use write_excel_file::save_schedule;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 fn main() -> Result<()> {
     const FNAME: &str = "schedulebot_test.xlsx";
 

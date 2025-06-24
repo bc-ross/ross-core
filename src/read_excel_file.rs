@@ -18,7 +18,7 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> 
 
             let (header, data) = rows.split_first().unwrap();
 
-            let columns: Vec<Series> = header
+            let columns: Vec<Column> = header
                 .iter()
                 .enumerate()
                 .map(|(i, name)| build_typed_series(name, data.iter().map(|row| row[i])))
@@ -33,7 +33,7 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<HashMap<String, DataFrame>> 
     Ok(df_map)
 }
 
-fn build_typed_series<'a, I>(name: &Data, mut values: I) -> anyhow::Result<Series>
+fn build_typed_series<'a, I>(name: &Data, mut values: I) -> anyhow::Result<Column>
 where
     I: Iterator<Item = &'a Data>,
 {
@@ -59,7 +59,7 @@ where
                         })
                         .map(|x| x.map(|v| (v as u8) as u32))
                         .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
+                    Ok(Column::new(col_name.into(), v))
                 } else {
                     let v = once(dtype)
                         .chain(values)
@@ -69,7 +69,7 @@ where
                             _ => None,
                         })
                         .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
+                    Ok(Column::new(col_name.into(), v))
                 }
             }
             Data::Float(_) => {
@@ -83,7 +83,7 @@ where
                         })
                         .map(|x| x.map(|v| (v as u8) as u32))
                         .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
+                    Ok(Column::new(col_name.into(), v))
                 } else {
                     let v = once(dtype)
                         .chain(values)
@@ -93,7 +93,7 @@ where
                             _ => None,
                         })
                         .collect::<Vec<_>>();
-                    Ok(Series::new(col_name, v))
+                    Ok(Column::new(col_name.into(), v))
                 }
             }
             Data::Bool(_) => {
@@ -105,7 +105,7 @@ where
                         _ => None,
                     })
                     .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
+                Ok(Column::new(col_name.into(), v))
             }
             Data::String(_) => {
                 let v = once(dtype)
@@ -116,7 +116,7 @@ where
                         _ => None,
                     })
                     .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
+                Ok(Column::new(col_name.into(), v))
             }
             Data::Error(_) => {
                 // If you want, handle as string
@@ -124,12 +124,12 @@ where
                     .chain(values)
                     .map(|d| format!("{:?}", d))
                     .collect::<Vec<_>>();
-                Ok(Series::new(col_name, v))
+                Ok(Column::new(col_name.into(), v))
             }
             _ => {
                 // all empty? fallback to empty strings
-                Ok(Series::new(
-                    col_name,
+                Ok(Column::new(
+                    col_name.into(),
                     vec![""; once(dtype).chain(values).count()],
                 ))
             }

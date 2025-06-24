@@ -84,12 +84,12 @@ impl CourseColumns {
 
     fn into_df(self, sem_name: &str) -> anyhow::Result<DataFrame> {
         Ok(DataFrame::new(vec![
-            Series::new(&format!("{}_kind", sem_name), self.kind),
-            Series::new(&format!("{}_credit", sem_name), self.credit),
-            Series::new(&format!("{}_name", sem_name), self.name),
-            Series::new(&format!("{}_code", sem_name), self.code),
-            Series::new(&format!("{}_url", sem_name), self.url),
-            Series::new(&format!("{}_info", sem_name), self.info),
+            Column::new(format!("{}_kind", sem_name).into(), self.kind),
+            Column::new(format!("{}_credit", sem_name).into(), self.credit),
+            Column::new(format!("{}_name", sem_name).into(), self.name),
+            Column::new(format!("{}_code", sem_name).into(), self.code),
+            Column::new(format!("{}_url", sem_name).into(), self.url),
+            Column::new(format!("{}_info", sem_name).into(), self.info),
         ])?)
     }
 }
@@ -142,7 +142,7 @@ fn parse_and_convert_xml_prog(xml_string: &str, _root_tag: &str) -> anyhow::Resu
         .map(semester_to_dataframe)
         .collect();
 
-    Ok(concat_df_horizontal(&semester_dfs?)?)
+    Ok(concat_df_horizontal(&semester_dfs?, false)?)
 }
 
 fn gened_to_dataframe(gened: Gened) -> anyhow::Result<DataFrame> {
@@ -158,7 +158,7 @@ fn parse_and_convert_xml_edreq(xml_string: &str, _root_tag: &str) -> anyhow::Res
     let gened_dfs: anyhow::Result<Vec<DataFrame>> =
         root.geneds.into_iter().map(gened_to_dataframe).collect();
 
-    Ok(concat_df_horizontal(&gened_dfs?)?)
+    Ok(concat_df_horizontal(&gened_dfs?, false)?)
 }
 
 pub fn load_catalogs() -> anyhow::Result<Vec<Catalog>> {

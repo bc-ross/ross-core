@@ -4,7 +4,7 @@ use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use std::{collections::HashMap, path::PathBuf};
 use struct_field_names_as_array::FieldNamesAsArray;
 
-use crate::{read_self_zip::Course, schedule::Schedule};
+use crate::{read_self_zip::Course, schedule::Schedule, VERSION};
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()
@@ -12,7 +12,9 @@ fn trim_titles(s: &str) -> String {
 
 fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     for (col_idx, field) in df.get_columns().iter().enumerate() {
-        sheet.write_string(0, col_idx as u16, field.name())?;
+        let field = field.as_materialized_series();
+
+        sheet.write_string(0, col_idx as u16, field.name().as_str())?;
 
         let field = field.rechunk(); // field.iter() panics otherwise
         for (row_idx, val) in field.iter().enumerate() {
@@ -87,6 +89,7 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     let selected_df = df.select(selected_columns)?;
 
     for (col_idx, field) in selected_df.get_columns().iter().enumerate() {
+        let field = field.as_materialized_series();
         let max_len = field.iter().map(|s| s.to_string().len()).max().unwrap_or(0);
         sheet.set_column_width(col_idx as u16, max_len as f64 - 2.0)?;
 
@@ -112,10 +115,22 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
 }
 
 pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
+    let meta_df = DataFrame::new_with_height(
+        sched.programs.len(),
+        vec![
+            Column::new("Programs".into(), &sched.programs),
+            Column::new("Catalog".into(), vec![sched.catalog.low_year]),
+            Column::new("Schedulebot".into(), vec![VERSION]),
+        ],
+    )?;
+
     let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
     pretty_print_df_to_sheet(&sched.df, schedule_sheet)?;
+
+    let meta_sheet = workbook.add_worksheet().set_name("Metadata")?;
+    write_df_to_sheet(&meta_df, meta_sheet)?;
 
     let gened_sheet = workbook.add_worksheet().set_name("General_Education")?;
     write_df_to_sheet(&sched.catalog.geneds, gened_sheet)?;

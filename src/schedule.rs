@@ -41,7 +41,7 @@ pub fn generate_schedule<'k>(programs: Vec<&str>, catalog: &'k Catalog) -> Resul
         all_columns.extend(
             df.get_column_names()
                 .iter()
-                .map(|x| (*x).to_owned())
+                .map(|x| (*x).to_string())
                 .zip(df.dtypes()),
         );
     }
@@ -50,8 +50,8 @@ pub fn generate_schedule<'k>(programs: Vec<&str>, catalog: &'k Catalog) -> Resul
         .into_iter()
         .map(|mut df| {
             for (col, dtype) in &all_columns {
-                if !df.get_column_names().contains(&col.as_str()) {
-                    let s = Series::full_null(col, df.height(), dtype);
+                if !df.get_column_names().contains(&&PlSmallStr::from_str(col)) {
+                    let s = Column::full_null(col.into(), df.height(), dtype);
                     df.with_column(s)?;
                 }
             }
