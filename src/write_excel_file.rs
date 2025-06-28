@@ -4,7 +4,11 @@ use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use std::{collections::HashMap, path::PathBuf};
 use struct_field_names_as_array::FieldNamesAsArray;
 
-use crate::{read_self_zip::Course, schedule::Schedule, VERSION};
+use crate::{
+    read_self_zip::Course,
+    schedule::{self, Schedule},
+    VERSION,
+};
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()
@@ -142,19 +146,32 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
     pretty_print_df_to_sheet(&sched.df, schedule_sheet)?;
+    schedule_sheet.protect();
 
     let internal_sheet = workbook.add_worksheet().set_name("Schedule_Internal")?;
     write_df_to_sheet(&sched.df, internal_sheet)?;
+    internal_sheet.protect();
+    #[cfg(not(debug_assertions))]
+    internal_sheet.set_hidden(true);
 
     let meta_sheet = workbook.add_worksheet().set_name("Metadata")?;
     write_df_to_sheet(&meta_df, meta_sheet)?;
+    meta_sheet.protect();
+    #[cfg(not(debug_assertions))]
+    meta_sheet.set_hidden(true);
 
     let gened_sheet = workbook.add_worksheet().set_name("General_Education")?;
     write_df_to_sheet(&sched.catalog.geneds, gened_sheet)?;
+    gened_sheet.protect();
+    #[cfg(not(debug_assertions))]
+    gened_sheet.set_hidden(true);
 
     for (name, df) in &sched.catalog.programs {
         let sheet = workbook.add_worksheet().set_name(trim_titles(name))?;
         write_df_to_sheet(df, sheet)?;
+        sheet.protect();
+        #[cfg(not(debug_assertions))]
+        sheet.set_hidden(true);
     }
 
     workbook.save(fname)?;

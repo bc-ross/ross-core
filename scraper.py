@@ -2,6 +2,7 @@ import dataclasses
 import glob
 import logging
 import pathlib
+import sys
 import zipfile
 
 import numpy as np
@@ -409,4 +410,4 @@ if __name__ == "__main__":
     if not pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").is_dir():
         pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").mkdir()
     # main()
-    inject()
+    inject(sys.argv[1])
