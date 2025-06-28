@@ -12,6 +12,8 @@ use read_self_zip::load_catalogs;
 use schedule::generate_schedule;
 use write_excel_file::save_schedule;
 
+use crate::schedule::StandaloneSchedule;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn main() -> Result<()> {
@@ -33,10 +35,13 @@ fn main() -> Result<()> {
     println!("Excel file created: {}", FNAME);
     println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
-    let new_df = read_file(&Path::new(FNAME).to_path_buf())?;
+    let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
     println!("Read file: {}", FNAME);
 
-    // save_schedule(&Path::new("output.xlsx").to_path_buf(), &sched.df, &new_df)?;
+    save_schedule(
+        &Path::new("output.xlsx").to_path_buf(),
+        new_sched.borrow_schedule(),
+    )?;
 
     println!("Excel file created: output.xlsx");
     Ok(())

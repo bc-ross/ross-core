@@ -1,6 +1,8 @@
 use anyhow::Result;
 use indexmap::IndexMap;
-use polars::prelude::*;
+use ouroboros::self_referencing;
+use polars::{error, prelude::*};
+use std::ptr;
 use std::{collections::HashMap, fmt, path::Path};
 
 #[derive(Debug, Clone)]
@@ -25,6 +27,14 @@ pub struct Schedule<'a> {
     pub df: DataFrame,
     pub programs: Vec<String>,
     pub catalog: &'a Catalog,
+}
+
+#[self_referencing(pub_extras)]
+pub struct StandaloneSchedule {
+    pub catalog: Catalog,
+    #[borrows(catalog)]
+    #[covariant]
+    pub schedule: Schedule<'this>,
 }
 
 pub fn generate_schedule<'k>(programs: Vec<&str>, catalog: &'k Catalog) -> Result<Schedule<'k>> {
