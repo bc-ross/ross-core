@@ -143,6 +143,9 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
     pretty_print_df_to_sheet(&sched.df, schedule_sheet)?;
 
+    let internal_sheet = workbook.add_worksheet().set_name("Schedule_Internal")?;
+    write_df_to_sheet(&sched.df, internal_sheet)?;
+
     let meta_sheet = workbook.add_worksheet().set_name("Metadata")?;
     write_df_to_sheet(&meta_df, meta_sheet)?;
 

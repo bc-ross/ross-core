@@ -15,12 +15,18 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<StandaloneSchedule> {
     // Open workbook (auto detects xlsx or xls)
     let mut workbook = open_workbook_auto(fname)?;
     let mut df_map = HashMap::new();
+    let mut sched_df = None;
     let mut gened_df = None;
     let mut metadata = None;
     // For each sheet (or pick by name)
     for sheet_name in workbook.sheet_names() {
         match sheet_name.as_str() {
             "Schedule" => (),
+            "Schedule_Internal" => {
+                if let Ok(range) = workbook.worksheet_range(&sheet_name) {
+                    sched_df = Some(read_df_range(range)?);
+                }
+            }
             "Metadata" => {
                 if let Ok(range) = workbook.worksheet_range(&sheet_name) {
                     metadata = Some(load_metadata(range)?);
@@ -53,24 +59,19 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<StandaloneSchedule> {
             geneds: gened_df.ok_or(anyhow!("No geneds found"))?,
         };
 
-        Ok(StandaloneSchedule::new(catalog, |catalog| Schedule {
-            df: DataFrame::empty(), // HACK
-            programs,
+        Ok(StandaloneSchedule::try_new(
             catalog,
-        }))
+            |catalog| -> anyhow::Result<_> {
+                Ok(Schedule {
+                    df: sched_df.ok_or(anyhow!("No geneds found"))?,
+                    programs,
+                    catalog,
+                })
+            },
+        )?)
     } else {
         Err(anyhow!("no metadata found"))
     }
-}
-
-fn column_iter<'a, T>(
-    names: &'a [&'a str],
-    rows: &'a [Vec<T>],
-) -> impl Iterator<Item = (&'a str, impl Iterator<Item = &'a T> + 'a)> + 'a {
-    names.iter().enumerate().map(move |(col_idx, &name)| {
-        let column_iter = rows.iter().map(move |row| &row[col_idx]);
-        (name, column_iter)
-    })
 }
 
 fn load_metadata(range: Range<Data>) -> anyhow::Result<Metadata> {
@@ -158,10 +159,10 @@ fn build_typed_series<'a, I>(name: &Data, mut values: I) -> anyhow::Result<Colum
 where
     I: Iterator<Item = &'a Data>,
 {
-    let col_name = if let Data::String(s) = name {
+    let col_name = if let Data::String(s) = &name {
         s
     } else {
-        "UNKNOWN"
+        return Err(anyhow!("cannot identify column name"));
     };
 
     // Find first non-empty to decide
