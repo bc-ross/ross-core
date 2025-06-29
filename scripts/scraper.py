@@ -354,6 +354,7 @@ def course_lookup(code: str) -> dict[str]:
 
 
 def inject(mode="debug"):
+    print(mode)
     with zipfile.ZipFile(
         f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "w", compression=zipfile.ZIP_STORED
     ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:

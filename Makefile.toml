@@ -1,0 +1,30 @@
+[env.development]
+RUST_BACKTRACE = "full"
+
+# [env.production]
+# PROD = true
+
+[env]
+PYO3_PYTHON = "python" # TODO: make an actual conda env
+
+[tasks.release]
+command = "cargo"
+args = ["post", "build", "--release"]
+dependencies = ["scan"]
+
+[tasks.develop]
+command = "cargo"
+args = ["post", "build"]
+
+[tasks.trial]
+command = "cargo"
+args = ["run"]
+dependencies = ["develop"]
+
+[tasks.scan]
+script = [
+    "cargo check",
+    "cargo clippy --all-targets -- -D warnings",
+    "cargo bloat",
+    "cargo +nightly udeps",
+]
