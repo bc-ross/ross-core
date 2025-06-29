@@ -3,40 +3,18 @@
     "tasks": [
         {
             "type": "cargo",
-            "command": "post",
+            "command": "make",
             "args": [
-                "build"
+                "trial"
             ],
             "problemMatcher": [
                 "$rustc"
             ],
-            "group": "build",
-            "label": "rust: cargo build"
-        },
-        {
-            "label": "rust: run debug",
-            "type": "shell",
-            "command": "$(cygpath -u \"${workspaceFolder}/target/debug/schedulebot.exe\")",
             "group": {
                 "kind": "build",
                 "isDefault": true
             },
-            "presentation": {
-                "echo": false,
-                "reveal": "always",
-                "panel": "shared",
-                "clear": false,
-                "revealProblems": "onProblem",
-            },
-            "problemMatcher": [
-                "$rustc"
-            ],
-            "dependsOn": "rust: cargo build",
-            "options": {
-                "env": {
-                    "RUST_BACKTRACE": "1"
-                }
-            }
-        }
+            "label": "rust: run trial"
+        },
     ]
 }
