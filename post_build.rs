@@ -16,6 +16,9 @@ use std::{env, process::Command};
 // }
 
 fn main() -> Result<()> {
+    let old_bt = env::var("RUST_BACKTRACE")?;
+    env::set_var("RUST_BACKTRACE", "0");
+
     let script_dir = Path::new(&env::var("CRATE_MANIFEST_DIR")?).join("scripts");
     let data_dir = Path::new(&env::var("CRATE_MANIFEST_DIR")?).join("scraped_programs");
     let exec_path =
@@ -32,17 +35,19 @@ fn main() -> Result<()> {
         println!("Python {}", sys.getattr("version")?.extract::<&str>()?);
 
         let sys_path = sys.getattr("path")?;
-        // sys_path.insert(0, data_dir.to_str().unwrap())?;
         sys_path
             .downcast::<PyList>()?
             .call_method1("insert", (0, script_dir.to_string_lossy()))?;
 
-        // Now you can import your local script:
         let my_script = py.import("scraper")?;
-        my_script.call_method0("inject")?;
+        my_script.call_method1(
+            "inject",
+            (data_dir.to_string_lossy(), exec_path.to_string_lossy()),
+        )?;
 
         Ok(())
     })?;
 
+    env::set_var("RUST_BACKTRACE", old_bt);
     Ok(())
 }

@@ -2,7 +2,6 @@ import dataclasses
 import glob
 import logging
 import pathlib
-import sys
 import zipfile
 
 import numpy as np
@@ -11,8 +10,6 @@ import pathvalidate
 import requests
 import requests_cache
 from bs4 import BeautifulSoup
-from lxml import etree
-
 from data_structures import (
     GENERIC_ELECTIVE_NAMES,
     DefaultGenEdCodes,
@@ -20,6 +17,7 @@ from data_structures import (
     ProgramKind,
     ProgramStub,
 )
+from lxml import etree
 from xml_structures import Course, CourseKind
 
 # Configure logging
@@ -353,17 +351,16 @@ def course_lookup(code: str) -> dict[str]:
     return {"code": course_code, "title": title, "credits": int(credits), "url": url}
 
 
-def inject(mode="debug"):
-    print(mode)
+def inject(data_dir, exec_path):
     with zipfile.ZipFile(
-        f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "w", compression=zipfile.ZIP_STORED
+        pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"), "w", compression=zipfile.ZIP_STORED
     ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:
-        for i in glob.glob(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/*.xml"):
+        for i in glob.glob(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/*.xml").as_posix()):
             pth = pathlib.Path(i)
             zf.write(i, pathlib.Path(*pth.parts[:-3], *pth.parts[-2:]))
     with (
-        open(f"target/{mode}/schedulebot.exe", "ab") as exe,
-        open(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip", "rb") as zipobj,
+        open(exec_path, "ab") as exe,
+        open(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"), "rb") as zipobj,
     ):
         # exe.seek(0, os.SEEK_END)
         exe.write(zipobj.read())
@@ -411,4 +408,4 @@ if __name__ == "__main__":
     if not pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").is_dir():
         pathlib.Path("scraped_programs").joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}").mkdir()
     # main()
-    inject(sys.argv[1])
+    # inject(sys.argv[1])
