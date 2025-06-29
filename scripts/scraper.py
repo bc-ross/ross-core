@@ -1,6 +1,7 @@
 import dataclasses
 import glob
 import logging
+import os
 import pathlib
 import zipfile
 
@@ -364,7 +365,7 @@ def inject(data_dir, exec_path):
     ):
         # exe.seek(0, os.SEEK_END)
         exe.write(zipobj.read())
-    # os.remove(f"scraped_programs/{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip")
+    os.remove(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"))
 
 
 def main():
