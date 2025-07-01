@@ -5,7 +5,7 @@
             "type": "cargo",
             "command": "make",
             "args": [
-                "run"
+                "run",
             ],
             "problemMatcher": [
                 "$rustc"
@@ -14,7 +14,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "label": "cargo-make: run"
+            "label": "cargo-make: run",
         },
-    ]
+    ],
 }

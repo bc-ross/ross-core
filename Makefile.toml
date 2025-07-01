@@ -7,6 +7,7 @@ CARGO_MAKE_OUTPUT_DIR = "debug"
 
 [env.production]
 CARGO_MAKE_OUTPUT_DIR = "release"
+CARGO_MAKE_BUILD_PROFILE = "--release"
 
 [env]
 CONDA_PREFIX = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env"
@@ -15,28 +16,17 @@ CONDA_PREFIX = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env"
 dependencies = ["build"]
 
 [tasks.build]
-dependencies = [
-    "pre-build",
-    "build-development",
-    "build-production",
-    "post-build",
-]
+dependencies = ["pre-build", "build-core", "post-build"]
 
-[tasks.build-development]
-condition = { profiles = ["development"] }
+[tasks.build-core]
 command = "cargo"
-args = ["build"]
-
-[tasks.build-production]
-condition = { profiles = ["production"] }
-command = "cargo"
-args = ["build", "--release"]
+args = ["build", "@@remove-empty(CARGO_MAKE_BUILD_PROFILE)"]
 
 [tasks.pre-build]
 condition = { files_not_exist = [
     "${CONDA_PREFIX}/LICENSE_PYTHON.txt",
 ] } # Python will always have a license, right?
-command = "conda"
+command = "${CONDA_PATH}"
 args = [
     "env",
     "create",
@@ -46,9 +36,15 @@ args = [
     "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
     "--yes",
 ]
+dependencies = ["find-conda"]
+
+
+[tasks.find-conda]
+condition = { env_not_set = ["CONDA_PATH"] }
+env = { "CONDA_PATH" = "conda" }
 
 [tasks.post-build]
-command = "conda"
+command = "${CONDA_PATH}"
 args = [
     "run",
     "--prefix",
@@ -56,6 +52,7 @@ args = [
     "python",
     "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts/inject.py",
 ]
+dependencies = ["find-conda"]
 
 [tasks.scan]
 script = [
