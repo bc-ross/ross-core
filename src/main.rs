@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
-use indexmap::IndexMap;
 use polars::prelude::*;
-use std::{collections::HashMap, path::Path};
+use std::path::Path;
 
 mod read_excel_file;
 mod read_self_zip;
@@ -12,7 +11,6 @@ use read_self_zip::load_catalogs;
 use schedule::generate_schedule;
 use write_excel_file::save_schedule;
 
-use crate::schedule::StandaloneSchedule;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -32,11 +30,11 @@ fn main() -> Result<()> {
     )?;
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
-    println!("Excel file created: {}", FNAME);
+    println!("Excel file created: {FNAME}");
     println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
     let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    println!("Read file: {}", FNAME);
+    println!("Read file: {FNAME}");
 
     save_schedule(
         &Path::new("output.xlsx").to_path_buf(),

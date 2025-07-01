@@ -1,12 +1,12 @@
 use anyhow::Result;
 use polars::prelude::*;
 use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 use struct_field_names_as_array::FieldNamesAsArray;
 
 use crate::{
     read_self_zip::Course,
-    schedule::{self, Schedule},
+    schedule::Schedule,
     VERSION,
 };
 
@@ -52,21 +52,21 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     let exprs = (0..semesters)
         .map(|x| {
             when(
-                col(&format!("semester-{}_code", x + 1))
+                col(format!("semester-{}_code", x + 1))
                     .is_not_null()
-                    .and(col(&format!("semester-{}_code", x + 1)).neq(lit(""))),
+                    .and(col(format!("semester-{}_code", x + 1)).neq(lit(""))),
             )
-            .then(col(&format!("semester-{}_code", x + 1)))
+            .then(col(format!("semester-{}_code", x + 1)))
             .otherwise(
                 when(
-                    col(&format!("semester-{}_info", x + 1))
+                    col(format!("semester-{}_info", x + 1))
                         .is_not_null()
-                        .and(col(&format!("semester-{}_info", x + 1)).neq(lit(""))),
+                        .and(col(format!("semester-{}_info", x + 1)).neq(lit(""))),
                 )
-                .then(col(&format!("semester-{}_info", x + 1)))
-                .otherwise(col(&format!("semester-{}_name", x + 1))),
+                .then(col(format!("semester-{}_info", x + 1)))
+                .otherwise(col(format!("semester-{}_name", x + 1))),
             )
-            .alias(&format!("semester-{}_prettyname", x + 1))
+            .alias(format!("semester-{}_prettyname", x + 1))
         })
         .collect::<Vec<_>>();
     let df = lf.with_columns(exprs).collect()?;

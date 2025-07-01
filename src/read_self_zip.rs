@@ -30,7 +30,7 @@ pub enum CourseKind {
 
 impl std::fmt::Display for CourseKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!("{:?}", self))
+        f.write_fmt(format_args!("{self:?}"))
     }
 }
 
@@ -84,12 +84,12 @@ impl CourseColumns {
 
     fn into_df(self, sem_name: &str) -> anyhow::Result<DataFrame> {
         Ok(DataFrame::new(vec![
-            Column::new(format!("{}_kind", sem_name).into(), self.kind),
-            Column::new(format!("{}_credit", sem_name).into(), self.credit),
-            Column::new(format!("{}_name", sem_name).into(), self.name),
-            Column::new(format!("{}_code", sem_name).into(), self.code),
-            Column::new(format!("{}_url", sem_name).into(), self.url),
-            Column::new(format!("{}_info", sem_name).into(), self.info),
+            Column::new(format!("{sem_name}_kind").into(), self.kind),
+            Column::new(format!("{sem_name}_credit").into(), self.credit),
+            Column::new(format!("{sem_name}_name").into(), self.name),
+            Column::new(format!("{sem_name}_code").into(), self.code),
+            Column::new(format!("{sem_name}_url").into(), self.url),
+            Column::new(format!("{sem_name}_info").into(), self.info),
         ])?)
     }
 }

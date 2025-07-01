@@ -83,7 +83,7 @@ fn load_metadata(range: Range<Data>) -> anyhow::Result<Metadata> {
     let mut sb_version = None;
 
     for (col, vals) in header
-        .into_iter()
+        .iter()
         .enumerate()
         .filter_map(|(idx, data)| match data {
             Data::String(s) => Some((idx, s.as_str())),
@@ -244,7 +244,7 @@ where
                 // If you want, handle as string
                 let v = once(dtype)
                     .chain(values)
-                    .map(|d| format!("{:?}", d))
+                    .map(|d| format!("{d:?}"))
                     .collect::<Vec<_>>();
                 Ok(Column::new(col_name.into(), v))
             }

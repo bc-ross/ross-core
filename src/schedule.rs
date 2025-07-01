@@ -1,9 +1,8 @@
 use anyhow::Result;
 use indexmap::IndexMap;
 use ouroboros::self_referencing;
-use polars::{error, prelude::*};
-use std::ptr;
-use std::{collections::HashMap, fmt, path::Path};
+use polars::prelude::*;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone)]
 pub struct Catalog {
