@@ -1,5 +1,4 @@
-use anyhow::{anyhow, Result};
-use polars::prelude::*;
+use anyhow::{Result, anyhow};
 use std::path::Path;
 
 mod read_excel_file;
@@ -10,7 +9,6 @@ use read_excel_file::read_file;
 use read_self_zip::load_catalogs;
 use schedule::generate_schedule;
 use write_excel_file::save_schedule;
-
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 

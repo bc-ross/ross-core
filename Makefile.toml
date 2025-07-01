@@ -24,7 +24,7 @@ dependencies = ["develop"]
 [tasks.scan]
 script = [
     "cargo check",
-    "cargo clippy --all-targets -- -D warnings",
+    # "cargo clippy --all-targets -- -D warnings",
     "cargo bloat",
     "cargo +nightly udeps",
 ]

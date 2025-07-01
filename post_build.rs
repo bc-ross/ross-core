@@ -1,9 +1,8 @@
 use anyhow::{Result, anyhow};
-use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::*;
-use std::path::{Path, PathBuf};
-use std::{env, process::Command};
+use std::env;
+use std::path::Path;
 
 // fn main() {
 //     let output = Command::new("python")
