@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use calamine::{open_workbook_auto, Data, Range, Reader};
+use calamine::{Data, Range, Reader, open_workbook_auto};
 use polars::prelude::*;
 use std::{collections::HashMap, iter::once, path::PathBuf};
 

@@ -4,11 +4,7 @@ use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
 use std::path::PathBuf;
 use struct_field_names_as_array::FieldNamesAsArray;
 
-use crate::{
-    read_self_zip::Course,
-    schedule::Schedule,
-    VERSION,
-};
+use crate::{VERSION, read_self_zip::Course, schedule::Schedule};
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()

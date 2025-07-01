@@ -1,9 +1,6 @@
 import dataclasses
-import glob
 import logging
-import os
 import pathlib
-import zipfile
 
 import numpy as np
 import pandas as pd
@@ -350,24 +347,6 @@ def course_lookup(code: str) -> dict[str]:
     credits = credits_raw.strip("()").split()[0]  # Extract just the number
 
     return {"code": course_code, "title": title, "credits": int(credits), "url": url}
-
-
-def inject(data_dir, exec_path):
-    print(data_dir, exec_path)
-    with zipfile.ZipFile(
-        pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"), "w", compression=zipfile.ZIP_STORED
-    ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:
-        for i in glob.glob(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/*.xml").as_posix()):
-            pth = pathlib.Path(i)
-            zf.write(i, pathlib.Path(*pth.parts[:-3], *pth.parts[-2:]))
-    with (
-        open(exec_path, "ab") as exe,
-        open(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"), "rb") as zipobj,
-    ):
-        # exe.seek(0, os.SEEK_END)
-        exe.write(zipobj.read())
-    os.remove(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"))
-    return True
 
 
 def main():

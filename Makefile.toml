@@ -1,48 +1,40 @@
+[config]
+skip_core_tasks = true
+
 [env.development]
 RUST_BACKTRACE = "full"
+CARGO_MAKE_OUTPUT_DIR = "debug"
 
-# [env.production]
-# PROD = true
+[env.production]
+CARGO_MAKE_OUTPUT_DIR = "release"
 
 [env]
 CONDA_PREFIX = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env"
 
-# [tasks.linux_set_env]
-# env = { "PYO3_PYTHON" = /bin/python", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env/lib" }
+[tasks.default]
+dependencies = ["build"]
 
-# [tasks.windows_set_env]
-# env = { "PYO3_PYTHON" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\\env\\python.exe", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\\env\\lib" }
-
-# [tasks.set_env]
-# linux_alias = "linux_set_env"
-# windows_alias = "windows_set_env"
-# mac_alias = "mac_set_env" # TODO
-
-[tasks.release]
-command = "cargo"
-args = ["post", "build", "--release"]
-dependencies = ["scan"]
-
-[tasks.develop]
-command = "conda"
-args = ["run", "--prefix", "${CONDA_PREFIX}", "cargo", "post", "build"]
-
-[tasks.trial]
-command = "cargo"
-args = ["run"]
-dependencies = ["develop"]
-
-[tasks.scan]
-script = [
-    "cargo check",
-    # "cargo clippy --all-targets -- -D warnings",
-    "cargo bloat",
-    "cargo +nightly udeps",
+[tasks.build]
+dependencies = [
+    "pre-build",
+    "build-development",
+    "build-production",
+    "post-build",
 ]
 
-[tasks.env]
+[tasks.build-development]
+condition = { profiles = ["development"] }
+command = "cargo"
+args = ["build"]
+
+[tasks.build-production]
+condition = { profiles = ["production"] }
+command = "cargo"
+args = ["build", "--release"]
+
+[tasks.pre-build]
 condition = { files_not_exist = [
-    "${CONDA_PREFIX}/LICENSE-PYTHON.txt",
+    "${CONDA_PREFIX}/LICENSE_PYTHON.txt",
 ] } # Python will always have a license, right?
 command = "conda"
 args = [
@@ -54,3 +46,33 @@ args = [
     "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
     "--yes",
 ]
+
+[tasks.post-build]
+command = "conda"
+args = [
+    "run",
+    "--prefix",
+    "${CONDA_PREFIX}",
+    "python",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts/inject.py",
+]
+
+[tasks.scan]
+script = [
+    "cargo check",
+    # "cargo clippy --all-targets -- -D warnings",
+    "cargo bloat",
+    "cargo +nightly udeps",
+]
+
+[tasks.run]
+linux_alias = "linux_run"
+windows_alias = "windows_run"
+
+[tasks.linux_run]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_OUTPUT_DIR}/${CARGO_MAKE_PROJECT_NAME}"
+dependencies = ["build"]
+
+[tasks.windows_run]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_OUTPUT_DIR}/${CARGO_MAKE_PROJECT_NAME}.exe"
+dependencies = ["build"]
