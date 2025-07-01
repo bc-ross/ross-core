@@ -1,13 +1,15 @@
-*.sqlite
 __pycache__
-*.xlsx
-scraped_programs
-current_programs
+
+/scraped_programs
+/current_programs
+/env
+
 *.xml
 *.pkl
 *.zip
 *.db
-
+*.xlsx
+*.sqlite
 
 # Added by cargo
 

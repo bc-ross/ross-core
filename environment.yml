@@ -1,0 +1,13 @@
+# name: schedulebot
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python==3.12
+  - requests
+  - bs4
+  - requests-cache
+  - pandas
+  - openpyxl
+  - pathvalidate
+  - lxml

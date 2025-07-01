@@ -353,6 +353,7 @@ def course_lookup(code: str) -> dict[str]:
 
 
 def inject(data_dir, exec_path):
+    print(data_dir, exec_path)
     with zipfile.ZipFile(
         pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"), "w", compression=zipfile.ZIP_STORED
     ) as zf:  # ZIP_DEFLATED, compresslevel=9) as zf:
@@ -366,6 +367,7 @@ def inject(data_dir, exec_path):
         # exe.seek(0, os.SEEK_END)
         exe.write(zipobj.read())
     os.remove(pathlib.Path(data_dir).joinpath(f"{LOW_YEAR}-{LOW_YEAR + 1}/temp.zip"))
+    return True
 
 
 def main():

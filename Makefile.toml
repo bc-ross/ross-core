@@ -5,7 +5,18 @@ RUST_BACKTRACE = "full"
 # PROD = true
 
 [env]
-PYO3_PYTHON = "python" # TODO: make an actual conda env
+CONDA_PREFIX = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env"
+
+# [tasks.linux_set_env]
+# env = { "PYO3_PYTHON" = /bin/python", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env/lib" }
+
+# [tasks.windows_set_env]
+# env = { "PYO3_PYTHON" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\\env\\python.exe", "LD_LIBRARY_PATH" = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}\\env\\lib" }
+
+# [tasks.set_env]
+# linux_alias = "linux_set_env"
+# windows_alias = "windows_set_env"
+# mac_alias = "mac_set_env" # TODO
 
 [tasks.release]
 command = "cargo"
@@ -13,8 +24,8 @@ args = ["post", "build", "--release"]
 dependencies = ["scan"]
 
 [tasks.develop]
-command = "cargo"
-args = ["post", "build"]
+command = "conda"
+args = ["run", "--prefix", "${CONDA_PREFIX}", "cargo", "post", "build"]
 
 [tasks.trial]
 command = "cargo"
@@ -27,4 +38,19 @@ script = [
     # "cargo clippy --all-targets -- -D warnings",
     "cargo bloat",
     "cargo +nightly udeps",
+]
+
+[tasks.env]
+condition = { files_not_exist = [
+    "${CONDA_PREFIX}/LICENSE-PYTHON.txt",
+] } # Python will always have a license, right?
+command = "conda"
+args = [
+    "env",
+    "create",
+    "--prefix",
+    "${CONDA_PREFIX}",
+    "--file",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
+    "--yes",
 ]

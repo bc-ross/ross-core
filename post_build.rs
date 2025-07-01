@@ -23,10 +23,14 @@ fn main() -> Result<()> {
     let exec_path =
         Path::new(&env::var("CRATE_OUT_DIR")?).join(&env::var("CARGO_MAKE_CRATE_NAME")?);
 
-    if !matches!(env::var("CONDA_DEFAULT_ENV"), Ok(x) if x == env::var("CARGO_MAKE_CRATE_NAME")?) {
-        // TODO: add conda env to CRATE_MANIFEST_DIR
-        return Err(anyhow!("Please activate your conda environment."));
-    }
+    dbg!(&env::var("CONDA_PREFIX")?);
+    dbg!(&script_dir, &exec_path, &data_dir);
+
+    // if !matches!(env::var("PYO3_PYTHON"), Ok(x) if Path::new(&x) == Path::new(&env::var("CRATE_MANIFEST_DIR")?).join("env"))
+    // {
+    //     // TODO: add conda env to CRATE_MANIFEST_DIR
+    //     return Err(anyhow!("Could not locate build-script Conda environment."));
+    // }
 
     pyo3::prepare_freethreaded_python();
     Python::with_gil(|py| -> PyResult<()> {
@@ -39,10 +43,10 @@ fn main() -> Result<()> {
             .call_method1("insert", (0, script_dir.to_string_lossy()))?;
 
         let my_script = py.import("scraper")?;
-        my_script.call_method1(
+        dbg!(my_script.call_method1(
             "inject",
             (data_dir.to_string_lossy(), exec_path.to_string_lossy()),
-        )?;
+        )?);
 
         Ok(())
     })?;
