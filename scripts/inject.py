@@ -31,7 +31,6 @@ def inject(data_dir, exec_path):
 
 if __name__ == "__main__":
     # print(list(os.environ.keys()))
-    print()
     exec_path = pathlib.Path(
         os.environ["CARGO_MAKE_CRATE_CUSTOM_TRIPLE_TARGET_DIRECTORY"],
         os.environ["CARGO_MAKE_OUTPUT_DIR"],
