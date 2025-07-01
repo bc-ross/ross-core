@@ -41,7 +41,7 @@ dependencies = ["find-conda"]
 
 [tasks.find-conda]
 condition = { env_not_set = ["CONDA_PATH"] }
-env = { "CONDA_PATH" = "conda" }
+env = { CONDA_PATH = "conda" }
 
 [tasks.post-build]
 command = "${CONDA_PATH}"
