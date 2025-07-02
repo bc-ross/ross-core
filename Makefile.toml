@@ -23,18 +23,51 @@ command = "cargo"
 args = ["build", "@@remove-empty(CARGO_MAKE_BUILD_PROFILE)"]
 
 [tasks.pre-build]
+condition = { files_modified = { input = [
+    "${CARGO_MAKE_WORKING_DIRECTORY}/conda-lock.yml",
+], output = [
+    "${CONDA_PREFIX}/build/*",
+] } }
+command = "${CONDA_PATH}"
+args = [
+    "run",
+    "--prefix",
+    "${CONDA_PREFIX}/lock",
+    "conda-lock",
+    "install",
+    "--prefix",
+    "${CONDA_PREFIX}/build",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/conda-lock.yml",
+]
+dependencies = ["ensure-cl"]
+
+[tasks.ensure-cl]
 condition = { files_not_exist = [
-    "${CONDA_PREFIX}/LICENSE_PYTHON.txt",
+    "${CONDA_PREFIX}/lock/LICENSE_PYTHON.txt",
 ] } # Python will always have a license, right?
 command = "${CONDA_PATH}"
 args = [
-    "env",
     "create",
     "--prefix",
-    "${CONDA_PREFIX}",
-    "--file",
-    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
+    "${CONDA_PREFIX}/lock",
+    # "python==3.12.*",
+    "--channel=conda-forge",
+    "conda-lock",
     "--yes",
+]
+dependencies = ["find-conda"]
+
+[tasks.gen-lockfile]
+command = "${CONDA_PATH}"
+args = [
+    "run",
+    "--prefix",
+    "${CONDA_PREFIX}/lock",
+    "conda-lock",
+    "-f",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
+    "--lockfile",
+    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/conda-lock.yml",
 ]
 dependencies = ["find-conda"]
 
@@ -48,7 +81,7 @@ command = "${CONDA_PATH}"
 args = [
     "run",
     "--prefix",
-    "${CONDA_PREFIX}",
+    "${CONDA_PREFIX}/build",
     "python",
     "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts/inject.py",
 ]
