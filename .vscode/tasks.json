@@ -5,16 +5,25 @@
             "type": "cargo",
             "command": "make",
             "args": [
-                "run",
+                "run"
             ],
             "problemMatcher": [
                 "$rustc"
             ],
+            "group": "build",
+            "label": "cargo-make: run"
+        },
+        {
+            "type": "cargo",
+            "command": "run",
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "label": "rust: cargo run",
             "group": {
                 "kind": "build",
                 "isDefault": true
-            },
-            "label": "cargo-make: run",
-        },
+            }
+        }
     ],
 }

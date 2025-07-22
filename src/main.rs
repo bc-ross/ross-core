@@ -15,30 +15,30 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 fn main() -> Result<()> {
     const FNAME: &str = "schedulebot_test.xlsx";
 
-    let catalogs = load_catalogs()?;
-    let sched = generate_schedule(
-        catalogs
-            .first()
-            .ok_or(anyhow!("no catalogs found"))?
-            .programs
-            .keys()
-            .map(|x| x.as_str())
-            .collect(),
-        catalogs.first().ok_or(anyhow!("no catalogs found"))?,
-    )?;
-    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
+    // let catalogs = load_catalogs()?;
+    // let sched = generate_schedule(
+    // catalogs
+    //     .first()
+    //     .ok_or(anyhow!("no catalogs found"))?
+    //     .programs
+    //     .keys()
+    //     .map(|x| x.as_str())
+    //     .collect(),
+    // catalogs.first().ok_or(anyhow!("no catalogs found"))?,
+    // )?;
+    save_schedule(&Path::new(FNAME).to_path_buf())?; // , &sched)?;
 
     println!("Excel file created: {FNAME}");
-    println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
+    // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
-    let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    println!("Read file: {FNAME}");
+    // let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
+    // println!("Read file: {FNAME}");
 
-    save_schedule(
-        &Path::new("output.xlsx").to_path_buf(),
-        new_sched.borrow_schedule(),
-    )?;
+    // save_schedule(
+    //     &Path::new("output.xlsx").to_path_buf(),
+    //     new_sched.borrow_schedule(),
+    // )?;
 
-    println!("Excel file created: output.xlsx");
+    // println!("Excel file created: output.xlsx");
     Ok(())
 }
