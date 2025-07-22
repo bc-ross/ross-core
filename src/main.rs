@@ -1,13 +1,13 @@
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
-// mod read_excel_file;
-// mod read_self_zip;
-// mod schedule;
+mod read_excel_file;
+mod read_self_zip;
+mod schedule;
 mod write_excel_file;
-// use read_excel_file::read_file;
-// use read_self_zip::load_catalogs;
-// use schedule::generate_schedule;
+use read_excel_file::read_file;
+use read_self_zip::load_catalogs;
+use schedule::generate_schedule;
 use write_excel_file::save_schedule;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -31,8 +31,9 @@ fn main() -> Result<()> {
     println!("Excel file created: {FNAME}");
     // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
-    // let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    // println!("Read file: {FNAME}");
+    let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
+    dbg!(new_sched);
+    println!("Read file: {FNAME}");
 
     // save_schedule(
     //     &Path::new("output.xlsx").to_path_buf(),

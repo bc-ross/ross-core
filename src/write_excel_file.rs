@@ -1,8 +1,4 @@
 use anyhow::Result;
-use little_exif::exif_tag::ExifTag;
-use little_exif::filetype::FileExtension;
-use little_exif::ifd::ExifTagGroup;
-use little_exif::metadata::Metadata;
 use polars::prelude::*;
 use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
 use savefile::prelude::*;
@@ -13,9 +9,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use struct_field_names_as_array::FieldNamesAsArray;
 
-use crate::{VERSION, read_self_zip::Course, schedule::Schedule};
+// use crate::VERSION; //, read_self_zip::Course, schedule::Schedule};
 
-static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
+pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()
@@ -53,90 +49,91 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
     Ok(())
 }
 
-fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
-    let semesters = df.get_column_names().len() / Course::FIELD_NAMES_AS_ARRAY.len();
-    let lf = df.clone().lazy();
-    let exprs = (0..semesters)
-        .map(|x| {
-            when(
-                col(format!("semester-{}_code", x + 1))
-                    .is_not_null()
-                    .and(col(format!("semester-{}_code", x + 1)).neq(lit(""))),
-            )
-            .then(col(format!("semester-{}_code", x + 1)))
-            .otherwise(
-                when(
-                    col(format!("semester-{}_info", x + 1))
-                        .is_not_null()
-                        .and(col(format!("semester-{}_info", x + 1)).neq(lit(""))),
-                )
-                .then(col(format!("semester-{}_info", x + 1)))
-                .otherwise(col(format!("semester-{}_name", x + 1))),
-            )
-            .alias(format!("semester-{}_prettyname", x + 1))
-        })
-        .collect::<Vec<_>>();
-    let df = lf.with_columns(exprs).collect()?;
-    let format = Format::new().set_align(FormatAlign::Center);
+// fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
+//     let semesters = df.get_column_names().len() / Course::FIELD_NAMES_AS_ARRAY.len();
+//     let lf = df.clone().lazy();
+//     let exprs = (0..semesters)
+//         .map(|x| {
+//             when(
+//                 col(format!("semester-{}_code", x + 1))
+//                     .is_not_null()
+//                     .and(col(format!("semester-{}_code", x + 1)).neq(lit(""))),
+//             )
+//             .then(col(format!("semester-{}_code", x + 1)))
+//             .otherwise(
+//                 when(
+//                     col(format!("semester-{}_info", x + 1))
+//                         .is_not_null()
+//                         .and(col(format!("semester-{}_info", x + 1)).neq(lit(""))),
+//                 )
+//                 .then(col(format!("semester-{}_info", x + 1)))
+//                 .otherwise(col(format!("semester-{}_name", x + 1))),
+//             )
+//             .alias(format!("semester-{}_prettyname", x + 1))
+//         })
+//         .collect::<Vec<_>>();
+//     let df = lf.with_columns(exprs).collect()?;
+//     let format = Format::new().set_align(FormatAlign::Center);
 
-    for col_idx in 0..semesters {
-        sheet.merge_range(
-            0,
-            (col_idx * 2) as u16,
-            0,
-            ((col_idx * 2) + 1) as u16,
-            &format!("Semester {}", col_idx + 1),
-            &format,
-        )?;
-    }
+//     for col_idx in 0..semesters {
+//         sheet.merge_range(
+//             0,
+//             (col_idx * 2) as u16,
+//             0,
+//             ((col_idx * 2) + 1) as u16,
+//             &format!("Semester {}", col_idx + 1),
+//             &format,
+//         )?;
+//     }
 
-    let keys = ["prettyname", "credit"];
-    let selected_columns = (0..semesters)
-        .flat_map(|x| {
-            keys.iter()
-                .map(move |y| format!("semester-{}_{}", x + 1, y))
-        })
-        .collect::<Vec<_>>();
-    let selected_df = df.select(selected_columns)?;
+//     let keys = ["prettyname", "credit"];
+//     let selected_columns = (0..semesters)
+//         .flat_map(|x| {
+//             keys.iter()
+//                 .map(move |y| format!("semester-{}_{}", x + 1, y))
+//         })
+//         .collect::<Vec<_>>();
+//     let selected_df = df.select(selected_columns)?;
 
-    for (col_idx, field) in selected_df.get_columns().iter().enumerate() {
-        let field = field.as_materialized_series();
-        let max_len = field.iter().map(|s| s.to_string().len()).max().unwrap_or(0);
-        sheet.set_column_width(col_idx as u16, max_len as f64 - 2.0)?;
+//     for (col_idx, field) in selected_df.get_columns().iter().enumerate() {
+//         let field = field.as_materialized_series();
+//         let max_len = field.iter().map(|s| s.to_string().len()).max().unwrap_or(0);
+//         sheet.set_column_width(col_idx as u16, max_len as f64 - 2.0)?;
 
-        for (row_idx, val) in field.iter().filter(|x| !x.is_null()).enumerate() {
-            match val {
-                AnyValue::String(v) => {
-                    sheet.write_string((row_idx + 1) as u32, col_idx as u16, v)?
-                }
-                AnyValue::Int32(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
-                }
-                AnyValue::Int64(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
-                }
-                AnyValue::Float64(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v)?
-                }
-                _ => sheet.write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())?,
-            };
-        }
-    }
-    Ok(())
-}
+//         for (row_idx, val) in field.iter().filter(|x| !x.is_null()).enumerate() {
+//             match val {
+//                 AnyValue::String(v) => {
+//                     sheet.write_string((row_idx + 1) as u32, col_idx as u16, v)?
+//                 }
+//                 AnyValue::Int32(v) => {
+//                     sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
+//                 }
+//                 AnyValue::Int64(v) => {
+//                     sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
+//                 }
+//                 AnyValue::Float64(v) => {
+//                     sheet.write_number((row_idx + 1) as u32, col_idx as u16, v)?
+//                 }
+//                 _ => sheet.write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())?,
+//             };
+//         }
+//     }
+//     Ok(())
+// }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-struct Player {
+pub struct Player {
     name: String,
 }
+
+pub const VERSION: u32 = 1;
 
 fn embed_data_in_sheet(sheet: &mut Worksheet) -> Result<()> {
     let embeddable = Player {
         name: "Test Player".to_string(),
     };
-    const VERSION: u32 = 1;
 
-    sheet.embed_image(
+    sheet.insert_image(
         0,
         0,
         &Image::new_from_buffer(&[TEMPLATE_PNG, &save_to_mem(VERSION, &embeddable)?].concat())?,
@@ -150,7 +147,7 @@ pub fn save_schedule(fname: &PathBuf) -> Result<()> {
     //     "PadColumn".into(),
     //     sched.programs.len() - 1,
     //     &DataType::String,
-    // );
+    // );R
     // let mut cat_col = Column::new(
     //     "Catalog".into(),
     //     vec![format!(
