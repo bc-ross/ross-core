@@ -37,6 +37,11 @@ pub fn read_file(fname: &PathBuf) -> anyhow::Result<StandaloneSchedule> {
                     gened_df = Some(read_df_range(range)?);
                 }
             }
+            "TESTING EMBED" => {
+                if let Ok(range) = workbook.worksheet_range(&sheet_name) {
+                    df_map.insert(sheet_name, read_df_range(range)?);
+                }
+            }
             _ => {
                 if let Ok(range) = workbook.worksheet_range(&sheet_name) {
                     df_map.insert(sheet_name, read_df_range(range)?);

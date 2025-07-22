@@ -1,10 +1,21 @@
 use anyhow::Result;
+use little_exif::exif_tag::ExifTag;
+use little_exif::filetype::FileExtension;
+use little_exif::ifd::ExifTagGroup;
+use little_exif::metadata::Metadata;
 use polars::prelude::*;
-use rust_xlsxwriter::{Format, FormatAlign, Workbook, Worksheet};
+use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
+use savefile::prelude::*;
+use savefile::save_to_mem;
+use savefile_derive::Savefile;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::str::FromStr;
 use struct_field_names_as_array::FieldNamesAsArray;
 
 use crate::{VERSION, read_self_zip::Course, schedule::Schedule};
+
+static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()
@@ -114,6 +125,26 @@ fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()>
     Ok(())
 }
 
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
+struct Player {
+    name: String,
+}
+
+fn embed_data_in_sheet(sheet: &mut Worksheet) -> Result<()> {
+    let embeddable = Player {
+        name: "Test Player".to_string(),
+    };
+    const VERSION: u32 = 1;
+
+    sheet.embed_image(
+        0,
+        0,
+        &Image::new_from_buffer(&[TEMPLATE_PNG, &save_to_mem(VERSION, &embeddable)?].concat())?,
+    )?;
+
+    Ok(())
+}
+
 pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     let pad_col = Column::full_null(
         "PadColumn".into(),
@@ -161,6 +192,12 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     gened_sheet.protect();
     #[cfg(not(debug_assertions))]
     gened_sheet.set_hidden(true);
+
+    let test_sheet = workbook.add_worksheet().set_name("TESTING EMBED")?;
+    embed_data_in_sheet(test_sheet)?;
+    test_sheet.protect();
+    #[cfg(not(debug_assertions))]
+    test_sheet.set_hidden(true);
 
     for (name, df) in &sched.catalog.programs {
         let sheet = workbook.add_worksheet().set_name(trim_titles(name))?;
