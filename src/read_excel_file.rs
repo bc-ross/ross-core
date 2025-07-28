@@ -1,20 +1,14 @@
-use anyhow::anyhow;
-use polars::prelude::*;
 use std::{collections::HashMap, iter::once, path::PathBuf};
 
-use crate::schedule::{Catalog, Schedule, StandaloneSchedule};
+use crate::schedule::{Catalog, Schedule};
 
-struct Metadata {
-    low_year: u32,
-    programs: Vec<String>,
-    sb_version: String,
-}
-use crate::write_excel_file::{Player, TEMPLATE_PNG, VERSION};
+use crate::SAVEFILE_VERSION;
+use crate::write_excel_file::TEMPLATE_PNG;
 use anyhow::{Result, bail};
 use savefile::prelude::*;
 use umya_spreadsheet::{Spreadsheet, Worksheet, reader::xlsx};
 
-pub fn read_file(fname: &PathBuf) -> Result<Player> {
+pub fn read_file(fname: &PathBuf) -> Result<Schedule> {
     // Open workbook
     let workbook = xlsx::read(fname)?;
 
@@ -40,6 +34,6 @@ pub fn read_file(fname: &PathBuf) -> Result<Player> {
     let embedded_bytes = &img_bytes[template_len..];
 
     // Deserialize Player
-    let player: Player = load_from_mem(embedded_bytes, VERSION)?;
-    Ok(player)
+    let sched: Schedule = load_from_mem(embedded_bytes, SAVEFILE_VERSION)?;
+    Ok(sched)
 }

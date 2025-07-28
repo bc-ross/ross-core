@@ -1,3 +1,5 @@
+use crate::SAVEFILE_VERSION;
+use crate::schedule::Schedule;
 use anyhow::Result;
 use polars::prelude::*;
 use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
@@ -15,38 +17,6 @@ pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn trim_titles(s: &str) -> String {
     s.chars().take(31).collect()
-}
-
-fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
-    for (col_idx, field) in df.get_columns().iter().enumerate() {
-        let field = field.as_materialized_series();
-
-        sheet.write_string(0, col_idx as u16, field.name().as_str())?;
-
-        let field = field.rechunk(); // field.iter() panics otherwise
-        for (row_idx, val) in field.iter().enumerate() {
-            match val {
-                AnyValue::String(v) => {
-                    sheet.write_string((row_idx + 1) as u32, col_idx as u16, v)?
-                }
-                AnyValue::Int32(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
-                }
-                AnyValue::UInt32(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
-                }
-                AnyValue::Int64(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v as f64)?
-                }
-                AnyValue::Float64(v) => {
-                    sheet.write_number((row_idx + 1) as u32, col_idx as u16, v)?
-                }
-                AnyValue::Null => continue,
-                _ => sheet.write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())?,
-            };
-        }
-    }
-    Ok(())
 }
 
 // fn pretty_print_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
@@ -121,28 +91,17 @@ fn write_df_to_sheet(df: &DataFrame, sheet: &mut Worksheet) -> Result<()> {
 //     Ok(())
 // }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub struct Player {
-    name: String,
-}
-
-pub const VERSION: u32 = 1;
-
-fn embed_data_in_sheet(sheet: &mut Worksheet) -> Result<()> {
-    let embeddable = Player {
-        name: "Test Player".to_string(),
-    };
-
+fn embed_schedule_in_sheet(sheet: &mut Worksheet, sched: &Schedule) -> Result<()> {
     sheet.insert_image(
         0,
         0,
-        &Image::new_from_buffer(&[TEMPLATE_PNG, &save_to_mem(VERSION, &embeddable)?].concat())?,
+        &Image::new_from_buffer(&[TEMPLATE_PNG, &save_to_mem(SAVEFILE_VERSION, sched)?].concat())?,
     )?;
 
     Ok(())
 }
 
-pub fn save_schedule(fname: &PathBuf) -> Result<()> {
+pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     // let pad_col = Column::full_null(
     //     "PadColumn".into(),
     //     sched.programs.len() - 1,
@@ -172,26 +131,8 @@ pub fn save_schedule(fname: &PathBuf) -> Result<()> {
     // pretty_print_df_to_sheet(&sched.df, schedule_sheet)?;
     // schedule_sheet.protect();
 
-    // let internal_sheet = workbook.add_worksheet().set_name("Schedule_Internal")?;
-    // write_df_to_sheet(&sched.df, internal_sheet)?;
-    // internal_sheet.protect();
-    // #[cfg(not(debug_assertions))]
-    // internal_sheet.set_hidden(true);
-
-    // let meta_sheet = workbook.add_worksheet().set_name("Metadata")?;
-    // write_df_to_sheet(&meta_df, meta_sheet)?;
-    // meta_sheet.protect();
-    // #[cfg(not(debug_assertions))]
-    // meta_sheet.set_hidden(true);
-
-    // let gened_sheet = workbook.add_worksheet().set_name("General_Education")?;
-    // write_df_to_sheet(&sched.catalog.geneds, gened_sheet)?;
-    // gened_sheet.protect();
-    // #[cfg(not(debug_assertions))]
-    // gened_sheet.set_hidden(true);
-
     let test_sheet = workbook.add_worksheet().set_name("TESTING EMBED")?;
-    embed_data_in_sheet(test_sheet)?;
+    embed_schedule_in_sheet(test_sheet, sched)?;
     test_sheet.protect();
     // #[cfg(not(debug_assertions))]
     // test_sheet.set_hidden(true);
