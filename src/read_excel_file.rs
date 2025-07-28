@@ -1,12 +1,12 @@
-use std::{collections::HashMap, iter::once, path::PathBuf};
+use std::path::PathBuf;
 
-use crate::schedule::{Catalog, Schedule};
+use crate::schedule::Schedule;
 
 use crate::SAVEFILE_VERSION;
 use crate::write_excel_file::TEMPLATE_PNG;
 use anyhow::{Result, bail};
 use savefile::prelude::*;
-use umya_spreadsheet::{Spreadsheet, Worksheet, reader::xlsx};
+use umya_spreadsheet::reader::xlsx;
 
 pub fn read_file(fname: &PathBuf) -> Result<Schedule> {
     // Open workbook

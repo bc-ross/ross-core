@@ -1,15 +1,9 @@
 use crate::SAVEFILE_VERSION;
 use crate::schedule::Schedule;
 use anyhow::Result;
-use polars::prelude::*;
-use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
-use savefile::prelude::*;
+use rust_xlsxwriter::{Image, Workbook, Worksheet};
 use savefile::save_to_mem;
-use savefile_derive::Savefile;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use std::str::FromStr;
-use struct_field_names_as_array::FieldNamesAsArray;
 
 // use crate::VERSION; //, read_self_zip::Course, schedule::Schedule};
 
