@@ -4,10 +4,23 @@ use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
+use crate::prereqs::CourseReq;
+
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CourseCode {
-    stem: String,
-    code: usize,
+    pub stem: String,
+    pub code: usize,
+}
+
+#[macro_export]
+// #[macro_use]
+macro_rules! CC {
+    ($stem:expr, $code:expr) => {
+        CourseCode {
+            stem: $stem.to_ascii_uppercase(),
+            code: $code,
+        }
+    };
 }
 
 pub type Semester = Vec<CourseCode>;
