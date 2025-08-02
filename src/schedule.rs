@@ -7,9 +7,47 @@ use std::fmt;
 use crate::prereqs::CourseReq;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
+pub enum CourseCodeSuffix {
+    Number(usize),
+    Special(String),
+    Unique(usize),
+}
+
+impl PartialOrd for CourseCodeSuffix {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        use CourseCodeSuffix::*;
+        match (self, other) {
+            (Number(x), Number(y))
+            | (Number(x), Unique(y))
+            | (Unique(x), Number(y))
+            | (Unique(x), Unique(y)) => Some(x.cmp(y)),
+            (Special(_), _) | (_, Special(_)) => None,
+        }
+    }
+}
+
+impl From<usize> for CourseCodeSuffix {
+    fn from(num: usize) -> Self {
+        CourseCodeSuffix::Number(num)
+    }
+}
+
+impl From<String> for CourseCodeSuffix {
+    fn from(s: String) -> Self {
+        CourseCodeSuffix::Special(s)
+    }
+}
+
+impl From<&str> for CourseCodeSuffix {
+    fn from(s: &str) -> Self {
+        CourseCodeSuffix::Special(s.to_string())
+    }
+}
+
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CourseCode {
     pub stem: String,
-    pub code: usize,
+    pub code: CourseCodeSuffix,
 }
 
 #[macro_export]
@@ -18,7 +56,7 @@ macro_rules! CC {
     ($stem:expr, $code:expr) => {
         CourseCode {
             stem: $stem.to_ascii_uppercase(),
-            code: $code,
+            code: $code.into(),
         }
     };
 }

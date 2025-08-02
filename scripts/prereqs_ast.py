@@ -21,9 +21,9 @@ POSTAMBLE = "]);}"
 def rustify(node, default_stem, in_tuple=False, co_prefix=False):
     # Helper to wrap with PreCourse/CoCourse or their Grade variants
     def wrap_course(stem, code, grade=None):
-        cc = f'CC!("{stem}", {code})'
+        cc = f"CC!({stem}, {code})"
         if grade is not None:
-            gr = f"GR!({grade})"
+            gr = grade if grade.startswith("GR!") else f"GR!({grade})"
             return f"{'CoCourseGrade' if co_prefix else 'PreCourseGrade'}({cc}, {gr})"
         else:
             return f"{'CoCourse' if co_prefix else 'PreCourse'}({cc})"
@@ -41,7 +41,7 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             return f'Program("{rustify(args[0], default_stem)}")'
         if func == "GR":
             # Grade macro
-            return ", ".join(str(ast.unparse(arg)).replace('"', "") for arg in args)
+            return f"GR!({', '.join(rustify(arg, default_stem) for arg in args)})"
     elif isinstance(node, ast.Tuple):
         elts = node.elts
         if len(elts) == 3:
@@ -53,11 +53,13 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
         elif len(elts) == 2:
             # (STEM, CODE) or (CODE, GRADE)
             if isinstance(elts[0], ast.Constant) and isinstance(elts[1], ast.Constant):
+                # (CODE, GRADE) if second is a grade string
                 if isinstance(elts[1].value, str) and re.fullmatch(r"[A-DF][+-]?", elts[1].value):
                     code = rustify(elts[0], default_stem, in_tuple=True)
                     grade = rustify(elts[1], default_stem, in_tuple=True)
                     return wrap_course(default_stem, code, grade)
                 else:
+                    # (STEM, CODE) where code can be string or int
                     stem = rustify(elts[0], default_stem, in_tuple=True)
                     code = rustify(elts[1], default_stem, in_tuple=True)
                     return wrap_course(stem, code)
@@ -84,17 +86,25 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             # If it looks like a grade, just return the string (parent will wrap in GR!)
             if re.fullmatch(r"[A-DF][+-]?", node.value):
                 return node.value
+            # If it looks like a course code (alphanumeric, length > 2), emit as string
+            elif re.fullmatch(r"[A-Za-z0-9]{3,}", node.value):
+                return f'"{node.value}"'
             else:
                 return f'"{node.value}"'
     elif isinstance(node, ast.Name):
-        # Instructor, None, etc.
-        return node.id
+        # Special-case Instructor and None, otherwise treat as a string course code
+        if node.id in {"Instructor", "None"}:
+            return node.id
+        if in_tuple:
+            return f'"{node.id}"'
+        # If bare, treat as course with default stem
+        return wrap_course(default_stem, node.id, None)
     raise ValueError(f"Unsupported AST node: {ast.dump(node)}")
 
 
 def parse_req(req, default_stem):
     expr = ast.parse(preprocess_grades(req), mode="eval").body
-    return rustify(expr, default_stem)
+    return rustify(expr, '"' + default_stem + '"')  # Wrap the stem in an extra quote set
 
 
 def preprocess_grades(expr: str) -> str:

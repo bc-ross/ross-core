@@ -19,7 +19,11 @@ lazy_static! {
             ]),
             CoCourseGrade(CC!("CS", 1050), GR!(C+)),
             CoCourseGrade(CC!("MUSC", 1090), GR!(F)),
-            PreCourse(CC!("CS", 1030))
+            PreCourse(CC!("CS", 1030)),
+            PreCourse(CC!("CS", COMP)),
+            PreCourse(CC!("CS", COMP)),
+            PreCourse(CC!("MATH", "COMP")),
+            PreCourseGrade(CC!("MATH", "COMP"), GR!(C+))
         ]),
     ),]);
 }
