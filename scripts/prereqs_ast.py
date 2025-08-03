@@ -18,10 +18,16 @@ lazy_static! { pub static ref PREREQS_MAP: HashMap<CourseCode, CourseReq> = Hash
 POSTAMBLE = "]);}"
 
 
+def strip_quotes(s):
+    if isinstance(s, str) and s.startswith('"') and s.endswith('"'):
+        return s[1:-1]
+    return s
+
+
 def rustify(node, default_stem, in_tuple=False, co_prefix=False):
     # Helper to wrap with PreCourse/CoCourse or their Grade variants
-    def wrap_course(stem, code, grade=None):
-        cc = f"CC!({stem}, {code})"
+    def wrap_course(stem, code, grade=None, co_prefix=False):
+        cc = f'CC!("{stem}", {code})'
         if grade is not None:
             gr = grade if grade.startswith("GR!") else f"GR!({grade})"
             return f"{'CoCourseGrade' if co_prefix else 'PreCourseGrade'}({cc}, {gr})"
@@ -40,16 +46,15 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
         if func == "Prog":
             return f'Program("{rustify(args[0], default_stem)}")'
         if func == "GR":
-            # Grade macro
             return f"GR!({', '.join(rustify(arg, default_stem) for arg in args)})"
     elif isinstance(node, ast.Tuple):
         elts = node.elts
         if len(elts) == 3:
             # (STEM, CODE, GRADE)
-            stem = rustify(elts[0], default_stem, in_tuple=True)
+            stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
             code = rustify(elts[1], default_stem, in_tuple=True)
             grade = rustify(elts[2], default_stem, in_tuple=True)
-            return wrap_course(stem, code, grade)
+            return wrap_course(stem, code, grade, co_prefix)
         elif len(elts) == 2:
             # (STEM, CODE) or (CODE, GRADE)
             if isinstance(elts[0], ast.Constant) and isinstance(elts[1], ast.Constant):
@@ -57,20 +62,20 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
                 if isinstance(elts[1].value, str) and re.fullmatch(r"[A-DF][+-]?", elts[1].value):
                     code = rustify(elts[0], default_stem, in_tuple=True)
                     grade = rustify(elts[1], default_stem, in_tuple=True)
-                    return wrap_course(default_stem, code, grade)
+                    return wrap_course(default_stem, code, grade, co_prefix)
                 else:
                     # (STEM, CODE) where code can be string or int
-                    stem = rustify(elts[0], default_stem, in_tuple=True)
+                    stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
                     code = rustify(elts[1], default_stem, in_tuple=True)
-                    return wrap_course(stem, code)
+                    return wrap_course(stem, code, None, co_prefix)
             elif isinstance(elts[1], ast.Call) and getattr(elts[1].func, "id", None) == "GR":
                 code = rustify(elts[0], default_stem, in_tuple=True)
                 grade = rustify(elts[1], default_stem, in_tuple=True)
-                return wrap_course(default_stem, code, grade)
+                return wrap_course(default_stem, code, grade, co_prefix)
             else:
-                stem = rustify(elts[0], default_stem, in_tuple=True)
+                stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
                 code = rustify(elts[1], default_stem, in_tuple=True)
-                return wrap_course(stem, code)
+                return wrap_course(stem, code, None, co_prefix)
         elif len(elts) == 1:
             # (CODE,) or (STEM,)
             return rustify(elts[0], default_stem, in_tuple)
@@ -81,7 +86,7 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             if in_tuple:
                 return str(node.value)
             else:
-                return wrap_course(default_stem, node.value)
+                return wrap_course(default_stem, node.value, None, co_prefix)
         elif isinstance(node.value, str):
             # If it looks like a grade, just return the string (parent will wrap in GR!)
             if re.fullmatch(r"[A-DF][+-]?", node.value):
@@ -97,14 +102,14 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             return node.id
         if in_tuple:
             return f'"{node.id}"'
-        # If bare, treat as course with default stem
-        return wrap_course(default_stem, node.id, None)
+        # If bare, treat as course with default stem, and respect co_prefix
+        return wrap_course(default_stem, f'"{node.id}"', None, co_prefix)
     raise ValueError(f"Unsupported AST node: {ast.dump(node)}")
 
 
 def parse_req(req, default_stem):
     expr = ast.parse(preprocess_grades(req), mode="eval").body
-    return rustify(expr, '"' + default_stem + '"')  # Wrap the stem in an extra quote set
+    return rustify(expr, default_stem)
 
 
 def preprocess_grades(expr: str) -> str:
