@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::path::Path;
 
-#[path = "../resources/course_reqs.rs"]
+#[path = "../resources/course_reqs/mod.rs"]
 mod course_reqs;
 
 mod prereqs;

@@ -3,19 +3,35 @@ import pathlib
 import re
 import subprocess
 
-PATH = pathlib.Path(__file__).parent.parent.joinpath("resources", "course_reqs.rs")
+PATH = pathlib.Path(__file__).parent.parent.joinpath("resources", "course_reqs")
 
-PREAMBLE = """
-use crate::{GR, CC};
-use crate::prereqs::{Grade, GradeLetter, GradeQualifier, CourseReq::{self, *}};
+BASE_FILENAME = "mod.rs"
+
+BASE_PREAMBLE = """
+use crate::prereqs::CourseReq;
 use crate::schedule::CourseCode;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
-
-lazy_static! { pub static ref PREREQS_MAP: HashMap<CourseCode, CourseReq> = HashMap::from([
+use std::iter::empty;
 """
 
-POSTAMBLE = "]);}"
+BASE_MIDAMBLE = "lazy_static! { pub static ref PREREQS_MAP: HashMap<&'static CourseCode, &'static CourseReq> = empty()"
+
+BASE_POSTAMBLE = ".collect();}"
+
+PREAMBLE = """
+use crate::prereqs::{
+    CourseReq::{self, *},
+    Grade, GradeLetter, GradeQualifier,
+};
+use crate::schedule::CourseCode;
+use crate::{CC, GR};
+use lazy_static::lazy_static;
+
+lazy_static! { pub static ref PREREQS: Vec<(CourseCode, CourseReq)> = vec![
+"""
+
+POSTAMBLE = "];}"
 
 
 def strip_quotes(s):
@@ -118,36 +134,59 @@ def preprocess_grades(expr: str) -> str:
     return expr.strip()
 
 
+class StopMeError(Exception):
+    pass
+
+
 # Example usage:
 def main():
-    if PATH.exists():
-        resp = input(f"File {PATH} exists. Overwrite? [Y/n] ").strip().lower()
-        if resp != "y":
-            print("Aborting.")
-            return
-    with open(PATH, "w") as f:
-        f.write(PREAMBLE)
+    # if PATH.exists():
+    #     resp = input(f"File {PATH} exists. Overwrite? [Y/n] ").strip().lower()
+    #     if resp != "y":
+    #         print("Aborting.")
+    #         return
+    with open(PATH.joinpath(BASE_FILENAME), "w") as base_f:
+        base_f.write(BASE_PREAMBLE)
         print("Rust CourseReq REPL. Type 'stem STEM' to set stem, 'exit' to quit.")
-        stem = "CS"
-        while True:
-            inp = input(f"[stem={stem}] code> ").strip()
-            if inp.lower() == "exit":
-                break
-            if inp.lower().startswith("stem "):
-                stem = inp.split()[1].upper()
-                continue
-            if not inp.isdigit():
-                print("Enter a course code (e.g., 1020) or 'stem STEM'.")
-                continue
-            code = inp
-            req = input(f"[stem={stem}] req for {code}> ").strip()
-            if not req:
-                print("No requirement entered, skipping.")
-                continue
-            parsed_req = parse_req(req, stem)
-            print("Added course!")
-            f.write(f'(\n    CC!("{stem}", {code}),\n    {parsed_req},\n),\n')
-        f.write(POSTAMBLE)
+        stems = []
+        try:
+            stem = input("Stem? ")
+            while True:
+                stems.append(stem)
+                with open(PATH.joinpath("TEMP.rs").with_stem(f"stem_{stem.lower()}"), "w") as f:
+                    f.write(PREAMBLE)
+
+                    try:
+                        while True:
+                            inp = input(f"[stem={stem}] code> ").strip()
+                            if inp.lower() == "exit":
+                                raise StopMeError
+                            if inp.lower().startswith("stem "):
+                                stem = inp.split()[1].upper()
+                                break
+                            # if not inp.isdigit():
+                            #     print("Enter a course code (e.g., 1020) or 'stem STEM'.")
+                            #     continue
+                            code = inp
+                            req = input(f"[stem={stem}] req for {code}> ").strip()
+                            if not req:
+                                print("No requirement entered, skipping.")
+                                continue
+                            if stem:
+                                parsed_req = parse_req(req, stem)
+                                print("Added course!")
+                                f.write(f'(\n    CC!("{stem}", {code}),\n    {parsed_req},\n),\n')
+                    finally:
+                        f.write(POSTAMBLE)
+        except StopMeError:
+            pass
+        finally:
+            for i in stems:
+                base_f.write(f"mod stem_{i.lower()};\n")
+            base_f.write(BASE_MIDAMBLE)
+            for i in stems:
+                base_f.write(f".chain(stem_{i.lower()}::PREREQS.iter().map(|(x, y)| (x, y)))\n")
+            base_f.write(BASE_POSTAMBLE)
     subprocess.run(["rustfmt", str(PATH)], check=True)
 
 
