@@ -77,8 +77,9 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
                 code = rustify(elts[1], default_stem, in_tuple=True)
                 return wrap_course(stem, code, None, co_prefix)
         elif len(elts) == 1:
-            # (CODE,) or (STEM,)
-            return rustify(elts[0], default_stem, in_tuple)
+            # (CODE,)
+            code = rustify(elts[0], default_stem, in_tuple=True)
+            return wrap_course(default_stem, code, None, co_prefix)
         else:
             raise ValueError(f"Unsupported tuple length: {len(elts)} in {ast.dump(node)}")
     elif isinstance(node, ast.Constant):
@@ -86,7 +87,7 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             if in_tuple:
                 return str(node.value)
             else:
-                return wrap_course(default_stem, node.value, None, co_prefix)
+                return wrap_course(default_stem, node.value, None, co_prefix=co_prefix)
         elif isinstance(node.value, str):
             # If it looks like a grade, just return the string (parent will wrap in GR!)
             if re.fullmatch(r"[A-DF][+-]?", node.value):
@@ -97,13 +98,11 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             else:
                 return f'"{node.value}"'
     elif isinstance(node, ast.Name):
-        # Special-case Instructor and None, otherwise treat as a string course code
         if node.id in {"Instructor", "None"}:
             return node.id
         if in_tuple:
             return f'"{node.id}"'
-        # If bare, treat as course with default stem, and respect co_prefix
-        return wrap_course(default_stem, f'"{node.id}"', None, co_prefix)
+        return wrap_course(default_stem, f'"{node.id}"', None, co_prefix=co_prefix)
     raise ValueError(f"Unsupported AST node: {ast.dump(node)}")
 
 

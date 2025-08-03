@@ -13,15 +13,15 @@ lazy_static! {
         Or(vec![
             And(vec![
                 PreCourseGrade(CC!("CS", 1080), GR!(C-)),
-                PreCourse(CC!("CS", 1090)),
+                CoCourse(CC!("CS", 1090)),
                 PreCourseGrade(CC!("MATH", 1090), GR!(B)),
                 PreCourse(CC!("CS", 1040))
             ]),
             CoCourseGrade(CC!("CS", 1050), GR!(C+)),
             CoCourseGrade(CC!("MUSC", 1090), GR!(F)),
-            PreCourse(CC!("CS", 1030)),
+            CoCourse(CC!("CS", 1030)),
             PreCourse(CC!("CS", "COMP")),
-            PreCourse(CC!("CS", "COMP"))
+            CoCourse(CC!("CS", "COMP"))
         ]),
     ),]);
 }
