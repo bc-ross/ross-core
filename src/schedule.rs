@@ -74,8 +74,9 @@ pub enum Elective {
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
 pub struct Program {
     pub(crate) name: String,
-    semesters: Vec<Semester>,
-    electives: Vec<Elective>,
+    pub(crate) semesters: Vec<Semester>,
+    pub(crate) electives: Vec<Elective>,
+    pub(crate) assoc_stems: Vec<String>,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
