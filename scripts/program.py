@@ -76,9 +76,10 @@ pub fn prog() -> Program {
             base_f.write(f"mod prog_{i.stem[5:].lower()};\n")
         base_f.write(BASE_MIDAMBLE)
         for i in PATH.glob("prog_*.rs"):
-            base_f.write(f".chain(prog_{i.stem[5:].lower()}::prereqs().into_iter())\n")
+            base_f.write(f"let x = prog_{i.stem[5:].lower()}::prog(); m.insert(x.name.clone(), x);\n")
         base_f.write(BASE_POSTAMBLE)
     subprocess.run(["rustfmt", str(PATH.joinpath("TEMP.rs").with_stem(f"prog_{fname.lower()}"))], check=True)
+    subprocess.run(["rustfmt", str(PATH.joinpath("mod.rs"))], check=True)
 
 
 if __name__ == "__main__":
