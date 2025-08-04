@@ -1,4 +1,5 @@
 import ast
+import itertools
 import pathlib
 import re
 import subprocess
@@ -13,9 +14,12 @@ use crate::schedule::CourseCode;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::iter::empty;
+
 """
 
-BASE_MIDAMBLE = "lazy_static! { pub static ref PREREQS_MAP: HashMap<&'static CourseCode, &'static CourseReq> = empty()"
+BASE_MIDAMBLE = (
+    "\nlazy_static! { pub static ref PREREQS_MAP: HashMap<&'static CourseCode, &'static CourseReq> = empty()"
+)
 
 BASE_POSTAMBLE = ".collect();}"
 
@@ -148,11 +152,9 @@ def main():
     with open(PATH.joinpath(BASE_FILENAME), "w") as base_f:
         base_f.write(BASE_PREAMBLE)
         print("Rust CourseReq REPL. Type 'stem STEM' to set stem, 'exit' to quit.")
-        stems = []
         try:
             stem = input("Stem? ")
             while True:
-                stems.append(stem)
                 with open(PATH.joinpath("TEMP.rs").with_stem(f"stem_{stem.lower()}"), "w") as f:
                     f.write(PREAMBLE)
 
@@ -181,13 +183,14 @@ def main():
         except StopMeError:
             pass
         finally:
-            for i in stems:
-                base_f.write(f"mod stem_{i.lower()};\n")
+            for i in PATH.glob("stem_*.rs"):
+                base_f.write(f"mod stem_{i.stem[5:].lower()};\n")
             base_f.write(BASE_MIDAMBLE)
-            for i in stems:
-                base_f.write(f".chain(stem_{i.lower()}::PREREQS.iter().map(|(x, y)| (x, y)))\n")
+            for i in PATH.glob("stem_*.rs"):
+                base_f.write(f".chain(stem_{i.stem[5:].lower()}::PREREQS.iter().map(|(x, y)| (x, y)))\n")
             base_f.write(BASE_POSTAMBLE)
-    subprocess.run(["rustfmt", str(PATH)], check=True)
+    for i in itertools.chain(PATH.glob("stem_*.rs"), [PATH.joinpath(BASE_FILENAME)]):
+        subprocess.run(["rustfmt", str(i)], check=True)
 
 
 if __name__ == "__main__":
