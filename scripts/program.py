@@ -3,19 +3,11 @@ import subprocess
 
 PATH = pathlib.Path(__file__).parent.parent.joinpath("resources", "programs")
 
-BASE_PREAMBLE = """
-use crate::schedule::Program;
-use lazy_static::lazy_static;
-use std::collections::HashMap;
-"""
+BASE_PREAMBLE = "use crate::schedule::Program;\n"
 
-BASE_MIDAMBLE = """
-lazy_static! {
-    pub static ref PROGRAMS_MAP: HashMap<String, Program> = {
-        let mut m = HashMap::new();
-"""
+BASE_MIDAMBLE = "\npub fn programs() -> Vec<Program> { vec![\n"
 
-BASE_POSTAMBLE = "m};}"
+BASE_POSTAMBLE = "]}"
 
 
 def parse_course_code(code):
@@ -76,7 +68,7 @@ pub fn prog() -> Program {
             base_f.write(f"mod prog_{i.stem[5:].lower()};\n")
         base_f.write(BASE_MIDAMBLE)
         for i in PATH.glob("prog_*.rs"):
-            base_f.write(f"let x = prog_{i.stem[5:].lower()}::prog(); m.insert(x.name.clone(), x);\n")
+            base_f.write(f"prog_{i.stem[5:].lower()}::prog(),\n")
         base_f.write(BASE_POSTAMBLE)
     subprocess.run(["rustfmt", str(PATH.joinpath("TEMP.rs").with_stem(f"prog_{fname.lower()}"))], check=True)
     subprocess.run(["rustfmt", str(PATH.joinpath("mod.rs"))], check=True)

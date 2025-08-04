@@ -11,15 +11,14 @@ BASE_FILENAME = "mod.rs"
 BASE_PREAMBLE = """
 use crate::prereqs::CourseReq;
 use crate::schedule::CourseCode;
-use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::iter::empty;
 
 """
 
-BASE_MIDAMBLE = "\nlazy_static! { pub static ref PREREQS_MAP: HashMap<CourseCode, CourseReq> = empty()"
+BASE_MIDAMBLE = "\npub fn prereqs() -> HashMap<CourseCode, CourseReq> { empty()"
 
-BASE_POSTAMBLE = ".collect();}"
+BASE_POSTAMBLE = ".collect()}"
 
 PREAMBLE = """
 #![allow(unused_imports)]
