@@ -17,9 +17,7 @@ use std::iter::empty;
 
 """
 
-BASE_MIDAMBLE = (
-    "\nlazy_static! { pub static ref PREREQS_MAP: HashMap<&'static CourseCode, &'static CourseReq> = empty()"
-)
+BASE_MIDAMBLE = "\nlazy_static! { pub static ref PREREQS_MAP: HashMap<CourseCode, CourseReq> = empty()"
 
 BASE_POSTAMBLE = ".collect();}"
 
@@ -30,12 +28,11 @@ use crate::prereqs::{
 };
 use crate::schedule::CourseCode;
 use crate::{CC, GR};
-use lazy_static::lazy_static;
 
-lazy_static! { pub static ref PREREQS: Vec<(CourseCode, CourseReq)> = vec![
+pub fn prereqs() -> Vec<(CourseCode, CourseReq)> { vec![
 """
 
-POSTAMBLE = "];}"
+POSTAMBLE = "]}"
 
 
 def strip_quotes(s):
@@ -187,7 +184,7 @@ def main():
                 base_f.write(f"mod stem_{i.stem[5:].lower()};\n")
             base_f.write(BASE_MIDAMBLE)
             for i in PATH.glob("stem_*.rs"):
-                base_f.write(f".chain(stem_{i.stem[5:].lower()}::PREREQS.iter().map(|(x, y)| (x, y)))\n")
+                base_f.write(f".chain(stem_{i.stem[5:].lower()}::prereqs().into_iter())\n")
             base_f.write(BASE_POSTAMBLE)
     for i in itertools.chain(PATH.glob("stem_*.rs"), [PATH.joinpath(BASE_FILENAME)]):
         subprocess.run(["rustfmt", str(i)], check=True)
