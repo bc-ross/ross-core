@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 use crate::prereqs::{
     CourseReq::{self, *},
     Grade, GradeLetter, GradeQualifier,

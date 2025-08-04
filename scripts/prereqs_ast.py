@@ -22,6 +22,8 @@ BASE_MIDAMBLE = "\nlazy_static! { pub static ref PREREQS_MAP: HashMap<CourseCode
 BASE_POSTAMBLE = ".collect();}"
 
 PREAMBLE = """
+#![allow(unused_imports)]
+
 use crate::prereqs::{
     CourseReq::{self, *},
     Grade, GradeLetter, GradeQualifier,
