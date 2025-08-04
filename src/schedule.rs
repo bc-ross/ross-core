@@ -69,6 +69,7 @@ pub enum Elective {
     Or(Vec<Elective>),
     Courses { num: usize, opts: Vec<CourseCode> },
     Credits { num: usize, opts: Vec<CourseCode> },
+    Sequence(Vec<Vec<CourseCode>>),
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]

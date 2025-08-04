@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 
-use crate::schedule::{CourseCode, Program};
 use crate::CC;
+use crate::schedule::{CourseCode, Elective::*, Program};
 
 pub fn prog() -> Program {
     Program {
@@ -10,7 +10,7 @@ pub fn prog() -> Program {
             vec![CC!("ASTR", 1010), CC!("ASTR", 1030)],
             vec![CC!("ASTR", 1040), CC!("ASTR", 1050)],
         ],
-        electives: vec![],
         assoc_stems: vec!["ASTR".to_string()],
+        electives: vec![],
     }
 }

@@ -37,7 +37,7 @@ def main():
 #![allow(unused_imports)]
 
 use crate::CC;
-use crate::schedule::{CourseCode, Program};
+use crate::schedule::{CourseCode, Elective::*, Program};
 
 pub fn prog() -> Program {
     Program {
@@ -47,10 +47,9 @@ pub fn prog() -> Program {
             semesters: vec![
     {chr(10).join(semesters)}
             ],
-            electives: vec![],
             assoc_stems: vec![{", ".join(stems)}],
     """
-        + "}}"
+        + "electives: vec![],\n}}"
     )
     with open(EXAMPLE_RS, "w", encoding="utf-8") as f:
         f.write(rust_code)
