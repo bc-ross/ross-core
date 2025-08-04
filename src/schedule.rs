@@ -2,7 +2,7 @@ use anyhow::Result;
 use savefile::prelude::*;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use crate::prereqs::CourseReq;
 
@@ -98,6 +98,7 @@ pub struct GenEd {
 pub struct Catalog {
     pub programs: Vec<Program>,
     pub geneds: Vec<GenEd>,
+    pub prereqs: HashMap<CourseCode, CourseReq>,
     pub low_year: u32,
 }
 

@@ -2,19 +2,12 @@ use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::path::Path;
 
-#[path = "../resources/course_reqs/mod.rs"]
-mod course_reqs;
-
-#[path = "../resources/programs/mod.rs"]
-mod programs;
-
 mod prereqs;
 mod read_excel_file;
 mod read_self_zip;
 mod schedule;
 mod write_excel_file;
 
-use course_reqs::PREREQS_MAP;
 use read_excel_file::read_file;
 use read_self_zip::CATALOGS;
 use schedule::generate_schedule;

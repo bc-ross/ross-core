@@ -1,13 +1,18 @@
-use crate::SAVEFILE_VERSION;
 use lazy_static::lazy_static;
-use savefile::prelude::*;
+
+#[path = "../resources/course_reqs/mod.rs"]
+mod course_reqs;
+
+#[path = "../resources/programs/mod.rs"]
+mod programs;
 
 use crate::schedule::Catalog;
 
 lazy_static! {
-    pub static ref CATALOGS: Vec<Catalog> = {
-        let x: Vec<Catalog> =
-            load_from_mem(include_bytes!("../assets/catalogs.bin"), SAVEFILE_VERSION).unwrap();
-        x
-    };
+    pub static ref CATALOGS: Vec<Catalog> = vec![Catalog {
+        geneds: vec![],
+        programs: programs::programs(),
+        prereqs: course_reqs::prereqs(),
+        low_year: 2025,
+    }];
 }
