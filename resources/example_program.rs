@@ -1,16 +1,16 @@
+#![allow(unused_imports)]
 
-use crate::CC;
 use crate::schedule::{CourseCode, Program};
-use lazy_static::lazy_static;
+use crate::CC;
 
-lazy_static! {
-    pub static ref PROG: Program = Program {
-        name: "Example #2".to_string(),
+pub fn prog() -> Program {
+    Program {
+        name: "Example #4".to_string(),
         semesters: vec![
-            vec![CC!("ASTR", 1050), CC!("ENGL", 1060), CC!("HONR", "PROJ")],
-            vec![CC!("ENGL", 9930)],
+            vec![CC!("ASTR", 1010), CC!("ASTR", 1030)],
+            vec![CC!("ASTR", 1040), CC!("ASTR", 1050)],
         ],
         electives: vec![],
-        assoc_stems: vec!["ENGL".to_string(), "ASTR".to_string(), "COLO".to_string()],
-    };
+        assoc_stems: vec!["ASTR".to_string()],
+    }
 }

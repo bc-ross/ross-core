@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 EXAMPLE_RS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "example_program.rs"))
 
@@ -31,26 +32,30 @@ def main():
     stems_line = input("Associated stems (comma-separated): ").strip()
     stems = [f'"{s.strip().upper()}".to_string()' for s in stems_line.split(",") if s.strip()]
 
-    rust_code = f"""
+    rust_code = (
+        """
+#![allow(unused_imports)]
+
 use crate::CC;
-use crate::schedule::{{CourseCode, Program}};
-use lazy_static::lazy_static;
+use crate::schedule::{CourseCode, Program};
 
-lazy_static! {{
-    pub static ref PROG: Program = Program {{
-        name: "{name}".to_string(),
-        semesters: vec![
-{chr(10).join(semesters)}
-        ],
-        electives: vec![],
-        assoc_stems: vec![{", ".join(stems)}],
-    }};
-}}
-"""
-
+pub fn prog() -> Program {
+    Program {
+    """
+        + f"""
+            name: "{name}".to_string(),
+            semesters: vec![
+    {chr(10).join(semesters)}
+            ],
+            electives: vec![],
+            assoc_stems: vec![{", ".join(stems)}],
+    """
+        + "}}"
+    )
     with open(EXAMPLE_RS, "w", encoding="utf-8") as f:
         f.write(rust_code)
     print(f"Program written to {EXAMPLE_RS}")
+    subprocess.run(["rustfmt", str(EXAMPLE_RS)], check=True)
 
 
 if __name__ == "__main__":
