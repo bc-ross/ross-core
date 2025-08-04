@@ -5,8 +5,8 @@ use std::path::Path;
 #[path = "../resources/course_reqs/mod.rs"]
 mod course_reqs;
 
-#[path = "../resources/example_program.rs"]
-mod example_program;
+#[path = "../resources/programs/mod.rs"]
+mod programs;
 
 mod prereqs;
 mod read_excel_file;

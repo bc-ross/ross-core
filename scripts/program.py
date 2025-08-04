@@ -1,7 +1,21 @@
-import os
+import pathlib
 import subprocess
 
-EXAMPLE_RS = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "resources", "example_program.rs"))
+PATH = pathlib.Path(__file__).parent.parent.joinpath("resources", "programs")
+
+BASE_PREAMBLE = """
+use crate::schedule::Program;
+use lazy_static::lazy_static;
+use std::collections::HashMap;
+"""
+
+BASE_MIDAMBLE = """
+lazy_static! {
+    pub static ref PROGRAMS_MAP: HashMap<String, Program> = {
+        let mut m = HashMap::new();
+"""
+
+BASE_POSTAMBLE = "m};}"
 
 
 def parse_course_code(code):
@@ -19,6 +33,7 @@ def parse_course_code(code):
 def main():
     print("=== Program Definition REPL ===")
     name = input("Program name: ").strip()
+    fname = input("Program shortname (for file): ").strip()
     semesters = []
     sem_num = 1
     while True:
@@ -51,10 +66,19 @@ pub fn prog() -> Program {
     """
         + "electives: vec![],\n}}"
     )
-    with open(EXAMPLE_RS, "w", encoding="utf-8") as f:
+    with open(PATH.joinpath("TEMP.rs").with_stem(f"prog_{fname.lower()}"), "w", encoding="utf-8") as f:
         f.write(rust_code)
-    print(f"Program written to {EXAMPLE_RS}")
-    subprocess.run(["rustfmt", str(EXAMPLE_RS)], check=True)
+    print(f"Program written to {PATH.joinpath('TEMP.rs').with_stem(f'prog_{fname.lower()}')}")
+
+    with open(PATH.joinpath("mod.rs"), "w", encoding="utf-8") as base_f:
+        base_f.write(BASE_PREAMBLE)
+        for i in PATH.glob("prog_*.rs"):
+            base_f.write(f"mod prog_{i.stem[5:].lower()};\n")
+        base_f.write(BASE_MIDAMBLE)
+        for i in PATH.glob("prog_*.rs"):
+            base_f.write(f".chain(prog_{i.stem[5:].lower()}::prereqs().into_iter())\n")
+        base_f.write(BASE_POSTAMBLE)
+    subprocess.run(["rustfmt", str(PATH.joinpath("TEMP.rs").with_stem(f"prog_{fname.lower()}"))], check=True)
 
 
 if __name__ == "__main__":
