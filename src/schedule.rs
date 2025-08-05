@@ -164,6 +164,7 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
         catalog,
     };
     sched.reduce()?;
+    println!("Is schedule valid? {}", sched.is_valid()?);
 
     Ok(sched)
 }
@@ -182,5 +183,33 @@ impl Schedule {
             });
         });
         Ok(self)
+    }
+
+    pub fn is_valid(&self) -> Result<bool> {
+        let all_sched_codes = self
+            .courses
+            .iter()
+            .flatten()
+            .collect::<HashSet<&CourseCode>>();
+        Ok(self
+            .programs
+            .iter()
+            .map(|prog_name| {
+                let prog = self
+                    .catalog
+                    .programs
+                    .iter()
+                    .find(|p| p.name == *prog_name)
+                    .ok_or_else(|| anyhow::anyhow!("Program {} not found in catalog", prog_name))?;
+                let all_prog_codes = prog
+                    .semesters
+                    .iter()
+                    .flatten()
+                    .collect::<HashSet<&CourseCode>>();
+                Ok(all_sched_codes.is_superset(&all_prog_codes))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .iter()
+            .all(|x| *x))
     }
 }
