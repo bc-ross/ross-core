@@ -186,6 +186,10 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
+        Ok(self.are_programs_valid()?)
+    }
+
+    fn are_programs_valid(&self) -> Result<bool> {
         let all_sched_codes = self
             .courses
             .iter()
