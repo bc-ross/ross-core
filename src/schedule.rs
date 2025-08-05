@@ -3,7 +3,7 @@ use savefile::prelude::*;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{self, Display},
 };
 
@@ -158,9 +158,29 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
         }
     }
 
-    Ok(Schedule {
+    let mut sched = Schedule {
         courses: combined_semesters,
         programs: programs.iter().map(|x| x.name.to_owned()).collect(),
         catalog,
-    })
+    };
+    sched.reduce()?;
+
+    Ok(sched)
+}
+
+impl Schedule {
+    pub fn reduce<'a>(&'a mut self) -> Result<&'a mut Self> {
+        let mut all_codes: HashSet<CourseCode> = HashSet::new();
+        self.courses.iter_mut().for_each(|sem| {
+            sem.retain(|code| {
+                if !all_codes.contains(code) {
+                    all_codes.insert(code.clone()); // TODO: is cloning necessary?
+                    true
+                } else {
+                    false
+                }
+            });
+        });
+        Ok(self)
+    }
 }

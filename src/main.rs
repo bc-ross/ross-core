@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
     let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    dbg!(new_sched);
+    // dbg!(new_sched);
     println!("Read file: {FNAME}");
 
     // save_schedule(
