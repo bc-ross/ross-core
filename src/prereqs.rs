@@ -1,9 +1,9 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::CourseCode;
+use crate::schedule::{CourseCode, Semester};
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
     And(Vec<CourseReq>),
     Or(Vec<CourseReq>),
@@ -17,7 +17,7 @@ pub enum CourseReq {
     None,
 }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum GradeLetter {
     A,
     B,
@@ -38,7 +38,7 @@ impl Ord for GradeLetter {
     }
 }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum GradeQualifier {
     Plus,
     Minus,
@@ -65,7 +65,7 @@ impl Ord for GradeQualifier {
     }
 }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, PartialEq, Eq)]
 pub struct Grade {
     pub letter: GradeLetter,
     pub qualifier: GradeQualifier,
@@ -130,6 +130,27 @@ impl CourseReq {
                 codes.push(code);
             }
             _ => {}
+        }
+    }
+}
+
+impl CourseReq {
+    pub fn is_satisfied(&self, courses: &Vec<Semester>, sem_idx: usize) -> bool {
+        // TODO: grade is not implemented
+        match self {
+            CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(courses, sem_idx)),
+            CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(courses, sem_idx)),
+            CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
+                courses.iter().take(sem_idx).flatten().any(|c| c == code)
+            }
+            CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => courses
+                .iter()
+                .take(sem_idx + 1)
+                .flatten()
+                .any(|c| c == code),
+            CourseReq::Program(_) => unimplemented!(),
+            CourseReq::Instructor => unimplemented!(),
+            CourseReq::None => true,
         }
     }
 }

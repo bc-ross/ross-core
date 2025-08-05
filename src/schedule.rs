@@ -165,6 +165,10 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
+    println!(
+        "{} different prereq filling options",
+        sched.ensure_prereqs()?.len()
+    );
 
     Ok(sched)
 }
@@ -186,7 +190,7 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(self.are_programs_valid()?)
+        Ok(self.are_programs_valid()? && self.validate_prereqs()?)
     }
 
     fn are_programs_valid(&self) -> Result<bool> {
@@ -215,5 +219,46 @@ impl Schedule {
             .collect::<Result<Vec<_>>>()?
             .iter()
             .all(|x| *x))
+    }
+
+    pub fn validate_prereqs(&self) -> Result<bool> {
+        for (sem_idx, sem) in self.courses.iter().enumerate() {
+            for code in sem {
+                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
+                if !req.is_satisfied(&self.courses, sem_idx) {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn ensure_prereqs(&self) -> Result<Vec<Self>> {
+        let mut unimplemented_prereqs: HashMap<&CourseReq, usize> = HashMap::new();
+        for (sem_idx, sem) in self.courses.iter().enumerate() {
+            for code in sem {
+                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
+                if !req.is_satisfied(&self.courses, sem_idx) {
+                    unimplemented_prereqs
+                        .entry(req)
+                        .and_modify(|idx| {
+                            if sem_idx > *idx {
+                                *idx = sem_idx
+                            }
+                        })
+                        .or_insert(sem_idx);
+                    println!(
+                        "Unimplemented prereq for {}: {:?} at semester {}",
+                        code, req, sem_idx
+                    );
+                }
+            }
+        }
+        println!(
+            "{} unimplemented prereqs found",
+            unimplemented_prereqs.len()
+        );
+
+        Ok(vec![self.clone()])
     }
 }
