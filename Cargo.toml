@@ -7,6 +7,8 @@ edition = "2024"
 panic = "abort"
 lto = "fat"
 codegen-units = 1
+strip = true
+opt-level = "z"
 
 [dependencies]
 serde = { version = "^1.0.219", features = ["derive"] }
