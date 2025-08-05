@@ -1,8 +1,7 @@
 use crate::schedule::Program;
-mod prog_acct;
-mod prog_arch;
-mod prog_bsee;
+mod prog_chem_ba;
+mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
-    vec![prog_acct::prog(), prog_arch::prog(), prog_bsee::prog()]
+    vec![prog_chem_ba::prog(), prog_phys_ba::prog()]
 }

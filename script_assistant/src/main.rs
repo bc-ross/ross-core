@@ -7,9 +7,6 @@ mod course_reqs;
 #[path = "../../resources/programs/mod.rs"]
 mod programs;
 
-#[path = "../../resources/credits.rs"]
-mod credits;
-
 #[path = "../../src/schedule.rs"]
 pub mod schedule;
 

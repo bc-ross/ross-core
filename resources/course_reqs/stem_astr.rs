@@ -9,13 +9,9 @@ use crate::{CC, GR};
 
 pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
     vec![
-        (CC!("ASTR", 1050), PreCourse(CC!("ASTR", 1010))),
-        (
-            CC!("ASTR", 1080),
-            Or(vec![
-                PreCourse(CC!("ASTR", 1010)),
-                PreCourse(CC!("ASTR", 1050)),
-            ]),
-        ),
+        (CC!("ASTR", 3000), PreCourse(CC!("PHYS", 2110))),
+        (CC!("ASTR", 4100), PreCourse(CC!("PHYS", 3200))),
+        (CC!("ASTR", 4200), PreCourse(CC!("PHYS", 2110))),
+        (CC!("ASTR", 4300), PreCourse(CC!("PHYS", 3200))),
     ]
 }

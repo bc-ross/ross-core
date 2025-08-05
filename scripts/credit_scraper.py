@@ -1,6 +1,8 @@
 import json
 import logging
+import random
 import subprocess
+import time
 
 import requests
 import requests_cache
@@ -91,6 +93,8 @@ def main():
             logger.error("Failed to fetch course %s: %s", code, e)
         except Exception as e:
             logger.error("An error occurred while processing course %s: %s", code, e)
+        else:
+            time.sleep(random.randrange(1, 15) / 100)  # Sleep to avoid overwhelming the server
     with open("../resources/courses.rs", "w", encoding="utf-8") as f:
         f.write(PREAMBLE)
         for course, course_info in new_courses:
