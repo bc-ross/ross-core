@@ -11,8 +11,6 @@ __pycache__
 *.xlsx
 *.sqlite
 
-/assets/catalogs.bin
-
 # Added by cargo
 
 /target
