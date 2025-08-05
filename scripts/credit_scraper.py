@@ -93,7 +93,7 @@ def main():
             logger.error("An error occurred while processing course %s: %s", code, e)
     with open("../resources/courses.rs", "w", encoding="utf-8") as f:
         f.write(PREAMBLE)
-        for course in courses:
+        for course, course_info in new_courses:
             f.write(format_course(course, course_info))
         f.write(POSTAMBLE)
     subprocess.run(["rustfmt", "../resources/courses.rs"], check=True)
