@@ -247,6 +247,7 @@ impl Schedule {
                             }
                         })
                         .or_insert(sem_idx);
+                    #[cfg(debug_assertions)]
                     println!(
                         "Unimplemented prereq for {}: {:?} at semester {}",
                         code, req, sem_idx
