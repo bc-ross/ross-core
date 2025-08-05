@@ -12,6 +12,7 @@ pub enum CourseReq {
     PreCourseGrade(CourseCode, Grade),
     CoCourseGrade(CourseCode, Grade),
     Program(String),
+    // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
     Instructor,
     #[default]
     None,
