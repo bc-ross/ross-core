@@ -118,7 +118,7 @@ pub struct Catalog {
     pub programs: Vec<Program>,
     pub geneds: Vec<GenEd>,
     pub prereqs: HashMap<CourseCode, CourseReq>,
-    pub credits: HashMap<CourseCode, Option<u32>>,
+    pub courses: HashMap<CourseCode, (String, Option<u32>)>,
     pub low_year: u32,
 }
 

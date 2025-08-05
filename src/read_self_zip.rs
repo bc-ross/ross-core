@@ -6,8 +6,8 @@ mod course_reqs;
 #[path = "../resources/programs/mod.rs"]
 mod programs;
 
-#[path = "../resources/credits.rs"]
-mod credits;
+#[path = "../resources/courses.rs"]
+mod courses;
 
 use crate::schedule::Catalog;
 
@@ -16,7 +16,7 @@ lazy_static! {
         geneds: vec![],
         programs: programs::programs(),
         prereqs: course_reqs::prereqs(),
-        credits: credits::credits(),
+        courses: courses::courses(),
         low_year: 2025,
     }];
 }
