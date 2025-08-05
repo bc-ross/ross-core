@@ -6,15 +6,14 @@ mod prereqs;
 mod read_excel_file;
 mod read_self_zip;
 mod schedule;
+mod version;
 mod write_excel_file;
 
 use read_excel_file::read_file;
 use read_self_zip::CATALOGS;
 use schedule::generate_schedule;
+pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-const SAVEFILE_VERSION: u32 = 0;
 
 fn main() -> Result<()> {
     const FNAME: &str = "schedulebot_test.xlsx";

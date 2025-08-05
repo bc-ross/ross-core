@@ -2,7 +2,10 @@ use anyhow::Result;
 use savefile::prelude::*;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 
 use crate::prereqs::CourseReq;
 
@@ -44,6 +47,16 @@ impl From<&str> for CourseCodeSuffix {
     }
 }
 
+impl Display for CourseCodeSuffix {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CourseCodeSuffix::Number(num) => write!(f, "{}", num),
+            CourseCodeSuffix::Special(s) => write!(f, "{}", s),
+            CourseCodeSuffix::Unique(id) => write!(f, "{}", id),
+        }
+    }
+}
+
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub struct CourseCode {
     pub stem: String,
@@ -59,6 +72,12 @@ macro_rules! CC {
             code: $code.into(),
         }
     };
+}
+
+impl Display for CourseCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}-{}", self.stem, self.code.to_string())
+    }
 }
 
 pub type Semester = Vec<CourseCode>;
