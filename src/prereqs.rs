@@ -106,3 +106,30 @@ macro_rules! GR {
         }
     };
 }
+
+// Used for script_assistant crate
+#[allow(dead_code)]
+impl CourseReq {
+    pub fn all_course_codes(&self) -> Vec<CourseCode> {
+        let mut codes = Vec::new();
+        self.collect_course_codes(&mut codes);
+        codes.into_iter().map(|x| x.clone()).collect()
+    }
+
+    fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {
+        match self {
+            CourseReq::And(reqs) | CourseReq::Or(reqs) => {
+                for req in reqs {
+                    req.collect_course_codes(codes);
+                }
+            }
+            CourseReq::PreCourse(code) | CourseReq::CoCourse(code) => {
+                codes.push(code);
+            }
+            CourseReq::PreCourseGrade(code, _) | CourseReq::CoCourseGrade(code, _) => {
+                codes.push(code);
+            }
+            _ => {}
+        }
+    }
+}
