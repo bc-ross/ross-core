@@ -18,17 +18,11 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
     let format = Format::new().set_align(FormatAlign::Center);
 
     for col_idx in 0..semesters {
-        // sheet.merge_range(
-        //     0,
-        //     (col_idx * 2) as u16,
-        //     0,
-        //     ((col_idx * 2) + 1) as u16,
-        //     &format!("Semester {}", col_idx + 1),
-        //     &format,
-        // )?;
-        sheet.write_string_with_format(
+        sheet.merge_range(
             0,
-            col_idx as u16,
+            (col_idx * 2) as u16,
+            0,
+            ((col_idx * 2) + 1) as u16,
             &format!("Semester {}", col_idx + 1),
             &format,
         )?;
@@ -36,7 +30,18 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
 
     for (col_idx, field) in sched.courses.iter().enumerate() {
         for (row_idx, val) in field.iter().enumerate() {
-            sheet.write_string((row_idx + 1) as u32, col_idx as u16, val.to_string())?;
+            sheet.write_string((row_idx + 1) as u32, (col_idx * 2) as u16, val.to_string())?;
+            sheet.write_string(
+                (row_idx + 1) as u32,
+                ((col_idx * 2) + 1) as u16,
+                sched
+                    .catalog
+                    .courses
+                    .get(&val)
+                    .map(|(_, x)| x.map(|x| x.to_string()).unwrap_or("CR".into()))
+                    .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
+            )?;
+
             // TODO: How to add credit??
         }
     }
