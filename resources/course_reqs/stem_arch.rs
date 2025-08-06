@@ -34,7 +34,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             ]),
         ),
         (
-            CC!("stem ARCH", 2111),
+            CC!("ARCH", 2111),
             And(vec![
                 PreCourse(CC!("ARCH", 1200)),
                 PreCourse(CC!("ARCH", 1410)),
@@ -43,7 +43,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             ]),
         ),
         (
-            CC!("stem ARCH", 2112),
+            CC!("ARCH", 2112),
             PreCourseGrade(CC!("ARCH", 2111), GR!(C)),
         ),
         (
