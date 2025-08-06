@@ -17,7 +17,7 @@ use write_excel_file::save_schedule;
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
-    const FNAME: &str = "schedulebot_test.xlsx";
+    const FNAME: &str = "ross_test.xlsx";
 
     let sched = generate_schedule(
         CATALOGS
@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     println!("Excel file created: {FNAME}");
     // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
-    let new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
+    let _new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
     // dbg!(new_sched);
     println!("Read file: {FNAME}");
 
