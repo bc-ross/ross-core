@@ -168,14 +168,20 @@ def main():
                             #     print("Enter a course code (e.g., 1020) or 'stem STEM'.")
                             #     continue
                             code = inp
-                            req = input(f"[stem={stem}] req for {code}> ").strip()
-                            if not req:
-                                print("No requirement entered, skipping.")
-                                continue
-                            if stem:
-                                parsed_req = parse_req(req, stem)
-                                print("Added course!")
-                                f.write(f'(\n    CC!("{stem}", {code}),\n    {parsed_req},\n),\n')
+                            while True:
+                                req = input(f"[stem={stem}] req for {code}> ").strip()
+                                if not req:
+                                    print("No requirement entered, skipping.")
+                                    break
+                                if stem:
+                                    try:
+                                        parsed_req = parse_req(req, stem)
+                                    except SyntaxError as e:
+                                        print(f"Error parsing requirement: {e}")
+                                        continue
+                                    print("Added course!")
+                                    f.write(f'(\n    CC!("{stem}", {code}),\n    {parsed_req},\n),\n')
+                                    break
                     finally:
                         f.write(POSTAMBLE)
         except StopMeError:
