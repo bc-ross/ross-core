@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::prereqs::CourseReq;
+use crate::schedule_sorter::BestSchedule;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum CourseCodeSuffix {
@@ -173,12 +174,10 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
 
-    let mut scheds = sched.ensure_prereqs()?;
+    let scheds = sched.ensure_prereqs()?;
     println!("{} different prereq filling options", scheds.len());
 
-    Ok(scheds
-        .pop()
-        .ok_or_else(|| anyhow::anyhow!("No valid schedule found after ensuring prerequisites"))?)
+    Ok(scheds.best()?)
 }
 
 impl Schedule {
@@ -283,7 +282,8 @@ impl Schedule {
                     ))?
                     .extend(seq.iter().map(|x| (*x).clone()));
                 this_sched.reduce()?;
-                for fixed_sched_opt in this_sched.ensure_prereqs()? {
+                for mut fixed_sched_opt in this_sched.ensure_prereqs()? {
+                    fixed_sched_opt.reduce()?;
                     if !sched_opts.contains(&fixed_sched_opt) {
                         sched_opts.push(fixed_sched_opt);
                     }

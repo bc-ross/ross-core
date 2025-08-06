@@ -5,6 +5,7 @@ mod load_catalogs;
 mod prereqs;
 mod read_excel_file;
 mod schedule;
+mod schedule_sorter;
 mod version;
 mod write_excel_file;
 
