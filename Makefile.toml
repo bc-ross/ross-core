@@ -16,76 +16,26 @@ CONDA_PREFIX = "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/env"
 dependencies = ["build"]
 
 [tasks.build]
-dependencies = ["pre-build", "build-core", "post-build"]
-
-[tasks.build-core]
 command = "cargo"
 args = ["build", "@@remove-empty(CARGO_MAKE_BUILD_PROFILE)"]
 
-[tasks.pre-build]
-condition = { files_modified = { input = [
-    "${CARGO_MAKE_WORKING_DIRECTORY}/conda-lock.yml",
-], output = [
-    "${CONDA_PREFIX}/build/*",
-] } }
-command = "${CONDA_PATH}"
+[tasks.nightly-build]
+command = "cargo"
+env = { RUSTFLAGS = "-Zlocation-detail=none -Zfmt-debug=none" }
 args = [
-    "run",
-    "--prefix",
-    "${CONDA_PREFIX}/lock",
-    "conda-lock",
-    "install",
-    "--prefix",
-    "${CONDA_PREFIX}/build",
-    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/conda-lock.yml",
+    "+nightly",
+    "build",
+    "-Z",
+    "build-std=std,panic_abort",
+    '-Z',
+    'build-std-features="optimize_for_size"',
+    "-Z",
+    "build-std-features=panic_immediate_abort",
+    "--target",
+    "${CARGO_MAKE_RUST_TARGET_TRIPLE}",
+    "--release",
 ]
-dependencies = ["ensure-cl"]
-
-[tasks.ensure-cl]
-condition = { files_not_exist = [
-    "${CONDA_PREFIX}/lock/LICENSE_PYTHON.txt",
-] } # Python will always have a license, right?
-command = "${CONDA_PATH}"
-args = [
-    "create",
-    "--prefix",
-    "${CONDA_PREFIX}/lock",
-    # "python==3.12.*",
-    "--channel=conda-forge",
-    "conda-lock",
-    "--yes",
-]
-dependencies = ["find-conda"]
-
-[tasks.gen-lockfile]
-command = "${CONDA_PATH}"
-args = [
-    "run",
-    "--prefix",
-    "${CONDA_PREFIX}/lock",
-    "conda-lock",
-    "-f",
-    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/environment.yml",
-    "--lockfile",
-    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/conda-lock.yml",
-]
-dependencies = ["find-conda"]
-
-
-[tasks.find-conda]
-condition = { env_not_set = ["CONDA_PATH"] }
-env = { CONDA_PATH = "conda" }
-
-[tasks.post-build]
-command = "${CONDA_PATH}"
-args = [
-    "run",
-    "--prefix",
-    "${CONDA_PREFIX}/build",
-    "python",
-    "${CARGO_MAKE_WORKSPACE_WORKING_DIRECTORY}/scripts/inject.py",
-]
-dependencies = ["find-conda"]
+install_crate = false
 
 [tasks.scan]
 script = [
@@ -106,3 +56,15 @@ dependencies = ["build"]
 [tasks.windows_run]
 command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_OUTPUT_DIR}/${CARGO_MAKE_PROJECT_NAME}.exe"
 dependencies = ["build"]
+
+[tasks.nightly-run]
+linux_alias = "linux_nightly-run"
+windows_alias = "windows_nightly-run"
+
+[tasks.linux_nightly-run]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_RUST_TARGET_TRIPLE}/release/${CARGO_MAKE_PROJECT_NAME}"
+dependencies = ["nightly-build"]
+
+[tasks.windows_nightly-run]
+command = "${CARGO_MAKE_CRATE_TARGET_DIRECTORY}/${CARGO_MAKE_RUST_TARGET_TRIPLE}/release/${CARGO_MAKE_PROJECT_NAME}.exe"
+dependencies = ["nightly-build"]
