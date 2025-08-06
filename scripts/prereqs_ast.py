@@ -45,15 +45,29 @@ def strip_quotes(s):
 def rustify(node, default_stem, in_tuple=False, co_prefix=False):
     # Helper to wrap with PreCourse/CoCourse or their Grade variants
     def wrap_course(stem, code, grade=None, co_prefix=False):
+        if not code.isnumeric():
+            code = '"' + code.upper() + '"'
+        stem = stem.upper()
         cc = f'CC!("{stem}", {code})'
         if grade is not None:
-            gr = grade if grade.startswith("GR!") else f"GR!({grade})"
+            gr = grade if grade.startswith("GR!") else f"GR!({grade.upper()})"
             return f"{'CoCourseGrade' if co_prefix else 'PreCourseGrade'}({cc}, {gr})"
         else:
             return f"{'CoCourse' if co_prefix else 'PreCourse'}({cc})"
 
+    # Helper to parse STEM-CODE format
+    def parse_stem_code(course_str, default_stem):
+        course_str = strip_quotes(course_str)
+        if "-" in course_str:
+            stem, code = course_str.split("-", 1)
+        else:
+            stem = default_stem
+            code = course_str
+        return stem, code
+
     if isinstance(node, ast.Call):
         func = node.func.id
+        func = func.title()
         args = node.args
         if func == "And" or func == "Or":
             sub = [rustify(arg, default_stem) for arg in args]
@@ -63,41 +77,36 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             return rustify(ast.Tuple(elts=args, ctx=ast.Load()), default_stem, co_prefix=True)
         if func == "Prog":
             return f'Program("{rustify(args[0], default_stem)}")'
-        if func == "GR":
+        if func.upper() == "GR":
             return f"GR!({', '.join(rustify(arg, default_stem) for arg in args)})"
     elif isinstance(node, ast.Tuple):
         elts = node.elts
-        if len(elts) == 3:
-            # (STEM, CODE, GRADE)
-            stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
-            code = rustify(elts[1], default_stem, in_tuple=True)
-            grade = rustify(elts[2], default_stem, in_tuple=True)
-            return wrap_course(stem, code, grade, co_prefix)
-        elif len(elts) == 2:
-            # (STEM, CODE) or (CODE, GRADE)
-            if isinstance(elts[0], ast.Constant) and isinstance(elts[1], ast.Constant):
-                # (CODE, GRADE) if second is a grade string
-                if isinstance(elts[1].value, str) and re.fullmatch(r"[A-DF][+-]?", elts[1].value):
-                    code = rustify(elts[0], default_stem, in_tuple=True)
-                    grade = rustify(elts[1], default_stem, in_tuple=True)
-                    return wrap_course(default_stem, code, grade, co_prefix)
-                else:
-                    # (STEM, CODE) where code can be string or int
-                    stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
-                    code = rustify(elts[1], default_stem, in_tuple=True)
-                    return wrap_course(stem, code, None, co_prefix)
+        if len(elts) == 2:
+            # (STEM-CODE, GRADE) or (CODE, GRADE)
+            first_val = rustify(elts[0], default_stem, in_tuple=True)
+            second_val = rustify(elts[1], default_stem, in_tuple=True)
+
+            # Check if second element is a grade
+            if (
+                isinstance(elts[1], ast.Constant)
+                and isinstance(elts[1].value, str)
+                and re.fullmatch(r"[A-DF][+-]?", elts[1].value)
+            ):
+                # Second element is a grade
+                stem, code = parse_stem_code(first_val, default_stem)
+                return wrap_course(stem, code, second_val, co_prefix)
             elif isinstance(elts[1], ast.Call) and getattr(elts[1].func, "id", None) == "GR":
-                code = rustify(elts[0], default_stem, in_tuple=True)
-                grade = rustify(elts[1], default_stem, in_tuple=True)
-                return wrap_course(default_stem, code, grade, co_prefix)
+                # Second element is a GR() call
+                stem, code = parse_stem_code(first_val, default_stem)
+                return wrap_course(stem, code, second_val, co_prefix)
             else:
-                stem = strip_quotes(rustify(elts[0], default_stem, in_tuple=True))
-                code = rustify(elts[1], default_stem, in_tuple=True)
-                return wrap_course(stem, code, None, co_prefix)
+                # This shouldn't happen with the new format, but handle gracefully
+                raise ValueError(f"Unsupported 2-tuple format: {ast.dump(node)}")
         elif len(elts) == 1:
-            # (CODE,)
-            code = rustify(elts[0], default_stem, in_tuple=True)
-            return wrap_course(default_stem, code, None, co_prefix)
+            # (STEM-CODE,) or (CODE,)
+            course_val = rustify(elts[0], default_stem, in_tuple=True)
+            stem, code = parse_stem_code(course_val, default_stem)
+            return wrap_course(stem, code, None, co_prefix)
         else:
             raise ValueError(f"Unsupported tuple length: {len(elts)} in {ast.dump(node)}")
     elif isinstance(node, ast.Constant):
@@ -110,17 +119,42 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             # If it looks like a grade, just return the string (parent will wrap in GR!)
             if re.fullmatch(r"[A-DF][+-]?", node.value):
                 return node.value
-            # If it looks like a course code (alphanumeric, length > 2), emit as string
-            elif re.fullmatch(r"[A-Za-z0-9]{3,}", node.value):
+            # Handle STEM-CODE format or plain course code
+            elif in_tuple:
                 return f'"{node.value}"'
             else:
-                return f'"{node.value}"'
+                # Parse as STEM-CODE or use default stem
+                stem, code = parse_stem_code(node.value, default_stem)
+                return wrap_course(stem, code, None, co_prefix=co_prefix)
     elif isinstance(node, ast.Name):
         if node.id in {"Instructor", "None"}:
             return node.id
         if in_tuple:
             return f'"{node.id}"'
-        return wrap_course(default_stem, f'"{node.id}"', None, co_prefix=co_prefix)
+        # Parse as STEM-CODE or use default stem
+        stem, code = parse_stem_code(node.id, default_stem)
+        return wrap_course(stem, code, None, co_prefix=co_prefix)
+    elif isinstance(node, ast.BinOp) and isinstance(node.op, ast.Sub):
+        # Handle STEM-CODE format parsed as subtraction (e.g., CHEM-1210 or CHEM-COMP)
+        if isinstance(node.left, ast.Name):
+            stem = node.left.id
+            if isinstance(node.right, ast.Constant):
+                # STEM-NUMBER (e.g., CHEM-1210)
+                code = str(node.right.value)
+            elif isinstance(node.right, ast.Name):
+                # STEM-STRING (e.g., CHEM-COMP)
+                code = node.right.id
+            else:
+                raise ValueError(f"Unsupported BinOp right side: {ast.dump(node.right)}")
+
+            if in_tuple:
+                # For tuples, return as a quoted string in STEM-CODE format
+                code_str = code  # .strip('"') if isinstance(node.right, ast.Name) else code
+                return f'"{stem}-{code_str}"'
+            else:
+                return wrap_course(stem, code, None, co_prefix=co_prefix)
+        else:
+            raise ValueError(f"Unsupported BinOp format: {ast.dump(node)}")
     raise ValueError(f"Unsupported AST node: {ast.dump(node)}")
 
 
