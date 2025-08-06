@@ -45,7 +45,7 @@ def strip_quotes(s):
 def rustify(node, default_stem, in_tuple=False, co_prefix=False):
     # Helper to wrap with PreCourse/CoCourse or their Grade variants
     def wrap_course(stem, code, grade=None, co_prefix=False):
-        if not code.isnumeric():
+        if isinstance(code, str) and not code.isnumeric():
             code = '"' + code.upper() + '"'
         stem = stem.upper()
         cc = f'CC!("{stem}", {code})'
@@ -76,7 +76,9 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             # Co(...) just sets co_prefix for the inner logic
             return rustify(ast.Tuple(elts=args, ctx=ast.Load()), default_stem, co_prefix=True)
         if func == "Prog":
-            return f'Program("{rustify(args[0], default_stem)}")'
+            # Majors or Programs of Distinction (or say Nursing School etc.)
+            # This will get calculated on the program's end with `assoc_stems`
+            return f'Program("{default_stem}".into())'
         if func.upper() == "GR":
             return f"GR!({', '.join(rustify(arg, default_stem) for arg in args)})"
     elif isinstance(node, ast.Tuple):

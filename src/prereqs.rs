@@ -1,7 +1,7 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{CourseCode, Semester};
+use crate::schedule::{Catalog, CourseCode, Schedule, Semester};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -11,7 +11,7 @@ pub enum CourseReq {
     CoCourse(CourseCode),
     PreCourseGrade(CourseCode, Grade),
     CoCourseGrade(CourseCode, Grade),
-    Program(String),
+    Program(String), // Assoc'd STEM
     // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
     Instructor,
     #[default]
@@ -136,20 +136,37 @@ impl CourseReq {
 }
 
 impl CourseReq {
-    pub fn is_satisfied(&self, courses: &Vec<Semester>, sem_idx: usize) -> bool {
+    pub fn is_satisfied(&self, sched: &Schedule, sem_idx: usize) -> bool {
         // TODO: grade is not implemented
         match self {
-            CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(courses, sem_idx)),
-            CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(courses, sem_idx)),
-            CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
-                courses.iter().take(sem_idx).flatten().any(|c| c == code)
-            }
-            CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => courses
+            CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(sched, sem_idx)),
+            CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(sched, sem_idx)),
+            CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => sched
+                .courses
+                .iter()
+                .take(sem_idx)
+                .flatten()
+                .any(|c| c == code),
+            CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => sched
+                .courses
                 .iter()
                 .take(sem_idx + 1)
                 .flatten()
                 .any(|c| c == code),
-            CourseReq::Program(_) => unimplemented!(),
+            CourseReq::Program(x) => sched
+                .programs
+                .iter()
+                .filter(|p| {
+                    sched
+                        .catalog
+                        .programs
+                        .iter()
+                        .filter(|y| y.name.as_str() == p.as_str())
+                        .next()
+                        .is_some_and(|z| z.assoc_stems.contains(x))
+                })
+                .next()
+                .is_some(),
             CourseReq::Instructor => unimplemented!(),
             CourseReq::None => true,
         }
