@@ -153,20 +153,13 @@ impl CourseReq {
                 .take(sem_idx + 1)
                 .flatten()
                 .any(|c| c == code),
-            CourseReq::Program(x) => sched
-                .programs
-                .iter()
-                .filter(|p| {
-                    sched
-                        .catalog
-                        .programs
-                        .iter()
-                        .filter(|y| y.name.as_str() == p.as_str())
-                        .next()
-                        .is_some_and(|z| z.assoc_stems.contains(x))
-                })
-                .next()
-                .is_some(),
+            CourseReq::Program(x) => sched.programs.iter().any(|p| {
+                sched
+                    .catalog
+                    .programs
+                    .iter()
+                    .any(|y| y.name == *p && y.assoc_stems.contains(x))
+            }),
             CourseReq::Instructor => unimplemented!(),
             CourseReq::None => true,
         }

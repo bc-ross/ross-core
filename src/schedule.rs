@@ -224,7 +224,7 @@ impl Schedule {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
-                if !req.is_satisfied(&self.courses, sem_idx) {
+                if !req.is_satisfied(self, sem_idx) {
                     return Ok(false);
                 }
             }
@@ -237,7 +237,7 @@ impl Schedule {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
-                if !req.is_satisfied(&self.courses, sem_idx) {
+                if !req.is_satisfied(self, sem_idx) {
                     unimplemented_prereqs
                         .entry(req)
                         .and_modify(|idx| {
