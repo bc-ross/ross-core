@@ -165,7 +165,7 @@ impl CourseReq {
         }
     }
 
-    pub fn get_course_options(&self) -> Vec<Vec<CourseCode>> {
+    pub fn get_course_options<'a>(&'a self) -> Vec<Vec<&'a CourseCode>> {
         match self {
             CourseReq::Or(reqs) => {
                 // For Or nodes, collect all options from subreqs into a single list
@@ -204,7 +204,7 @@ impl CourseReq {
             | CourseReq::PreCourseGrade(code, _)
             | CourseReq::CoCourseGrade(code, _) => {
                 // Single course is a single option
-                vec![vec![code.clone()]]
+                vec![vec![&code]]
             }
             // Ignore these cases as requested
             CourseReq::Program(_) | CourseReq::Instructor | CourseReq::None => vec![],

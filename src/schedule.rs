@@ -121,6 +121,14 @@ pub struct Catalog {
     pub low_year: u32,
 }
 
+impl PartialEq for Catalog {
+    fn eq(&self, other: &Self) -> bool {
+        self.low_year == other.low_year // Assumes that no two Catalogs will have the same low_year
+    }
+}
+
+impl Eq for Catalog {}
+
 impl fmt::Display for Catalog {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!(
@@ -131,7 +139,7 @@ impl fmt::Display for Catalog {
     }
 }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Schedule {
     pub courses: Vec<Semester>,
     pub programs: Vec<String>,
@@ -164,12 +172,13 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
-    println!(
-        "{} different prereq filling options",
-        sched.ensure_prereqs()?.len()
-    );
 
-    Ok(sched)
+    let mut scheds = sched.ensure_prereqs()?;
+    println!("{} different prereq filling options", scheds.len());
+
+    Ok(scheds
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("No valid schedule found after ensuring prerequisites"))?)
 }
 
 impl Schedule {
@@ -232,12 +241,12 @@ impl Schedule {
         Ok(true)
     }
 
-    pub fn ensure_prereqs(&self) -> Result<Vec<Self>> {
+    pub fn ensure_prereqs(self) -> Result<Vec<Self>> {
         let mut unimplemented_prereqs: HashMap<&CourseReq, usize> = HashMap::new();
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
-                if !req.is_satisfied(self, sem_idx) {
+                if !req.is_satisfied(&self, sem_idx) {
                     unimplemented_prereqs
                         .entry(req)
                         .and_modify(|idx| {
@@ -254,11 +263,34 @@ impl Schedule {
                 }
             }
         }
+        if unimplemented_prereqs.is_empty() {
+            println!("All prereqs are satisfied.");
+            return Ok(vec![self]);
+        }
         println!(
             "{} unimplemented prereqs found",
             unimplemented_prereqs.len()
         );
+        let mut sched_opts = Vec::new();
+        for (req, _) in unimplemented_prereqs {
+            for seq in req.get_course_options() {
+                let mut this_sched = self.clone();
+                this_sched
+                    .courses
+                    .get_mut(0)
+                    .ok_or(anyhow::anyhow!(
+                        "No semesters found in schedule, cannot add prereq courses"
+                    ))?
+                    .extend(seq.iter().map(|x| (*x).clone()));
+                this_sched.reduce()?;
+                for fixed_sched_opt in this_sched.ensure_prereqs()? {
+                    if !sched_opts.contains(&fixed_sched_opt) {
+                        sched_opts.push(fixed_sched_opt);
+                    }
+                }
+            }
+        }
 
-        Ok(vec![self.clone()])
+        Ok(sched_opts)
     }
 }
