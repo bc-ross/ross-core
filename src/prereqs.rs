@@ -149,9 +149,10 @@ impl CourseReq {
                 .any(|c| c == code),
             CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => sched
                 .courses
-                .get(sem_idx)
-                .filter(|sem| sem.contains(code))
-                .is_some(),
+                .iter()
+                .take(sem_idx + 1)
+                .flatten()
+                .any(|c| c == code),
             CourseReq::Program(x) => sched.programs.iter().any(|p| {
                 sched
                     .catalog
