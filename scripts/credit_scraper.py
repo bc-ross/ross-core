@@ -38,12 +38,15 @@ def course_lookup(code: str) -> dict[str]:
     title = course_section.find("span", class_="detail-title").get_text(strip=True)
     credits_raw = course_section.find("span", class_="detail-hours_html").get_text(strip=True)
     credits = credits_raw.strip("()").split()[0]  # Extract just the number
+    term_raw = course_section.find("span", class_="detail-term").get_text(strip=True)
+    term = term_raw.strip("()").split()[0]
 
     return {
         "code": course_code,
         "title": title,
         "credits": int(credits) if credits.upper().strip() != "NULL" else None,
         "url": url,
+        "term": term,
     }
 
 
@@ -52,14 +55,14 @@ def format_code(course) -> str:
 
 
 PREAMBLE = """
-use crate::{CC, schedule::CourseCode};
+use crate::{CC, schedule::{CourseCode, CourseTermOffering::{self, *}}};
 use std::collections::HashMap;
 
-pub fn courses() -> HashMap<CourseCode, (String, Option<u32>)> {
-    let mut courses = HashMap::new();
+pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)> {
+    HashMap::from([
 """
 
-POSTAMBLE = "courses\n}\n"
+POSTAMBLE = "])\n}\n"
 
 
 def repr_rs(x: str) -> str:
@@ -74,7 +77,7 @@ def format_course(course, course_info) -> str:
     else:
         credits_str = f"Some({credits})"
 
-    return f"courses.insert(CC!({repr_rs(course['stem'])}, {repr_rs(list(course['code'].values())[0])}), ({repr_rs(title)}.into(), {credits_str}));\n"
+    return f"(CC!({repr_rs(course['stem'])}, {repr_rs(list(course['code'].values())[0])}), ({repr_rs(title)}.into(), {credits_str}, {course_info['term'].title()})),\n"
 
 
 def main():
@@ -86,7 +89,7 @@ def main():
         try:
             course_info = course_lookup(code)
             print(
-                f"Course: {course_info['code']}, Title: {course_info['title']}, Credits: {course_info['credits']}, URL: {course_info['url']}"
+                f"Course: {course_info['code']}, Title: {course_info['title']}, Credits: {course_info['credits']}, Term: {course_info['term']}, URL: {course_info['url']}"
             )
             new_courses.append((course, course_info))
         except requests.RequestException as e:

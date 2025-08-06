@@ -19,7 +19,13 @@ impl BestSchedule for Vec<Schedule> {
                     .courses
                     .iter()
                     .flatten()
-                    .filter_map(|c| sched.catalog.courses.get(c).and_then(|(_, creds)| *creds))
+                    .filter_map(|c| {
+                        sched
+                            .catalog
+                            .courses
+                            .get(c)
+                            .and_then(|(_, creds, _)| *creds)
+                    })
                     .sum::<u32>()
             })
             .ok_or_else(|| anyhow::anyhow!("No valid schedule found"))

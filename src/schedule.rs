@@ -9,6 +9,15 @@ use std::{
 use crate::prereqs::CourseReq;
 use crate::schedule_sorter::BestSchedule;
 
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash)]
+pub enum CourseTermOffering {
+    Fall,
+    Spring,
+    Both,
+    Discretion,
+    Infrequently,
+}
+
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 pub enum CourseCodeSuffix {
     Number(usize),
@@ -118,7 +127,7 @@ pub struct Catalog {
     pub programs: Vec<Program>,
     pub geneds: Vec<GenEd>,
     pub prereqs: HashMap<CourseCode, CourseReq>,
-    pub courses: HashMap<CourseCode, (String, Option<u32>)>,
+    pub courses: HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
     pub low_year: u32,
 }
 
