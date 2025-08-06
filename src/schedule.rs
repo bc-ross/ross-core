@@ -1,5 +1,4 @@
 use anyhow::Result;
-use savefile::prelude::*;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 use std::{

@@ -1,17 +1,9 @@
-use crate::SAVEFILE_VERSION;
 use crate::schedule::Schedule;
+use crate::{SAVEFILE_VERSION, TEMPLATE_PNG};
 use anyhow::Result;
 use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
 use savefile::save_to_mem;
 use std::path::PathBuf;
-
-// use crate::VERSION; //, read_self_zip::Course, schedule::Schedule};
-
-pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
-
-fn trim_titles(s: &str) -> String {
-    s.chars().take(31).collect()
-}
 
 fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Result<()> {
     let semesters = sched.courses.len();

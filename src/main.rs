@@ -1,19 +1,20 @@
 use anyhow::{Result, anyhow};
-use std::collections::HashMap;
 use std::path::Path;
 
+mod load_catalogs;
 mod prereqs;
 mod read_excel_file;
-mod read_self_zip;
 mod schedule;
 mod version;
 mod write_excel_file;
 
+use load_catalogs::CATALOGS;
 use read_excel_file::read_file;
-use read_self_zip::CATALOGS;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
+
+pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
     const FNAME: &str = "schedulebot_test.xlsx";

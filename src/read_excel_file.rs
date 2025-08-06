@@ -2,8 +2,7 @@ use std::path::PathBuf;
 
 use crate::schedule::Schedule;
 
-use crate::SAVEFILE_VERSION;
-use crate::write_excel_file::TEMPLATE_PNG;
+use crate::{SAVEFILE_VERSION, TEMPLATE_PNG};
 use anyhow::{Result, bail};
 use savefile::prelude::*;
 use umya_spreadsheet::reader::xlsx;
