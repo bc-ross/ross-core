@@ -23,17 +23,69 @@ pub fn solve_prereqs_cp(
 
     use crate::prereqs_sat;
 
-    // Use the SAT solver to get valid solutions
-    let sat_solutions = prereqs_sat::ensure_prereqs_sat(schedule.clone(), prereqs);
+    // Use the SAT solver to get multiple valid solutions
+    let sat_solutions = prereqs_sat::solve_multiple_prereqs(schedule.clone(), prereqs, 10);
 
     if sat_solutions.is_empty() {
         return Ok(vec![]); // Return empty if no solution found
     }
 
+    // Convert SAT solutions to schedule format
+    let schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
+        .iter()
+        .map(|sat_sol| {
+            let mut full_schedule = schedule.clone();
+
+            // Add additional courses to their respective semesters
+            for (sem_idx, courses) in &sat_sol.additional_courses {
+                if *sem_idx < full_schedule.len() {
+                    full_schedule[*sem_idx].extend(courses.clone());
+                }
+            }
+
+            full_schedule
+        })
+        .collect();
+
     // Apply optimization logic to choose the best solution
-    let best_solution = find_best_solution(sat_solutions, courses);
+    let best_solution = find_best_solution(schedule_solutions.clone(), courses);
 
     Ok(vec![best_solution])
+}
+
+/// Get all solutions for analysis and comparison
+pub fn solve_prereqs_cp_all_solutions(
+    schedule: Vec<Vec<CourseCode>>,
+    prereqs: &HashMap<CourseCode, CourseReq>,
+    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+) -> Result<Vec<Vec<Vec<CourseCode>>>> {
+    use crate::prereqs_sat;
+
+    // Use the SAT solver to get multiple valid solutions
+    let sat_solutions = prereqs_sat::solve_multiple_prereqs(schedule.clone(), prereqs, 10);
+
+    if sat_solutions.is_empty() {
+        return Ok(vec![]); // Return empty if no solution found
+    }
+
+    // Convert SAT solutions to schedule format
+    let schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
+        .iter()
+        .map(|sat_sol| {
+            let mut full_schedule = schedule.clone();
+
+            // Add additional courses to their respective semesters
+            for (sem_idx, courses) in &sat_sol.additional_courses {
+                if *sem_idx < full_schedule.len() {
+                    full_schedule[*sem_idx].extend(courses.clone());
+                }
+            }
+
+            full_schedule
+        })
+        .collect();
+
+    Ok(schedule_solutions)
 }
 
 /// Find the best solution based on optimization criteria:
@@ -217,11 +269,46 @@ pub fn test_cp_solver() {
         println!("  Semester {}: {:?}", i, sem);
     }
 
+    // First, show all solutions found
+    match solve_prereqs_cp_all_solutions(schedule.clone(), &prereqs, &courses) {
+        Ok(all_solutions) => {
+            println!(
+                "\nCP solver found {} total solution(s):",
+                all_solutions.len()
+            );
+            for (sol_idx, solution) in all_solutions.iter().enumerate() {
+                println!("Solution {}:", sol_idx + 1);
+                let mut total_credits = 0;
+                for (sem_idx, semester) in solution.iter().enumerate() {
+                    let sem_credits: u32 = semester
+                        .iter()
+                        .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
+                        .sum();
+                    total_credits += sem_credits;
+                    println!(
+                        "  Semester {}: {:?} ({} credits)",
+                        sem_idx, semester, sem_credits
+                    );
+                }
+                println!("  Total credits: {}", total_credits);
+
+                // Calculate solution score
+                let score = calculate_solution_score(solution, &courses);
+                println!("  Optimization score: {:.2}", score);
+            }
+        }
+        Err(e) => {
+            println!("CP solver failed to get all solutions: {}", e);
+        }
+    }
+
+    // Then show the optimized choice
+    println!("\nNow finding the BEST solution via optimization:");
     match solve_prereqs_cp(schedule, &prereqs, &courses) {
         Ok(solutions) => {
-            println!("CP solver found {} solution(s):", solutions.len());
+            println!("Optimized solution chosen:");
             for (sol_idx, solution) in solutions.iter().enumerate() {
-                println!("Solution {}:", sol_idx + 1);
+                println!("Best Solution {}:", sol_idx + 1);
                 let mut total_credits = 0;
                 for (sem_idx, semester) in solution.iter().enumerate() {
                     let sem_credits: u32 = semester

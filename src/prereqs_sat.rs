@@ -371,6 +371,28 @@ impl PrereqSatSolver {
         }
         // For larger cases, we'd need a more sophisticated encoding (omitted for now)
     }
+
+    /// Add a constraint to exclude a specific pattern of courses from the solution
+    pub fn add_forbidden_pattern(&mut self, pattern: &[(CourseCode, usize)]) {
+        if pattern.is_empty() {
+            return;
+        }
+
+        // Create a clause that prevents this exact pattern from occurring
+        // At least one course in the pattern must be placed differently
+        let mut clause = Vec::new();
+
+        for (course, semester) in pattern {
+            if let Some(&var) = self.course_semester_vars.get(&(course.clone(), *semester)) {
+                // Add the negation: this course should NOT be in this semester
+                clause.push(!Lit::from_var(var, true));
+            }
+        }
+
+        if !clause.is_empty() {
+            self.formula.add_clause(&clause);
+        }
+    }
 }
 
 /// Helper function to check if a prerequisite is satisfied
@@ -451,6 +473,48 @@ pub fn solve_prereqs_optimized(
     // 3. Use multiple solving rounds with different constraints
 
     Some(initial_solution)
+}
+
+/// Enhanced SAT solver that finds multiple solutions by iteratively excluding previous ones
+pub fn solve_multiple_prereqs(
+    schedule: Vec<Vec<CourseCode>>,
+    prereqs: &HashMap<CourseCode, CourseReq>,
+    max_solutions: usize,
+) -> Vec<SatSolution> {
+    let mut solutions = Vec::new();
+    let mut forbidden_patterns: Vec<Vec<(CourseCode, usize)>> = Vec::new();
+
+    for _attempt in 0..max_solutions {
+        let num_semesters = schedule.len();
+        let mut solver = PrereqSatSolver::new(num_semesters);
+
+        solver.add_existing_schedule(&schedule);
+        solver.add_prereq_constraints(&schedule, prereqs);
+
+        // Add constraints to exclude previous solutions
+        for forbidden in &forbidden_patterns {
+            solver.add_forbidden_pattern(forbidden);
+        }
+
+        if let Some(solution) = solver.solve(&schedule) {
+            // Extract the pattern of additional courses for this solution
+            let mut pattern = Vec::new();
+            for (sem_idx, additional_courses) in &solution.additional_courses {
+                for course in additional_courses {
+                    pattern.push((course.clone(), *sem_idx));
+                }
+            }
+
+            if !pattern.is_empty() {
+                forbidden_patterns.push(pattern);
+            }
+            solutions.push(solution);
+        } else {
+            break; // No more solutions
+        }
+    }
+
+    solutions
 }
 
 /// SAT-based equivalent of Schedule::ensure_prereqs that uses the SAT solver
