@@ -24,22 +24,22 @@ fn main() -> Result<()> {
     // // Test multi-course gened functionality first
     // prereqs_cp::test_multi_course_gened();
 
-    // Test the CP solver
-    println!("=== Testing CP Solver ===");
-    prereqs_cp::test_cp_solver();
-    println!();
+    // // Test the CP solver
+    // println!("=== Testing CP Solver ===");
+    // prereqs_cp::test_cp_solver();
+    // println!();
 
-    // Test all GenEdReq variants
-    println!("=== Testing All GenEdReq Variants ===");
-    prereqs_cp::test_all_gened_variants();
-    println!();
+    // // Test all GenEdReq variants
+    // println!("=== Testing All GenEdReq Variants ===");
+    // prereqs_cp::test_all_gened_variants();
+    // println!();
 
-    // return Ok(()); // Don't clutter the terminal when just testing the CP solver
+    // // return Ok(()); // Don't clutter the terminal when just testing the CP solver
 
-    // Test the SAT solver
-    println!("=== Testing SAT Solver ===");
-    prereqs_sat::test_prereq_sat();
-    println!();
+    // // Test the SAT solver
+    // println!("=== Testing SAT Solver ===");
+    // prereqs_sat::test_prereq_sat();
+    // println!();
 
     const FNAME: &str = "ross_test.xlsx";
 
@@ -58,7 +58,14 @@ fn main() -> Result<()> {
     )?;
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
-    println!("Excel file created: {FNAME}");
+    println!(
+        "Excel file created: {FNAME} with {} schedule",
+        if sched.is_valid()? {
+            "valid"
+        } else {
+            "invalid"
+        }
+    );
     // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
     let _new_sched = read_file(&Path::new(FNAME).to_path_buf())?;

@@ -33,7 +33,12 @@ pub fn solve_prereqs_cp(
     // Use the SAT solver to get multiple valid solutions
     let sat_solutions = prereqs_sat::solve_multiple_prereqs(schedule.clone(), prereqs, 10);
 
+    println!(
+        "SAT solver found {} prerequisite solutions",
+        sat_solutions.len()
+    );
     if sat_solutions.is_empty() {
+        println!("No SAT solutions found - returning empty schedule list");
         return Ok(vec![]); // Return empty if no solution found
     }
 
@@ -74,6 +79,11 @@ pub fn solve_prereqs_cp(
 
     // Apply optimization logic to choose the best solution
     let best_solution = find_best_solution(schedule_solutions.clone(), sched);
+
+    println!("Best solution found with {} semesters", best_solution.len());
+    for (i, sem) in best_solution.iter().enumerate() {
+        println!("  Best Semester {}: {} courses", i, sem.len());
+    }
 
     Ok(vec![best_solution])
 }
