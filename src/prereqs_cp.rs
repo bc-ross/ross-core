@@ -1,3 +1,4 @@
+use crate::geneds::{GenEd, GenEdReq, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
@@ -35,7 +36,7 @@ pub fn solve_prereqs_cp(
     }
 
     // Convert SAT solutions to schedule format
-    let schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
+    let mut schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
         .iter()
         .map(|sat_sol| {
             let mut full_schedule = schedule.clone();
@@ -51,6 +52,41 @@ pub fn solve_prereqs_cp(
         })
         .collect();
 
+    // Now handle geneds for each solution
+    for solution in &mut schedule_solutions {
+        let temp_schedule = Schedule {
+            courses: solution.clone(),
+            programs: sched.programs.clone(),
+            catalog: sched.catalog.clone(),
+        };
+
+        let missing_geneds = find_missing_geneds(&temp_schedule);
+
+        // Add missing gened courses to the first available semester (simple strategy)
+        for missing_course in missing_geneds {
+            // Find a semester with reasonable capacity (< 15 credits)
+            let mut placed = false;
+            for semester in solution.iter_mut() {
+                let sem_credits: u32 = semester
+                    .iter()
+                    .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
+                    .sum();
+
+                if sem_credits < 15 {
+                    // Leave room for more courses
+                    semester.push(missing_course.clone());
+                    placed = true;
+                    break;
+                }
+            }
+
+            // If no semester has room, add to the last one
+            if !placed && !solution.is_empty() {
+                solution.last_mut().unwrap().push(missing_course);
+            }
+        }
+    }
+
     // Apply optimization logic to choose the best solution
     let best_solution = find_best_solution(schedule_solutions.clone(), sched);
 
@@ -61,7 +97,7 @@ pub fn solve_prereqs_cp(
 pub fn solve_prereqs_cp_all_solutions(
     schedule: Vec<Vec<CourseCode>>,
     prereqs: &HashMap<CourseCode, CourseReq>,
-    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+    _courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
 ) -> Result<Vec<Vec<Vec<CourseCode>>>> {
     use crate::prereqs_sat;
 
@@ -90,6 +126,48 @@ pub fn solve_prereqs_cp_all_solutions(
         .collect();
 
     Ok(schedule_solutions)
+}
+
+/// Find missing gened requirements in a schedule
+pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
+    let mut missing_courses = Vec::new();
+
+    // Check if geneds are already satisfied
+    if are_geneds_satisfied(sched).unwrap_or(false) {
+        return missing_courses;
+    }
+
+    // Simple strategy: add one course from each gened requirement
+    // This is a heuristic approach - a more sophisticated solver would enumerate all options
+    for gened in &sched.catalog.geneds {
+        let potential_courses = match gened {
+            GenEd::Core { req, .. }
+            | GenEd::Foundation { req, .. }
+            | GenEd::SkillAndPerspective { req, .. } => get_satisfying_courses(req),
+        };
+
+        // Add the first course that could satisfy this gened
+        if let Some(course) = potential_courses.first() {
+            missing_courses.push(course.clone());
+        }
+    }
+
+    missing_courses
+}
+
+/// Get courses that could satisfy a gened requirement
+fn get_satisfying_courses(req: &GenEdReq) -> Vec<CourseCode> {
+    match req {
+        GenEdReq::Set(courses) => courses.clone(),
+        GenEdReq::SetOpts(opts) => {
+            // Return the first option for simplicity
+            opts.first().cloned().unwrap_or_default()
+        }
+        GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+            // Return the first course for simplicity
+            courses.iter().take(1).cloned().collect()
+        }
+    }
 }
 
 /// Find the best solution based on optimization criteria:
@@ -193,6 +271,7 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
 
 /// Test function for the CP solver that uses optimization principles
 pub fn test_cp_solver() {
+    use crate::geneds::{GenEd, GenEdReq};
     use crate::schedule::CourseCode;
     use std::collections::HashMap;
 
@@ -222,7 +301,21 @@ pub fn test_cp_solver() {
         code: 2400.into(),
     };
 
-    // Create a schedule that violates prerequisites
+    // Add some gened courses
+    let engl_comp = CourseCode {
+        stem: "ENGL".to_string(),
+        code: 1100.into(),
+    };
+    let theo_intro = CourseCode {
+        stem: "THEO".to_string(),
+        code: 1100.into(),
+    };
+    let phil_natural = CourseCode {
+        stem: "PHIL".to_string(),
+        code: 2100.into(),
+    };
+
+    // Create a schedule that violates prerequisites and is missing geneds
     let schedule = vec![
         vec![math_calc1.clone()], // Semester 0: Calc 1
         vec![],                   // Semester 1: Empty
@@ -243,6 +336,31 @@ pub fn test_cp_solver() {
             CourseReq::PreCourse(math_linalg.clone()),
         ]),
     );
+
+    // Set up geneds (simplified example)
+    let geneds = vec![
+        GenEd::Core {
+            name: "English Composition".to_string(),
+            req: GenEdReq::Courses {
+                num: 1,
+                courses: vec![engl_comp.clone()],
+            },
+        },
+        GenEd::Core {
+            name: "Intro to Theology".to_string(),
+            req: GenEdReq::Courses {
+                num: 1,
+                courses: vec![theo_intro.clone()],
+            },
+        },
+        GenEd::Foundation {
+            name: "Natural Philosophy".to_string(),
+            req: GenEdReq::Courses {
+                num: 1,
+                courses: vec![phil_natural.clone()],
+            },
+        },
+    ];
 
     // Course catalog
     let mut courses = HashMap::new();
@@ -282,11 +400,37 @@ pub fn test_cp_solver() {
             CourseTermOffering::Both,
         ),
     );
+    // Add gened courses to catalog
+    courses.insert(
+        engl_comp.clone(),
+        (
+            "English Composition".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        theo_intro.clone(),
+        (
+            "Introduction to Theology".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        phil_natural.clone(),
+        (
+            "Natural Philosophy".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+
     solve_schedule_cp(&Schedule {
         courses: schedule,
         programs: vec![],
         catalog: Catalog {
-            geneds: vec![],
+            geneds: geneds,
             prereqs: prereqs,
             programs: vec![],
             courses: courses,
@@ -312,15 +456,15 @@ pub fn solve_schedule_cp(
         println!("  Semester {}: {:?}", i, sem);
     }
 
-    // First, show all solutions found
+    // First, show all solutions found (prerequisite solutions only)
     match solve_prereqs_cp_all_solutions(schedule.clone(), &prereqs, &courses) {
         Ok(all_solutions) => {
             println!(
-                "\nCP solver found {} total solution(s):",
+                "\nCP solver found {} prerequisite solution(s):",
                 all_solutions.len()
             );
             for (sol_idx, solution) in all_solutions.iter().enumerate() {
-                println!("Solution {}:", sol_idx + 1);
+                println!("Prereq Solution {}:", sol_idx + 1);
                 let mut total_credits = 0;
                 for (sem_idx, semester) in solution.iter().enumerate() {
                     let sem_credits: u32 = semester
@@ -335,18 +479,36 @@ pub fn solve_schedule_cp(
                 }
                 println!("  Total credits: {}", total_credits);
 
+                // Check if geneds are satisfied
+                let temp_schedule = Schedule {
+                    courses: solution.clone(),
+                    programs: vec![],
+                    catalog: sched.catalog.clone(),
+                };
+                let geneds_satisfied = are_geneds_satisfied(&temp_schedule).unwrap_or(false);
+                println!("  Geneds satisfied: {}", geneds_satisfied);
+
+                // Check if geneds are satisfied
+                let temp_schedule = Schedule {
+                    courses: solution.clone(),
+                    programs: vec![],
+                    catalog: sched.catalog.clone(),
+                };
+                let geneds_satisfied = are_geneds_satisfied(&temp_schedule).unwrap_or(false);
+                println!("  Geneds satisfied: {}", geneds_satisfied);
+
                 // Calculate solution score
                 let score = calculate_solution_score(solution, sched);
                 println!("  Optimization score: {:.2}", score);
             }
         }
         Err(e) => {
-            println!("CP solver failed to get all solutions: {}", e);
+            println!("CP solver failed to get prerequisite solutions: {}", e);
         }
     }
 
-    // Then show the optimized choice
-    println!("\nNow finding the BEST solution via optimization:");
+    // Then show the optimized choice (with geneds)
+    println!("\nNow finding the BEST solution via optimization (with geneds):");
     solve_prereqs_cp(sched).and_then(|mut solutions| {
         println!("Optimized solution chosen:");
         for (sol_idx, solution) in solutions.iter().enumerate() {
