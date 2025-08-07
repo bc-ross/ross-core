@@ -1,4 +1,6 @@
 use crate::geneds::{GenEd, GenEdReq, are_geneds_satisfied};
+use crate::prereqs::CourseReq;
+use crate::prereqs_sat;
 use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
@@ -25,6 +27,7 @@ pub fn solve_prereqs_cp(
     let sat_solutions = prereqs_sat::solve_multiple_prereqs(
         schedule.clone(),
         prereqs,
+        courses,
         prereqs_sat::MAX_SAT_ITERATIONS,
     );
 
@@ -116,7 +119,15 @@ pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
     let current_courses_owned: Vec<CourseCode> = current_courses.into_iter().cloned().collect();
 
     // Use intelligent selection to find optimal course combination
-    find_optimal_gened_courses(&unsatisfied_geneds, &sched.catalog, &current_courses_owned)
+    let gened_courses =
+        find_optimal_gened_courses(&unsatisfied_geneds, &sched.catalog, &current_courses_owned);
+
+    // Apply credit-aware filtering to respect the 120 credit limit
+    filter_geneds_by_credit_limit(
+        gened_courses,
+        &current_courses_owned,
+        &sched.catalog.courses,
+    )
 }
 
 /// Check if a specific gened is satisfied by current courses
@@ -544,28 +555,38 @@ fn find_best_solution(
 
     let mut best_solution = &solutions[0];
     let mut best_score = evaluate_solution(&solutions[0], sched);
-    println!("Initial solution score: {:.2}", best_score);
+    let initial_credits = calculate_total_credits(&solutions[0], sched);
+    println!(
+        "Initial solution score: {:.2} ({} total credits)",
+        best_score, initial_credits
+    );
 
     for (i, solution) in solutions[1..].iter().enumerate() {
         let score = evaluate_solution(solution, sched);
+        let total_credits = calculate_total_credits(solution, sched);
         if score < best_score {
             println!(
-                "Found better solution at index {}: score {:.2} (improvement: {:.2})",
+                "Found better solution at index {}: score {:.2} (improvement: {:.2}) - {} total credits",
                 i + 1,
                 score,
-                best_score - score
+                best_score - score,
+                total_credits
             );
             best_score = score;
             best_solution = solution;
         }
     }
 
-    println!("Best solution selected with final score: {:.2}", best_score);
+    let final_credits = calculate_total_credits(best_solution, sched);
+    println!(
+        "Best solution selected with final score: {:.2} ({} total credits)",
+        best_score, final_credits
+    );
     Some(best_solution.clone())
 }
 
 /// Evaluate a solution based on optimization criteria
-/// Returns a score where lower is better
+/// Returns a score where lower is better - now heavily penalizes excessive credits
 fn evaluate_solution(solution: &[Vec<CourseCode>], sched: &Schedule) -> f64 {
     let mut total_credits = 0;
     let mut semester_credits = Vec::new();
@@ -576,11 +597,21 @@ fn evaluate_solution(solution: &[Vec<CourseCode>], sched: &Schedule) -> f64 {
         for course_code in semester {
             if let Some((_, Some(credits), _)) = sched.catalog.courses.get(course_code) {
                 semester_total += credits;
+            } else {
+                semester_total += 3; // Default to 3 credits if not specified
             }
         }
         semester_credits.push(semester_total);
         total_credits += semester_total;
     }
+
+    // MASSIVE penalty for exceeding 120 credit limit
+    let credit_penalty = if total_credits > prereqs_sat::MAX_TOTAL_CREDITS {
+        let excess = total_credits - prereqs_sat::MAX_TOTAL_CREDITS;
+        (excess as f64) * 1000.0 // Huge penalty for each credit over limit
+    } else {
+        0.0
+    };
 
     // Calculate credit balance (variance from ideal)
     let ideal_credits_per_semester = total_credits as f64 / solution.len() as f64;
@@ -589,6 +620,91 @@ fn evaluate_solution(solution: &[Vec<CourseCode>], sched: &Schedule) -> f64 {
         .map(|&credits| (credits as f64 - ideal_credits_per_semester).abs())
         .sum();
 
-    // Scoring formula: prioritize total credits, then balance
-    total_credits as f64 + (balance_penalty * 0.1)
+    // Scoring formula: credit penalty (massive) + total credits + balance penalty
+    credit_penalty + (total_credits as f64) + (balance_penalty * 0.1)
+}
+
+/// Calculate total credits in a solution
+fn calculate_total_credits(solution: &[Vec<CourseCode>], sched: &Schedule) -> u32 {
+    let mut total_credits = 0;
+    for semester in solution {
+        for course_code in semester {
+            if let Some((_, Some(credits), _)) = sched.catalog.courses.get(course_code) {
+                total_credits += credits;
+            } else {
+                total_credits += 3; // Default to 3 credits if not specified
+            }
+        }
+    }
+    total_credits
+}
+
+/// Filter gened courses to respect credit limits
+fn filter_geneds_by_credit_limit(
+    gened_courses: Vec<CourseCode>,
+    current_courses: &[CourseCode],
+    course_catalog: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+) -> Vec<CourseCode> {
+    // Calculate current credits
+    let mut current_credits = 0u32;
+    for course in current_courses {
+        current_credits += course_catalog
+            .get(course)
+            .map(|(_, credits, _)| credits.unwrap_or(3))
+            .unwrap_or(3);
+    }
+
+    println!(
+        "Credit filtering: current schedule has {} credits, budget remaining: {} credits",
+        current_credits,
+        prereqs_sat::MAX_TOTAL_CREDITS.saturating_sub(current_credits)
+    );
+
+    if current_credits >= prereqs_sat::MAX_TOTAL_CREDITS {
+        println!(
+            "WARNING: Current schedule already exceeds credit limit, returning minimal geneds"
+        );
+        return vec![]; // Already over limit, can't add more
+    }
+
+    let remaining_credits = prereqs_sat::MAX_TOTAL_CREDITS - current_credits;
+
+    // Sort gened courses by credit value (ascending) to prefer lower-credit courses
+    let mut weighted_geneds: Vec<(CourseCode, u32)> = gened_courses
+        .into_iter()
+        .map(|course| {
+            let credits = course_catalog
+                .get(&course)
+                .map(|(_, credits, _)| credits.unwrap_or(3))
+                .unwrap_or(3);
+            (course, credits)
+        })
+        .collect();
+
+    weighted_geneds.sort_by_key(|(_, credits)| *credits);
+
+    // Greedily select courses that fit within the credit budget
+    let mut selected_courses = Vec::new();
+    let mut used_credits = 0u32;
+
+    for (course, credits) in weighted_geneds {
+        if used_credits + credits <= remaining_credits {
+            selected_courses.push(course);
+            used_credits += credits;
+        } else {
+            println!(
+                "Skipping course {:?} ({} credits) - would exceed budget (used: {}, remaining: {})",
+                course, credits, used_credits, remaining_credits
+            );
+        }
+    }
+
+    println!(
+        "Credit filtering: selected {} gened courses using {} credits out of {} available",
+        selected_courses.len(),
+        used_credits,
+        remaining_credits
+    );
+
+    selected_courses
 }

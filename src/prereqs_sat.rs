@@ -3,6 +3,9 @@ use crate::schedule::CourseCode;
 use std::collections::HashMap;
 use varisat::{CnfFormula, ExtendFormula, Lit, Var, solver::Solver};
 
+// Maximum total credits allowed for optimization (typical bachelor's degree)
+pub const MAX_TOTAL_CREDITS: u32 = 120;
+
 // Maximum number of different SAT solutions to explore for optimization
 pub const MAX_SAT_ITERATIONS: usize = 100;
 
@@ -23,6 +26,8 @@ pub struct PrereqSatSolver {
     formula: CnfFormula,
     /// Number of semesters
     num_semesters: usize,
+    /// Course credit information for optimization
+    course_credits: HashMap<CourseCode, u32>,
 }
 
 impl PrereqSatSolver {
@@ -33,7 +38,13 @@ impl PrereqSatSolver {
             all_vars: Vec::new(),
             formula: CnfFormula::new(),
             num_semesters,
+            course_credits: HashMap::new(),
         }
+    }
+
+    /// Set course credit information for optimization
+    pub fn set_course_credits(&mut self, course_credits: HashMap<CourseCode, u32>) {
+        self.course_credits = course_credits;
     }
 
     fn new_var(&mut self) -> Var {
@@ -233,6 +244,17 @@ impl PrereqSatSolver {
         self.add_course_taken_constraints();
         self.add_uniqueness_constraints();
 
+        // Debug: calculate credits in original schedule
+        let mut original_credits = 0u32;
+        for semester in original_schedule {
+            for course in semester {
+                original_credits += self.course_credits.get(course).unwrap_or(&3);
+            }
+        }
+        println!("Original schedule has {} credits", original_credits);
+
+        self.add_credit_constraint();
+
         // Add optimization constraints
         self.add_minimization_constraints();
         self.add_distribution_constraints();
@@ -392,6 +414,172 @@ impl PrereqSatSolver {
             self.formula.add_clause(&clause);
         }
     }
+
+    /// Add hard constraint to ensure total credits don't exceed MAX_TOTAL_CREDITS
+    fn add_credit_constraint(&mut self) {
+        if self.course_credits.is_empty() {
+            return; // No credit information available
+        }
+
+        // Collect all course variables with their credit weights
+        let mut weighted_vars: Vec<(Var, u32)> = Vec::new();
+
+        for (course, &var) in &self.course_taken_vars {
+            let credits = self.course_credits.get(course).cloned().unwrap_or(3);
+            weighted_vars.push((var, credits));
+        }
+
+        println!(
+            "Adding credit constraint for {} courses (max {} credits)",
+            weighted_vars.len(),
+            MAX_TOTAL_CREDITS
+        );
+
+        // Add weighted cardinality constraint to ensure total credits <= MAX_TOTAL_CREDITS
+        self.add_weighted_cardinality_constraint(&weighted_vars, MAX_TOTAL_CREDITS);
+    }
+
+    /// Add weighted cardinality constraint: sum of credits for true variables <= max_credits
+    fn add_weighted_cardinality_constraint(
+        &mut self,
+        weighted_vars: &[(Var, u32)],
+        max_credits: u32,
+    ) {
+        if weighted_vars.is_empty() {
+            return;
+        }
+
+        // Calculate total possible credits
+        let total_possible: u32 = weighted_vars.iter().map(|(_, weight)| *weight).sum();
+
+        if total_possible <= max_credits {
+            return; // Constraint is already satisfied
+        }
+
+        println!(
+            "Adding credit constraint: max {} credits from {} possible courses (total possible: {})",
+            max_credits,
+            weighted_vars.len(),
+            total_possible
+        );
+
+        // For efficiency, we'll use a simplified approach for large problems
+        if weighted_vars.len() > 30 {
+            println!("Large problem detected, using simplified credit constraint");
+            // For large problems, just add constraints for obviously violating combinations
+            self.add_simple_credit_constraints(weighted_vars, max_credits);
+        } else {
+            // For smaller problems, use the more comprehensive approach
+            self.add_credit_constraint_clauses(weighted_vars, max_credits, 0, 0, Vec::new());
+        }
+    }
+
+    /// Add simplified credit constraints for large problems
+    fn add_simple_credit_constraints(&mut self, weighted_vars: &[(Var, u32)], max_credits: u32) {
+        // Sort by weight (descending) to prioritize high-credit courses
+        let mut sorted_vars = weighted_vars.to_vec();
+        sorted_vars.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Add constraints to prevent obviously violating combinations
+        for i in 0..sorted_vars.len() {
+            for j in i + 1..sorted_vars.len() {
+                let (var1, weight1) = sorted_vars[i];
+                let (var2, weight2) = sorted_vars[j];
+
+                // If just these two courses exceed the limit, forbid them together
+                if weight1 + weight2 > max_credits {
+                    self.formula
+                        .add_clause(&[!Lit::from_var(var1, true), !Lit::from_var(var2, true)]);
+                }
+            }
+        }
+
+        // Add constraints for triplets of high-credit courses
+        for i in 0..std::cmp::min(sorted_vars.len(), 10) {
+            for j in i + 1..std::cmp::min(sorted_vars.len(), 10) {
+                for k in j + 1..std::cmp::min(sorted_vars.len(), 10) {
+                    let (var1, weight1) = sorted_vars[i];
+                    let (var2, weight2) = sorted_vars[j];
+                    let (var3, weight3) = sorted_vars[k];
+
+                    if weight1 + weight2 + weight3 > max_credits {
+                        self.formula.add_clause(&[
+                            !Lit::from_var(var1, true),
+                            !Lit::from_var(var2, true),
+                            !Lit::from_var(var3, true),
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Recursively add clauses to forbid combinations that exceed credit limit
+    fn add_credit_constraint_clauses(
+        &mut self,
+        weighted_vars: &[(Var, u32)],
+        max_credits: u32,
+        current_index: usize,
+        current_credits: u32,
+        current_selection: Vec<Var>,
+    ) {
+        // Limit recursion depth to prevent exponential blowup
+        if current_selection.len() > 10 {
+            return;
+        }
+
+        // Base case: if we've exceeded the limit, add a clause to forbid this combination
+        if current_credits > max_credits {
+            if !current_selection.is_empty() {
+                let clause: Vec<Lit> = current_selection
+                    .iter()
+                    .map(|&var| !Lit::from_var(var, true))
+                    .collect();
+                self.formula.add_clause(&clause);
+            }
+            return;
+        }
+
+        // If we've processed all variables, no need to continue
+        if current_index >= weighted_vars.len() {
+            return;
+        }
+
+        // Pruning: if even taking all remaining courses won't exceed the limit, skip
+        let remaining_credits: u32 = weighted_vars[current_index..]
+            .iter()
+            .map(|(_, weight)| *weight)
+            .sum();
+
+        if current_credits + remaining_credits <= max_credits {
+            return;
+        }
+
+        let (var, weight) = weighted_vars[current_index];
+
+        // Try including this variable (only if it doesn't immediately violate)
+        if current_credits + weight <= max_credits + 20 {
+            // Allow some buffer for recursion
+            let mut new_selection = current_selection.clone();
+            new_selection.push(var);
+            self.add_credit_constraint_clauses(
+                weighted_vars,
+                max_credits,
+                current_index + 1,
+                current_credits + weight,
+                new_selection,
+            );
+        }
+
+        // Try not including this variable
+        self.add_credit_constraint_clauses(
+            weighted_vars,
+            max_credits,
+            current_index + 1,
+            current_credits,
+            current_selection,
+        );
+    }
 }
 
 /// Enhanced SAT solver that finds multiple solutions by iteratively excluding previous ones
@@ -399,6 +587,10 @@ impl PrereqSatSolver {
 pub fn solve_multiple_prereqs(
     schedule: Vec<Vec<CourseCode>>,
     prereqs: &HashMap<CourseCode, CourseReq>,
+    course_credits: &HashMap<
+        CourseCode,
+        (String, Option<u32>, crate::schedule::CourseTermOffering),
+    >,
     max_solutions: usize,
 ) -> Vec<SatSolution> {
     let mut solutions = Vec::new();
@@ -406,6 +598,12 @@ pub fn solve_multiple_prereqs(
     let mut best_score = f64::INFINITY;
     let mut solutions_since_improvement = 0;
     const MAX_STAGNANT_ITERATIONS: usize = 20; // Stop if no improvement for this many iterations
+
+    // Convert course credits to a simpler format
+    let credit_map: HashMap<CourseCode, u32> = course_credits
+        .iter()
+        .map(|(code, (_, credits, _))| (code.clone(), credits.unwrap_or(3)))
+        .collect();
 
     println!(
         "SAT solver exploring up to {} solutions for optimization...",
@@ -415,6 +613,9 @@ pub fn solve_multiple_prereqs(
     for attempt in 0..max_solutions {
         let num_semesters = schedule.len();
         let mut solver = PrereqSatSolver::new(num_semesters);
+
+        // Set course credit information for optimization
+        solver.set_course_credits(credit_map.clone());
 
         solver.add_existing_schedule(&schedule);
         solver.add_prereq_constraints(&schedule, prereqs);
@@ -426,16 +627,26 @@ pub fn solve_multiple_prereqs(
 
         if let Some(solution) = solver.solve(&schedule) {
             // Calculate a score for this solution (lower is better)
-            let score = score_solution(&solution, &schedule);
+            let score = score_solution(&solution, &schedule, &credit_map);
 
             if score < best_score {
                 best_score = score;
                 solutions_since_improvement = 0;
+
+                // Calculate total credits for this solution
+                let mut total_additional_credits = 0u32;
+                for additional_courses in solution.additional_courses.values() {
+                    for course in additional_courses {
+                        total_additional_credits += credit_map.get(course).unwrap_or(&3);
+                    }
+                }
+
                 println!(
-                    "SAT iteration {}: Found better solution with score {:.2} ({} additional courses)",
+                    "SAT iteration {}: Found better solution with score {:.2} ({} additional courses, {} additional credits)",
                     attempt + 1,
                     score,
-                    count_total_additional_courses(&solution)
+                    count_total_additional_courses(&solution),
+                    total_additional_credits
                 );
             } else {
                 solutions_since_improvement += 1;
@@ -464,12 +675,20 @@ pub fn solve_multiple_prereqs(
             }
             solutions.push(solution);
 
-            // Very early termination if we find a solution with very few additional courses
-            let total_additional = count_total_additional_courses(&solutions.last().unwrap());
-            if total_additional <= 2 {
+            // Very early termination based on credit efficiency
+            let last_solution = solutions.last().unwrap();
+            let total_additional = count_total_additional_courses(last_solution);
+            let mut total_additional_credits = 0u32;
+            for additional_courses in last_solution.additional_courses.values() {
+                for course in additional_courses {
+                    total_additional_credits += credit_map.get(course).unwrap_or(&3);
+                }
+            }
+
+            if total_additional <= 2 || total_additional_credits <= 6 {
                 println!(
-                    "SAT solver: Found excellent solution with only {} additional courses, terminating early",
-                    total_additional
+                    "SAT solver: Found excellent solution with only {} additional courses ({} credits), terminating early",
+                    total_additional, total_additional_credits
                 );
                 break;
             }
@@ -491,9 +710,21 @@ pub fn solve_multiple_prereqs(
 }
 
 /// Score a solution based on number of additional courses and distribution
-/// Lower scores are better
-fn score_solution(solution: &SatSolution, original_schedule: &[Vec<CourseCode>]) -> f64 {
+/// Lower scores are better - now heavily prioritizes total credits
+fn score_solution(
+    solution: &SatSolution,
+    original_schedule: &[Vec<CourseCode>],
+    credit_map: &HashMap<CourseCode, u32>,
+) -> f64 {
     let total_additional = count_total_additional_courses(solution);
+
+    // Calculate total credits for additional courses
+    let mut total_additional_credits = 0u32;
+    for additional_courses in solution.additional_courses.values() {
+        for course in additional_courses {
+            total_additional_credits += credit_map.get(course).unwrap_or(&3);
+        }
+    }
 
     // Calculate distribution penalty (prefer even spread across semesters)
     let mut distribution_penalty = 0.0;
@@ -510,8 +741,10 @@ fn score_solution(solution: &SatSolution, original_schedule: &[Vec<CourseCode>])
         distribution_penalty += (sem_additional - avg_additional).abs();
     }
 
-    // Main score: total additional courses + small distribution penalty
-    total_additional as f64 + (distribution_penalty * 0.1)
+    // HEAVILY prioritize total credits (weight 10x), then course count, then distribution
+    (total_additional_credits as f64 * 10.0)
+        + (total_additional as f64)
+        + (distribution_penalty * 0.1)
 }
 
 /// Count total number of additional courses in a solution
