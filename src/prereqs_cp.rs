@@ -179,7 +179,7 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
         .sum();
 
     // Objective 5: Ensure schedule is valid
-    let validation_penalty: f64 = (Schedule {
+    let validation_penalty: f64 = !(Schedule {
         courses: solution.to_vec(),
         programs: ref_sched.programs.clone(),
         catalog: ref_sched.catalog.clone(),

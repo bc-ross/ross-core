@@ -212,7 +212,7 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(self.are_programs_valid()? && self.validate_prereqs()?)
+        Ok(dbg!(self.are_programs_valid()?) && dbg!(self.validate_prereqs()?))
     }
 
     fn are_programs_valid(&self) -> Result<bool> {
