@@ -221,171 +221,145 @@ fn find_optimal_gened_courses(
 ) -> Vec<CourseCode> {
     use crate::geneds::{GenEd, GenEdReq};
 
+    println!("Finding optimal gened courses using backtracking-based assignment...");
+
+    // Create a comprehensive list of all possible courses for geneds
+    let mut all_possible_courses = HashSet::new();
+    for (_, _, possible_courses) in unsatisfied_geneds {
+        all_possible_courses.extend(possible_courses.iter().cloned());
+    }
+
+    // Add current courses to the pool
+    all_possible_courses.extend(current_courses.iter().cloned());
+
+    // Convert to the format expected by backtracking functions
+    let current_courses_refs: HashSet<&CourseCode> = current_courses.iter().collect();
+    let all_courses_refs: HashSet<&CourseCode> = all_possible_courses.iter().collect();
+
+    // Separate geneds by type for constraint-aware processing
+    let mut core_geneds = Vec::new();
+    let mut foundation_geneds = Vec::new();
+    let mut skill_perspective_geneds = Vec::new();
+
+    for (idx, gened, _) in unsatisfied_geneds {
+        match gened {
+            GenEd::Core { .. } => core_geneds.push((*idx, gened)),
+            GenEd::Foundation { .. } => foundation_geneds.push((*idx, gened)),
+            GenEd::SkillAndPerspective { .. } => skill_perspective_geneds.push((*idx, gened)),
+        }
+    }
+
+    // Sort Foundation geneds by index to match validation order
+    foundation_geneds.sort_by_key(|(idx, _)| *idx);
+
+    println!(
+        "Processing {} Core, {} Foundation, {} Skills&Perspective geneds",
+        core_geneds.len(),
+        foundation_geneds.len(),
+        skill_perspective_geneds.len()
+    );
+
     let mut selected_courses = Vec::new();
-    let mut foundation_courses = HashSet::new();
-    let mut skill_and_perspective_usage: HashMap<CourseCode, u8> = HashMap::new();
 
-    // Initialize tracking with courses already in schedule
-    // let current_courses_set: HashSet<&CourseCode> = current_courses.iter().collect();
+    // 1. Process Core geneds first (they have no overlap restrictions)
+    for (idx, gened) in &core_geneds {
+        if let GenEd::Core { req, name, .. } = gened {
+            // Check if already satisfied
+            if req
+                .fulfilled_courses(&current_courses_refs, catalog)
+                .is_some()
+            {
+                println!("Core gened {} ({}) already satisfied", idx, name);
+                continue;
+            }
 
-    // Check what's already used by analyzing current courses against geneds
-    // For Foundation geneds, we need to process them in the same order as validation
-    let mut foundation_geneds: Vec<_> = unsatisfied_geneds
-        .iter()
-        .filter(|(_, gened, _)| matches!(gened, GenEd::Foundation { .. }))
-        .collect();
-    foundation_geneds.sort_by_key(|(idx, _, _)| *idx);
+            // Find courses to satisfy this gened
+            if let Some(courses_needed) = req.fulfilled_courses(&all_courses_refs, catalog) {
+                let new_courses: Vec<CourseCode> = courses_needed
+                    .iter()
+                    .filter(|course| !current_courses.contains(*course))
+                    .cloned()
+                    .cloned()
+                    .collect();
 
-    // Process Foundation geneds in order to track which courses are used by which geneds
-    for (_, gened, _) in &foundation_geneds {
-        if let GenEd::Foundation { req, .. } = gened {
-            for course in current_courses {
-                if is_course_relevant_to_requirement(course, req) {
-                    foundation_courses.insert(course.clone());
-                }
+                println!(
+                    "Core gened {} ({}) needs {} new courses: {:?}",
+                    idx,
+                    name,
+                    new_courses.len(),
+                    new_courses
+                );
+                selected_courses.extend(new_courses);
+            } else {
+                println!("WARNING: Could not satisfy Core gened {} ({})", idx, name);
             }
         }
     }
 
-    // For Skills & Perspective, track usage across all such geneds
-    for (_, gened, _) in unsatisfied_geneds {
-        if let GenEd::SkillAndPerspective { req, .. } = gened {
-            for course in current_courses {
-                if is_course_relevant_to_requirement(course, req) {
-                    *skill_and_perspective_usage
-                        .entry(course.clone())
-                        .or_insert(0) += 1;
+    // 2. Use backtracking for Foundation geneds
+    if !foundation_geneds.is_empty() {
+        println!("Using backtracking for Foundation geneds...");
+        if let Some(foundation_assignments) =
+            find_foundation_gened_assignment(&foundation_geneds, &all_courses_refs, catalog)
+        {
+            for (idx, gened, used_courses) in foundation_assignments {
+                if let GenEd::Foundation { name, .. } = gened {
+                    let new_courses: Vec<CourseCode> = used_courses
+                        .iter()
+                        .filter(|course| !current_courses.contains(*course))
+                        .cloned()
+                        .cloned()
+                        .collect();
+
+                    println!(
+                        "Foundation gened {} ({}) assigned {} new courses: {:?}",
+                        idx,
+                        name,
+                        new_courses.len(),
+                        new_courses
+                    );
+                    selected_courses.extend(new_courses);
                 }
             }
+        } else {
+            println!("WARNING: Could not find valid Foundation gened assignment");
         }
     }
 
-    // Process geneds in order: Core first, then Foundation (in index order), then Skills & Perspective
-    let mut sorted_geneds: Vec<_> = unsatisfied_geneds.iter().collect();
-    sorted_geneds.sort_by_key(|(idx, gened, _)| match gened {
-        GenEd::Core { .. } => (0, *idx),
-        GenEd::Foundation { .. } => (1, *idx),
-        GenEd::SkillAndPerspective { .. } => (2, *idx),
-    });
-
-    for (idx, gened, possible_courses) in &sorted_geneds {
-        // Check if this gened is already satisfied
-        let mut test_courses = current_courses.to_vec();
-        test_courses.extend(selected_courses.iter().cloned());
-
-        if is_gened_fully_satisfied_constraint_aware(
-            gened,
-            &test_courses,
+    // 3. Use backtracking for Skills & Perspective geneds
+    if !skill_perspective_geneds.is_empty() {
+        println!("Using backtracking for Skills & Perspective geneds...");
+        if let Some(skill_assignments) = find_skills_perspective_gened_assignment(
+            &skill_perspective_geneds,
+            &all_courses_refs,
             catalog,
-            &foundation_courses,
-            &skill_and_perspective_usage,
         ) {
-            println!("Gened {} already satisfied, skipping", idx);
-            continue;
-        }
+            for (idx, gened, used_courses) in skill_assignments {
+                if let GenEd::SkillAndPerspective { name, .. } = gened {
+                    let new_courses: Vec<CourseCode> = used_courses
+                        .iter()
+                        .filter(|course| !current_courses.contains(*course))
+                        .cloned()
+                        .cloned()
+                        .collect();
 
-        println!(
-            "Processing gened {}: {:?}",
-            idx,
-            match gened {
-                GenEd::Core { name, .. } => format!("Core: {}", name),
-                GenEd::Foundation { name, .. } => format!("Foundation: {}", name),
-                GenEd::SkillAndPerspective { name, .. } =>
-                    format!("Skills & Perspective: {}", name),
-            }
-        );
-
-        let available_courses: Vec<CourseCode> = match gened {
-            GenEd::Core { .. } => {
-                // Core geneds can use any available course (except already selected)
-                possible_courses
-                    .iter()
-                    .filter(|course| {
-                        !current_courses.contains(course) && !selected_courses.contains(course)
-                    })
-                    .cloned()
-                    .collect()
-            }
-            GenEd::Foundation { .. } => {
-                // Foundation geneds cannot overlap with other foundation courses
-                possible_courses
-                    .iter()
-                    .filter(|course| {
-                        !foundation_courses.contains(course)
-                            && !current_courses.contains(course)
-                            && !selected_courses.contains(course)
-                    })
-                    .cloned()
-                    .collect()
-            }
-            GenEd::SkillAndPerspective { .. } => {
-                // Skills & Perspective can reuse courses up to MAX (3) times
-                possible_courses
-                    .iter()
-                    .filter(|course| {
-                        let current_usage = skill_and_perspective_usage.get(course).unwrap_or(&0);
-                        *current_usage < 3
-                            && !current_courses.contains(course)
-                            && !selected_courses.contains(course)
-                    })
-                    .cloned()
-                    .collect()
-            }
-        };
-
-        if available_courses.is_empty() {
-            println!("No available courses for gened {} due to constraints", idx);
-            continue;
-        }
-
-        // For Foundation geneds, be more strategic about course selection to avoid conflicts
-        let courses_needed = match gened {
-            GenEd::Foundation { req, .. } => select_courses_for_foundation_requirement(
-                req,
-                &available_courses,
-                catalog,
-                &sorted_geneds,
-                *idx,
-            ),
-            GenEd::Core { req, .. } | GenEd::SkillAndPerspective { req, .. } => {
-                select_courses_for_requirement(req, &available_courses, catalog)
-            }
-        };
-
-        if courses_needed.is_empty() {
-            println!("Could not satisfy gened {} with available courses", idx);
-            continue;
-        }
-
-        println!(
-            "Selected {} courses for gened {}: {:?}",
-            courses_needed.len(),
-            idx,
-            courses_needed
-        );
-
-        // Track course usage based on gened type
-        for course in &courses_needed {
-            match gened {
-                GenEd::Foundation { .. } => {
-                    foundation_courses.insert(course.clone());
-                }
-                GenEd::SkillAndPerspective { .. } => {
-                    *skill_and_perspective_usage
-                        .entry(course.clone())
-                        .or_insert(0) += 1;
-                }
-                GenEd::Core { .. } => {
-                    // Core courses don't have usage restrictions
+                    println!(
+                        "Skills & Perspective gened {} ({}) assigned {} new courses: {:?}",
+                        idx,
+                        name,
+                        new_courses.len(),
+                        new_courses
+                    );
+                    selected_courses.extend(new_courses);
                 }
             }
+        } else {
+            println!("WARNING: Could not find valid Skills & Perspective gened assignment");
         }
-
-        selected_courses.extend(courses_needed);
     }
 
     println!(
-        "Total constraint-aware gened courses selected: {}",
+        "Total backtracking-based gened courses selected: {}",
         selected_courses.len()
     );
     selected_courses
@@ -1859,4 +1833,153 @@ fn is_course_relevant_to_requirement(course: &CourseCode, req: &GenEdReq) -> boo
         GenEdReq::Courses { courses, .. } => courses.contains(course),
         GenEdReq::Credits { courses, .. } => courses.contains(course),
     }
+}
+
+/// Find a valid assignment for Foundation geneds using backtracking (CP solver version)
+fn find_foundation_gened_assignment<'a>(
+    foundation_geneds: &[(usize, &'a GenEd)],
+    all_codes: &HashSet<&'a CourseCode>,
+    catalog: &Catalog,
+) -> Option<Vec<(usize, &'a GenEd, HashSet<&'a CourseCode>)>> {
+    // Use backtracking to find a valid assignment
+    let mut assignments = Vec::new();
+    let mut used_courses = HashSet::new();
+
+    if backtrack_foundation_gened_assignment(
+        foundation_geneds,
+        all_codes,
+        catalog,
+        0,
+        &mut assignments,
+        &mut used_courses,
+    ) {
+        Some(assignments)
+    } else {
+        None
+    }
+}
+
+/// Backtracking algorithm for Foundation gened assignment (CP solver version)
+fn backtrack_foundation_gened_assignment<'a>(
+    foundation_geneds: &[(usize, &'a GenEd)],
+    all_codes: &HashSet<&'a CourseCode>,
+    catalog: &Catalog,
+    gened_index: usize,
+    assignments: &mut Vec<(usize, &'a GenEd, HashSet<&'a CourseCode>)>,
+    used_courses: &mut HashSet<&'a CourseCode>,
+) -> bool {
+    // Base case: all geneds assigned
+    if gened_index >= foundation_geneds.len() {
+        return true;
+    }
+
+    let (gened_idx, gened) = foundation_geneds[gened_index];
+    if let GenEd::Foundation { req, .. } = gened {
+        // Get available courses (not used by previous assignments)
+        let available_codes: HashSet<_> = all_codes.difference(used_courses).cloned().collect();
+
+        // Try to satisfy this gened with available courses
+        if let Some(fulfilled_courses) = req.fulfilled_courses(&available_codes, catalog) {
+            // Try this assignment
+            let original_used_size = used_courses.len();
+            used_courses.extend(fulfilled_courses.iter().cloned());
+            assignments.push((gened_idx, gened, fulfilled_courses.clone()));
+
+            // Recursively try to assign remaining geneds
+            if backtrack_foundation_gened_assignment(
+                foundation_geneds,
+                all_codes,
+                catalog,
+                gened_index + 1,
+                assignments,
+                used_courses,
+            ) {
+                return true;
+            }
+
+            // Backtrack: undo this assignment
+            assignments.pop();
+            used_courses.retain(|course| !fulfilled_courses.contains(course));
+            debug_assert_eq!(used_courses.len(), original_used_size);
+        }
+    }
+
+    false
+}
+
+/// Find a valid assignment for Skills & Perspective geneds using backtracking (CP solver version)
+fn find_skills_perspective_gened_assignment<'a>(
+    skill_perspective_geneds: &[(usize, &'a GenEd)],
+    all_codes: &HashSet<&'a CourseCode>,
+    catalog: &Catalog,
+) -> Option<Vec<(usize, &'a GenEd, HashSet<&'a CourseCode>)>> {
+    // Use backtracking to find a valid assignment
+    let mut assignments = Vec::new();
+    let mut course_usage = HashMap::new();
+
+    if backtrack_skills_gened_assignment(
+        skill_perspective_geneds,
+        all_codes,
+        catalog,
+        0,
+        &mut assignments,
+        &mut course_usage,
+    ) {
+        Some(assignments)
+    } else {
+        None
+    }
+}
+
+/// Backtracking algorithm for Skills & Perspective gened assignment (CP solver version)
+fn backtrack_skills_gened_assignment<'a>(
+    skill_perspective_geneds: &[(usize, &'a GenEd)],
+    all_codes: &HashSet<&'a CourseCode>,
+    catalog: &Catalog,
+    gened_index: usize,
+    assignments: &mut Vec<(usize, &'a GenEd, HashSet<&'a CourseCode>)>,
+    course_usage: &mut HashMap<&'a CourseCode, u8>,
+) -> bool {
+    // Base case: all geneds assigned
+    if gened_index >= skill_perspective_geneds.len() {
+        return true;
+    }
+
+    let (gened_idx, gened) = skill_perspective_geneds[gened_index];
+    if let GenEd::SkillAndPerspective { req, .. } = gened {
+        // Get available courses (not overused)
+        let available_codes: HashSet<_> = all_codes
+            .iter()
+            .filter(|course| course_usage.get(*course).unwrap_or(&0) < &3)
+            .cloned()
+            .collect();
+
+        // Try to satisfy this gened with available courses
+        if let Some(fulfilled_courses) = req.fulfilled_courses(&available_codes, catalog) {
+            // Try this assignment
+            let original_usage = course_usage.clone();
+            for course in &fulfilled_courses {
+                *course_usage.entry(course).or_insert(0) += 1;
+            }
+            assignments.push((gened_idx, gened, fulfilled_courses.clone()));
+
+            // Recursively try to assign remaining geneds
+            if backtrack_skills_gened_assignment(
+                skill_perspective_geneds,
+                all_codes,
+                catalog,
+                gened_index + 1,
+                assignments,
+                course_usage,
+            ) {
+                return true;
+            }
+
+            // Backtrack: undo this assignment
+            assignments.pop();
+            *course_usage = original_usage;
+        }
+    }
+
+    false
 }

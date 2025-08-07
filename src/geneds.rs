@@ -59,28 +59,53 @@ impl GenEdReq {
                 None
             }
             GenEdReq::Courses { num, courses } => {
-                let fulfilled: HashSet<_> = courses
+                let available: Vec<_> = courses
                     .iter()
                     .filter(|code| all_codes.contains(*code))
                     .collect();
-                if fulfilled.len() >= *num {
-                    Some(fulfilled)
+                if available.len() >= *num {
+                    // Return only the minimum number of courses needed
+                    Some(available.into_iter().take(*num).collect())
                 } else {
                     None
                 }
             }
             GenEdReq::Credits { num, courses } => {
-                let fulfilled: HashSet<_> = courses
+                let mut available: Vec<_> = courses
                     .iter()
                     .filter(|code| all_codes.contains(*code))
                     .collect();
-                if fulfilled
-                    .iter()
-                    .filter_map(|c| catalog.courses.get(c).and_then(|(_, creds, _)| *creds))
-                    .sum::<u32>()
-                    >= *num
-                {
-                    Some(fulfilled)
+
+                // Sort by credits to prioritize higher-credit courses for efficiency
+                available.sort_by_key(|code| {
+                    catalog
+                        .courses
+                        .get(code)
+                        .and_then(|(_, creds, _)| *creds)
+                        .unwrap_or(3)
+                });
+                available.reverse(); // Highest credits first
+
+                let mut selected = HashSet::new();
+                let mut total_credits = 0u32;
+
+                for code in available {
+                    let course_credits = catalog
+                        .courses
+                        .get(code)
+                        .and_then(|(_, creds, _)| *creds)
+                        .unwrap_or(3);
+
+                    selected.insert(code);
+                    total_credits += course_credits;
+
+                    if total_credits >= *num {
+                        break;
+                    }
+                }
+
+                if total_credits >= *num {
+                    Some(selected)
                 } else {
                     None
                 }
@@ -387,7 +412,7 @@ fn backtrack_skills_assignment<'a>(
         // Try to satisfy this gened with available courses
         if let Some(fulfilled_courses) = req.fulfilled_courses(&available_codes, catalog) {
             // Try this assignment
-            let mut backup_usage = course_usage.clone();
+            let backup_usage = course_usage.clone();
             for course in &fulfilled_courses {
                 *course_usage.entry(course).or_insert(0) += 1;
             }
