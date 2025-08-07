@@ -17,6 +17,7 @@ pub enum CourseTermOffering {
     Both,
     Discretion,
     Infrequently,
+    Summer,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]

@@ -7,6 +7,9 @@ mod course_reqs;
 #[path = "../../resources/programs/mod.rs"]
 mod programs;
 
+#[path = "../../resources/general_education.rs"]
+pub mod general_education;
+
 #[path = "../../src/schedule.rs"]
 pub mod schedule;
 
@@ -15,6 +18,9 @@ pub mod prereqs;
 
 #[path = "../../src/schedule_sorter.rs"]
 pub mod schedule_sorter;
+
+#[path = "../../src/geneds.rs"]
+pub mod geneds;
 
 fn main() {
     let mut courses = HashSet::new();
@@ -25,7 +31,9 @@ fn main() {
         courses.insert(course);
         courses.extend(prereq.all_course_codes());
     }
-    // Implement geneds later
+    for gened in general_education::geneds() {
+        courses.extend(gened.all_course_codes());
+    }
 
     let courses_json = serde_json::to_string_pretty(&courses).unwrap();
     let mut file = File::create("courses.json").unwrap();

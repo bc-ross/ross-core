@@ -152,3 +152,37 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     }
     Ok(true)
 }
+
+// Used for script_assistant crate
+#[allow(dead_code)]
+impl GenEd {
+    pub fn all_course_codes(&self) -> Vec<CourseCode> {
+        match self {
+            GenEd::Core { req, .. } => req.all_course_codes(),
+            GenEd::Foundation { req, .. } => req.all_course_codes(),
+            GenEd::SkillAndPerspective { req, .. } => req.all_course_codes(),
+        }
+    }
+}
+
+impl GenEdReq {
+    fn all_course_codes(&self) -> Vec<CourseCode> {
+        let mut codes = Vec::new();
+        self.collect_course_codes(&mut codes);
+        codes.into_iter().map(|x| x.clone()).collect()
+    }
+
+    fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {
+        match self {
+            GenEdReq::Set(courses) => {
+                codes.extend(courses.iter());
+            }
+            GenEdReq::SetOpts(course_seqs) => {
+                codes.extend(course_seqs.iter().flatten());
+            }
+            GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+                codes.extend(courses.iter());
+            }
+        }
+    }
+}
