@@ -21,25 +21,8 @@ use write_excel_file::save_schedule;
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
-    // // Test multi-course gened functionality first
-    // prereqs_cp::test_multi_course_gened();
-
-    // // Test the CP solver
-    // println!("=== Testing CP Solver ===");
-    // prereqs_cp::test_cp_solver();
-    // println!();
-
-    // // Test all GenEdReq variants
-    // println!("=== Testing All GenEdReq Variants ===");
-    // prereqs_cp::test_all_gened_variants();
-    // println!();
-
-    // // return Ok(()); // Don't clutter the terminal when just testing the CP solver
-
-    // // Test the SAT solver
-    // println!("=== Testing SAT Solver ===");
-    // prereqs_sat::test_prereq_sat();
-    // println!();
+    // Test the full real schedule generation with strategic Foundation selection
+    println!("=== Testing Real Schedule Generation with Strategic Foundation Selection ===");
 
     const FNAME: &str = "ross_test.xlsx";
 
@@ -66,17 +49,6 @@ fn main() -> Result<()> {
             "invalid"
         }
     );
-    // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
 
-    let _new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    // dbg!(new_sched);
-    println!("Read file: {FNAME}");
-
-    // save_schedule(
-    //     &Path::new("output.xlsx").to_path_buf(),
-    //     new_sched.borrow_schedule(),
-    // )?;
-
-    // println!("Excel file created: output.xlsx");
     Ok(())
 }

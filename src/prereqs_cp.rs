@@ -2,7 +2,7 @@ use crate::geneds::{GenEd, GenEdReq, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 // Normally 18 but adjusted to 18 for small-scale testing
 const MAX_OVERLOAD_SEMESTER: u32 = 18; // Maximum credits per semester
@@ -210,190 +210,470 @@ fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
 }
 
 /// Find optimal combination of courses to satisfy all unsatisfied geneds
-/// This uses a greedy approach that heavily favors course overlap and minimal additions
+/// This uses constraint-aware selection that respects the same overlap rules as validation:
+/// - Foundation geneds: no overlap between foundation courses
+/// - Skills & Perspective geneds: limited reuse (MAX_SKILLS_AND_PERSPECTIVES times)
+/// - Core geneds: can overlap with others
 fn find_optimal_gened_courses(
     unsatisfied_geneds: &[(usize, GenEd, Vec<CourseCode>)],
     catalog: &Catalog,
-    already_in_schedule: &[CourseCode],
+    current_courses: &[CourseCode],
 ) -> Vec<CourseCode> {
+    use crate::geneds::{GenEd, GenEdReq};
+
     let mut selected_courses = Vec::new();
-    let mut remaining_geneds = unsatisfied_geneds.to_vec();
+    let mut foundation_courses = HashSet::new();
+    let mut skill_and_perspective_usage: HashMap<CourseCode, u8> = HashMap::new();
 
-    // Build a map of course -> list of geneds it can satisfy
-    let mut course_to_geneds: std::collections::HashMap<CourseCode, Vec<usize>> =
-        std::collections::HashMap::new();
+    // Initialize tracking with courses already in schedule
+    // let current_courses_set: HashSet<&CourseCode> = current_courses.iter().collect();
 
-    for (gened_idx, _gened, possible_courses) in &remaining_geneds {
-        for course in possible_courses {
-            course_to_geneds
-                .entry(course.clone())
-                .or_default()
-                .push(*gened_idx);
-        }
-    }
+    // Check what's already used by analyzing current courses against geneds
+    // For Foundation geneds, we need to process them in the same order as validation
+    let mut foundation_geneds: Vec<_> = unsatisfied_geneds
+        .iter()
+        .filter(|(_, gened, _)| matches!(gened, GenEd::Foundation { .. }))
+        .collect();
+    foundation_geneds.sort_by_key(|(idx, _, _)| *idx);
 
-    // Track which geneds we've already satisfied
-    let mut satisfied_geneds = std::collections::HashSet::new();
-
-    // Initialize with already satisfied geneds
-    for (gened_idx, gened, _) in &remaining_geneds {
-        let current_courses: Vec<_> = already_in_schedule.iter().cloned().collect();
-        if is_gened_fully_satisfied(gened, &current_courses, catalog) {
-            satisfied_geneds.insert(*gened_idx);
-        }
-    }
-
-    // Remove already satisfied geneds
-    remaining_geneds.retain(|(gened_idx, _, _)| !satisfied_geneds.contains(gened_idx));
-
-    let mut iteration_count = 0;
-    let max_iterations = 20; // Much more conservative limit
-
-    while !remaining_geneds.is_empty() && iteration_count < max_iterations {
-        iteration_count += 1;
-
-        let mut best_course = None;
-        let mut best_score = f64::NEG_INFINITY;
-        let mut best_geneds_affected = Vec::new();
-
-        // Sort course keys to make iteration deterministic
-        let mut course_keys: Vec<_> = course_to_geneds.keys().collect();
-        course_keys.sort_by(|a, b| {
-            a.stem.cmp(&b.stem).then_with(|| {
-                a.code
-                    .partial_cmp(&b.code)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-        });
-
-        for course in course_keys {
-            let gened_indices = &course_to_geneds[course];
-
-            // Skip if this course is already selected or in the schedule
-            if selected_courses.contains(course) || already_in_schedule.contains(course) {
-                continue;
-            }
-
-            // Count how many unsatisfied geneds this course would help satisfy
-            let mut affected_geneds = Vec::new();
-            let mut geneds_that_would_be_completed = 0;
-
-            for &gened_idx in gened_indices {
-                if satisfied_geneds.contains(&gened_idx) {
-                    continue; // Skip already satisfied geneds
+    // Process Foundation geneds in order to track which courses are used by which geneds
+    for (_, gened, _) in &foundation_geneds {
+        if let GenEd::Foundation { req, .. } = gened {
+            for course in current_courses {
+                if is_course_relevant_to_requirement(course, req) {
+                    foundation_courses.insert(course.clone());
                 }
+            }
+        }
+    }
 
-                if let Some((_, gened, _)) = remaining_geneds
+    // For Skills & Perspective, track usage across all such geneds
+    for (_, gened, _) in unsatisfied_geneds {
+        if let GenEd::SkillAndPerspective { req, .. } = gened {
+            for course in current_courses {
+                if is_course_relevant_to_requirement(course, req) {
+                    *skill_and_perspective_usage
+                        .entry(course.clone())
+                        .or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    // Process geneds in order: Core first, then Foundation (in index order), then Skills & Perspective
+    let mut sorted_geneds: Vec<_> = unsatisfied_geneds.iter().collect();
+    sorted_geneds.sort_by_key(|(idx, gened, _)| match gened {
+        GenEd::Core { .. } => (0, *idx),
+        GenEd::Foundation { .. } => (1, *idx),
+        GenEd::SkillAndPerspective { .. } => (2, *idx),
+    });
+
+    for (idx, gened, possible_courses) in &sorted_geneds {
+        // Check if this gened is already satisfied
+        let mut test_courses = current_courses.to_vec();
+        test_courses.extend(selected_courses.iter().cloned());
+
+        if is_gened_fully_satisfied_constraint_aware(
+            gened,
+            &test_courses,
+            catalog,
+            &foundation_courses,
+            &skill_and_perspective_usage,
+        ) {
+            println!("Gened {} already satisfied, skipping", idx);
+            continue;
+        }
+
+        println!(
+            "Processing gened {}: {:?}",
+            idx,
+            match gened {
+                GenEd::Core { name, .. } => format!("Core: {}", name),
+                GenEd::Foundation { name, .. } => format!("Foundation: {}", name),
+                GenEd::SkillAndPerspective { name, .. } =>
+                    format!("Skills & Perspective: {}", name),
+            }
+        );
+
+        let available_courses: Vec<CourseCode> = match gened {
+            GenEd::Core { .. } => {
+                // Core geneds can use any available course (except already selected)
+                possible_courses
                     .iter()
-                    .find(|(idx, _, _)| *idx == gened_idx)
-                {
-                    if can_course_satisfy_gened(course, gened) {
-                        // Check if this course would complete the gened
-                        let mut test_courses = already_in_schedule.to_vec();
-                        test_courses.extend(selected_courses.iter().cloned());
-                        test_courses.push(course.clone());
+                    .filter(|course| {
+                        !current_courses.contains(course) && !selected_courses.contains(course)
+                    })
+                    .cloned()
+                    .collect()
+            }
+            GenEd::Foundation { .. } => {
+                // Foundation geneds cannot overlap with other foundation courses
+                possible_courses
+                    .iter()
+                    .filter(|course| {
+                        !foundation_courses.contains(course)
+                            && !current_courses.contains(course)
+                            && !selected_courses.contains(course)
+                    })
+                    .cloned()
+                    .collect()
+            }
+            GenEd::SkillAndPerspective { .. } => {
+                // Skills & Perspective can reuse courses up to MAX (3) times
+                possible_courses
+                    .iter()
+                    .filter(|course| {
+                        let current_usage = skill_and_perspective_usage.get(course).unwrap_or(&0);
+                        *current_usage < 3
+                            && !current_courses.contains(course)
+                            && !selected_courses.contains(course)
+                    })
+                    .cloned()
+                    .collect()
+            }
+        };
 
-                        if is_gened_fully_satisfied(gened, &test_courses, catalog) {
-                            geneds_that_would_be_completed += 1;
-                        }
-                        affected_geneds.push(gened_idx);
-                    }
+        if available_courses.is_empty() {
+            println!("No available courses for gened {} due to constraints", idx);
+            continue;
+        }
+
+        // For Foundation geneds, be more strategic about course selection to avoid conflicts
+        let courses_needed = match gened {
+            GenEd::Foundation { req, .. } => select_courses_for_foundation_requirement(
+                req,
+                &available_courses,
+                catalog,
+                &sorted_geneds,
+                *idx,
+            ),
+            GenEd::Core { req, .. } | GenEd::SkillAndPerspective { req, .. } => {
+                select_courses_for_requirement(req, &available_courses, catalog)
+            }
+        };
+
+        if courses_needed.is_empty() {
+            println!("Could not satisfy gened {} with available courses", idx);
+            continue;
+        }
+
+        println!(
+            "Selected {} courses for gened {}: {:?}",
+            courses_needed.len(),
+            idx,
+            courses_needed
+        );
+
+        // Track course usage based on gened type
+        for course in &courses_needed {
+            match gened {
+                GenEd::Foundation { .. } => {
+                    foundation_courses.insert(course.clone());
+                }
+                GenEd::SkillAndPerspective { .. } => {
+                    *skill_and_perspective_usage
+                        .entry(course.clone())
+                        .or_insert(0) += 1;
+                }
+                GenEd::Core { .. } => {
+                    // Core courses don't have usage restrictions
                 }
             }
+        }
 
-            if !affected_geneds.is_empty() {
-                // Score heavily favors courses that:
-                // 1. Complete multiple geneds (massive bonus)
-                // 2. Affect many geneds
-                // 3. Have low credit cost
+        selected_courses.extend(courses_needed);
+    }
+
+    println!(
+        "Total constraint-aware gened courses selected: {}",
+        selected_courses.len()
+    );
+    selected_courses
+}
+
+/// Check if a gened is satisfied considering constraints
+fn is_gened_fully_satisfied_constraint_aware(
+    gened: &GenEd,
+    all_courses: &[CourseCode],
+    catalog: &Catalog,
+    foundation_courses: &HashSet<CourseCode>,
+    skill_perspective_usage: &HashMap<CourseCode, u8>,
+) -> bool {
+    let all_codes: HashSet<&CourseCode> = all_courses.iter().collect();
+
+    match gened {
+        GenEd::Core { req, .. } => req.fulfilled_courses(&all_codes, catalog).is_some(),
+        GenEd::Foundation { req, .. } => {
+            // Filter out courses already used by other foundation geneds
+            let available_codes: HashSet<&CourseCode> = all_codes
+                .iter()
+                .filter(|course| !foundation_courses.contains(*course))
+                .cloned()
+                .collect();
+            req.fulfilled_courses(&available_codes, catalog).is_some()
+        }
+        GenEd::SkillAndPerspective { req, .. } => {
+            // Filter out courses that have been used more than 3 times
+            let available_codes: HashSet<&CourseCode> = all_codes
+                .iter()
+                .filter(|course| skill_perspective_usage.get(*course).unwrap_or(&0) < &3)
+                .cloned()
+                .collect();
+            req.fulfilled_courses(&available_codes, catalog).is_some()
+        }
+    }
+}
+
+/// Select courses to satisfy a specific GenEdReq
+fn select_courses_for_requirement(
+    req: &GenEdReq,
+    available_courses: &[CourseCode],
+    catalog: &Catalog,
+) -> Vec<CourseCode> {
+    match req {
+        GenEdReq::Set(required_courses) => {
+            // All courses in the set are required
+            let mut result = Vec::new();
+            for course in required_courses {
+                if available_courses.contains(course) {
+                    result.push(course.clone());
+                } else {
+                    // Can't satisfy this set requirement
+                    return Vec::new();
+                }
+            }
+            result
+        }
+        GenEdReq::SetOpts(options) => {
+            // Pick the first option that can be fully satisfied
+            for option in options {
+                let can_satisfy = option
+                    .iter()
+                    .all(|course| available_courses.contains(course));
+                if can_satisfy {
+                    return option.clone();
+                }
+            }
+            Vec::new()
+        }
+        GenEdReq::Courses { num, courses } => {
+            // Select the first `num` available courses
+            let result: Vec<_> = courses
+                .iter()
+                .filter(|course| available_courses.contains(course))
+                .take(*num)
+                .cloned()
+                .collect();
+
+            if result.len() >= *num {
+                result
+            } else {
+                Vec::new() // Can't satisfy the requirement
+            }
+        }
+        GenEdReq::Credits {
+            num: credits,
+            courses,
+        } => {
+            // Select courses until we have enough credits
+            let mut selected = Vec::new();
+            let mut total_credits = 0u32;
+
+            for course in courses {
+                if !available_courses.contains(course) {
+                    continue;
+                }
+
                 let course_credits = catalog
                     .courses
                     .get(course)
-                    .and_then(|(_, creds, _)| *creds)
-                    .unwrap_or(3) as f64;
+                    .and_then(|(_, c, _)| *c)
+                    .unwrap_or(3);
 
-                // Heavily favor courses that complete geneds, especially multiple ones
-                let completion_bonus = if geneds_that_would_be_completed > 0 {
-                    1000.0
-                        * geneds_that_would_be_completed as f64
-                        * geneds_that_would_be_completed as f64
+                selected.push(course.clone());
+                total_credits += course_credits;
+
+                if total_credits >= *credits {
+                    break;
+                }
+            }
+
+            if total_credits >= *credits {
+                selected
+            } else {
+                Vec::new() // Can't satisfy the credit requirement
+            }
+        }
+    }
+}
+
+/// Select courses for a Foundation requirement, being strategic to avoid conflicts with later Foundation geneds
+fn select_courses_for_foundation_requirement(
+    req: &GenEdReq,
+    available_courses: &[CourseCode],
+    catalog: &Catalog,
+    all_geneds: &[&(usize, GenEd, Vec<CourseCode>)],
+    current_gened_idx: usize,
+) -> Vec<CourseCode> {
+    match req {
+        GenEdReq::Set(required_courses) => {
+            // All courses in the set are required
+            let mut result = Vec::new();
+            for course in required_courses {
+                if available_courses.contains(course) {
+                    result.push(course.clone());
                 } else {
-                    0.0
-                };
-
-                // Bonus for affecting multiple geneds (even if not completing them)
-                let overlap_bonus = (affected_geneds.len() as f64 - 1.0) * 100.0;
-
-                // Score = completion bonus + overlap bonus - credit penalty
-                let score = completion_bonus + overlap_bonus - course_credits;
-
-                if score > best_score {
-                    best_score = score;
-                    best_course = Some(course.clone());
-                    best_geneds_affected = affected_geneds;
+                    // Can't satisfy this set requirement
+                    return Vec::new();
                 }
             }
+            result
         }
-
-        if let Some(course) = best_course {
-            selected_courses.push(course.clone());
-
-            // Check which geneds this course completes and mark them as satisfied
-            let mut test_courses = already_in_schedule.to_vec();
-            test_courses.extend(selected_courses.iter().cloned());
-
-            for &gened_idx in &best_geneds_affected {
-                if let Some((_, gened, _)) = remaining_geneds
+        GenEdReq::SetOpts(options) => {
+            // Pick the first option that can be fully satisfied
+            for option in options {
+                let can_satisfy = option
                     .iter()
-                    .find(|(idx, _, _)| *idx == gened_idx)
-                {
-                    if is_gened_fully_satisfied(gened, &test_courses, catalog) {
-                        satisfied_geneds.insert(gened_idx);
-                    }
+                    .all(|course| available_courses.contains(course));
+                if can_satisfy {
+                    return option.clone();
+                }
+            }
+            Vec::new()
+        }
+        GenEdReq::Courses { num, courses } => {
+            // For Foundation geneds, be strategic about which courses to select
+            // Prefer courses that are NOT needed by later Foundation geneds
+            let mut prioritized_courses = Vec::new();
+            let mut fallback_courses = Vec::new();
+
+            // Get all later Foundation geneds
+            let later_foundation_geneds: Vec<_> = all_geneds
+                .iter()
+                .filter(|(idx, gened, _)| {
+                    *idx > current_gened_idx && matches!(gened, GenEd::Foundation { .. })
+                })
+                .collect();
+
+            for course in courses {
+                if !available_courses.contains(course) {
+                    continue;
+                }
+
+                // Check if this course is needed by any later Foundation gened
+                let needed_by_later = later_foundation_geneds
+                    .iter()
+                    .any(|(_, _later_gened, possible_courses)| possible_courses.contains(course));
+
+                if needed_by_later {
+                    fallback_courses.push(course.clone());
+                } else {
+                    prioritized_courses.push(course.clone());
                 }
             }
 
-            // Remove satisfied geneds from remaining list
-            remaining_geneds.retain(|(gened_idx, _, _)| !satisfied_geneds.contains(gened_idx));
+            // Try to fulfill with prioritized courses first
+            let mut selected = Vec::new();
 
-            // Update course_to_geneds map to remove satisfied geneds
-            for geneds_list in course_to_geneds.values_mut() {
-                geneds_list.retain(|idx| !satisfied_geneds.contains(idx));
+            // Take from prioritized courses first
+            for course in prioritized_courses {
+                if selected.len() >= *num {
+                    break;
+                }
+                selected.push(course);
             }
 
-            println!(
-                "Selected {} to help satisfy {} gened(s) (would complete {} geneds, score: {:.2})",
-                format!("{}-{}", course.stem, course.code),
-                best_geneds_affected.len(),
-                best_geneds_affected
+            // If we need more, take from fallback courses
+            for course in fallback_courses {
+                if selected.len() >= *num {
+                    break;
+                }
+                selected.push(course);
+            }
+
+            if selected.len() >= *num {
+                selected.truncate(*num);
+                selected
+            } else {
+                Vec::new() // Can't satisfy the requirement
+            }
+        }
+        GenEdReq::Credits {
+            num: credits,
+            courses,
+        } => {
+            // Similar strategic approach for credit-based requirements
+            let mut prioritized_courses = Vec::new();
+            let mut fallback_courses = Vec::new();
+
+            // Get all later Foundation geneds
+            let later_foundation_geneds: Vec<_> = all_geneds
+                .iter()
+                .filter(|(idx, gened, _)| {
+                    *idx > current_gened_idx && matches!(gened, GenEd::Foundation { .. })
+                })
+                .collect();
+
+            for course in courses {
+                if !available_courses.contains(course) {
+                    continue;
+                }
+
+                // Check if this course is needed by any later Foundation gened
+                let needed_by_later = later_foundation_geneds
                     .iter()
-                    .filter(|&&gened_idx| satisfied_geneds.contains(&gened_idx))
-                    .count(),
-                best_score
-            );
-        } else {
-            println!(
-                "No more beneficial courses found, stopping gened selection (iteration {})",
-                iteration_count
-            );
-            break;
-        }
+                    .any(|(_, _later_gened, possible_courses)| possible_courses.contains(course));
 
-        if remaining_geneds.is_empty() {
-            println!("All geneds satisfied after {} iterations", iteration_count);
-            break;
+                if needed_by_later {
+                    fallback_courses.push(course.clone());
+                } else {
+                    prioritized_courses.push(course.clone());
+                }
+            }
+
+            // Select courses until we have enough credits, preferring prioritized ones
+            let mut selected = Vec::new();
+            let mut total_credits = 0u32;
+
+            // Try prioritized courses first
+            for course in prioritized_courses {
+                let course_credits = catalog
+                    .courses
+                    .get(&course)
+                    .and_then(|(_, c, _)| *c)
+                    .unwrap_or(3);
+
+                selected.push(course);
+                total_credits += course_credits;
+
+                if total_credits >= *credits {
+                    break;
+                }
+            }
+
+            // If we need more credits, use fallback courses
+            for course in fallback_courses {
+                if total_credits >= *credits {
+                    break;
+                }
+
+                let course_credits = catalog
+                    .courses
+                    .get(&course)
+                    .and_then(|(_, c, _)| *c)
+                    .unwrap_or(3);
+
+                selected.push(course);
+                total_credits += course_credits;
+            }
+
+            if total_credits >= *credits {
+                selected
+            } else {
+                Vec::new() // Can't satisfy the credit requirement
+            }
         }
     }
-
-    if iteration_count >= max_iterations {
-        println!(
-            "Warning: Reached maximum iterations ({}) in gened selection",
-            max_iterations
-        );
-    }
-
-    println!("Total gened courses selected: {}", selected_courses.len());
-    selected_courses
 }
 
 /// Calculate how much progress a course contributes to a specific gened
@@ -1569,4 +1849,14 @@ pub fn test_all_gened_variants() {
     }
 
     println!("=== End All GenEdReq Variants Test ===\n");
+}
+
+/// Check if a course is relevant to a specific GenEdReq
+fn is_course_relevant_to_requirement(course: &CourseCode, req: &GenEdReq) -> bool {
+    match req {
+        GenEdReq::Set(courses) => courses.contains(course),
+        GenEdReq::SetOpts(options) => options.iter().any(|opt| opt.contains(course)),
+        GenEdReq::Courses { courses, .. } => courses.contains(course),
+        GenEdReq::Credits { courses, .. } => courses.contains(course),
+    }
 }

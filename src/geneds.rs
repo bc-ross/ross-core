@@ -29,7 +29,7 @@ pub enum GenEdReq {
 }
 
 impl GenEdReq {
-    fn fulfilled_courses(
+    pub fn fulfilled_courses(
         &self,
         all_codes: &HashSet<&CourseCode>,
         catalog: &Catalog,
@@ -97,47 +97,71 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         .collect::<HashSet<&CourseCode>>();
     let mut foundation_courses = HashSet::new();
     let mut skill_and_perspective_courses: HashMap<&CourseCode, u8> = HashMap::new();
-    for gened in &sched.catalog.geneds {
+
+    println!("=== Checking gened satisfaction ===");
+    println!("Total courses in schedule: {}", all_codes.len());
+
+    for (gened_idx, gened) in sched.catalog.geneds.iter().enumerate() {
         match gened {
-            GenEd::Core { req, .. } => {
+            GenEd::Core { req, name, .. } => {
                 if req.fulfilled_courses(&all_codes, &sched.catalog).is_none() {
+                    println!("FAILED Core gened {}: {}", gened_idx, name);
                     return Ok(false);
+                } else {
+                    println!("PASSED Core gened {}: {}", gened_idx, name);
                 }
             }
-            GenEd::Foundation { req, .. } => {
-                match req.fulfilled_courses(
-                    &all_codes
-                        .difference(&foundation_courses)
-                        .map(|x| *x)
-                        .collect(),
-                    &sched.catalog,
-                ) {
+            GenEd::Foundation { req, name, .. } => {
+                let available_codes = all_codes
+                    .difference(&foundation_courses)
+                    .map(|x| *x)
+                    .collect();
+                match req.fulfilled_courses(&available_codes, &sched.catalog) {
                     Some(fulfilled) => {
+                        println!(
+                            "PASSED Foundation gened {}: {} (used {} courses: {:?})",
+                            gened_idx,
+                            name,
+                            fulfilled.len(),
+                            fulfilled.iter().collect::<Vec<_>>()
+                        );
                         foundation_courses.extend(fulfilled);
                     }
-                    None => return Ok(false),
+                    None => {
+                        println!(
+                            "FAILED Foundation gened {}: {} (available: {})",
+                            gened_idx,
+                            name,
+                            available_codes.len()
+                        );
+                        return Ok(false);
+                    }
                 }
             }
-            GenEd::SkillAndPerspective { req, .. } => {
-                match req.fulfilled_courses(
-                    &all_codes
-                        .difference(
-                            &skill_and_perspective_courses
-                                .iter()
-                                .filter_map(|(x, count)| {
-                                    if *count > MAX_SKILLS_AND_PERSPECTIVES {
-                                        None
-                                    } else {
-                                        Some(*x)
-                                    }
-                                })
-                                .collect(),
-                        )
-                        .map(|x| *x)
-                        .collect(),
-                    &sched.catalog,
-                ) {
+            GenEd::SkillAndPerspective { req, name, .. } => {
+                let available_codes = all_codes
+                    .difference(
+                        &skill_and_perspective_courses
+                            .iter()
+                            .filter_map(|(x, count)| {
+                                if *count > MAX_SKILLS_AND_PERSPECTIVES {
+                                    None
+                                } else {
+                                    Some(*x)
+                                }
+                            })
+                            .collect(),
+                    )
+                    .map(|x| *x)
+                    .collect();
+                match req.fulfilled_courses(&available_codes, &sched.catalog) {
                     Some(fulfilled) => {
+                        println!(
+                            "PASSED Skills & Perspective gened {}: {} (used {} courses)",
+                            gened_idx,
+                            name,
+                            fulfilled.len()
+                        );
                         fulfilled.into_iter().for_each(|code| {
                             skill_and_perspective_courses
                                 .entry(code)
@@ -145,11 +169,16 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
                                 .or_insert(1);
                         });
                     }
-                    None => return Ok(false),
+                    None => {
+                        println!("FAILED Skills & Perspective gened {}: {}", gened_idx, name);
+                        return Ok(false);
+                    }
                 }
             }
         }
     }
+
+    println!("=== All geneds satisfied ===");
     Ok(true)
 }
 
