@@ -10,7 +10,7 @@ use crate::geneds::{GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 use crate::schedule_sorter::BestSchedule;
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
     Fall,
     Spring,

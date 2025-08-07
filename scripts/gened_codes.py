@@ -42,7 +42,7 @@ def repr_rs(x: str) -> str:
     return repr(x).replace("'", '"')
 
 
-def format_course(course) -> str:
+def format_cc(course) -> str:
     stem, code = course.split("-")
     if code.isnumeric():
         code = int(code)
@@ -52,7 +52,7 @@ def format_course(course) -> str:
 
 def main():
     courses = gened_lookup(sys.argv[1])
-    print(*[format_course(course) for course in courses])
+    print(*[format_cc(course) for course in courses])
 
 
 if __name__ == "__main__":

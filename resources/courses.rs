@@ -522,6 +522,7 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("ENGL", 3060),
             ("Classical Mythology".into(), Some(3), Discretion),
         ),
+        (CC!("ENGL", 3110), ("The Novel".into(), Some(3), Discretion)),
         (
             CC!("ENGL", 3120),
             ("Short Story".into(), Some(3), Discretion),
@@ -941,6 +942,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Seminar in History".into(), Some(3), Spring),
         ),
         (
+            CC!("HONR", 1030),
+            ("Honors English Research Seminar".into(), Some(3), Fall),
+        ),
+        (
             CC!("ITAL", 1000),
             ("Beginning Italian".into(), Some(4), Both),
         ),
@@ -1012,6 +1017,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
                 Some(4),
                 Fall,
             ),
+        ),
+        (
+            CC!("MATH", 4930),
+            ("Directed Research".into(), Some(2), Fall),
         ),
         (CC!("MCOM", 1000), ("Media & Society".into(), Some(3), Both)),
         (
@@ -1130,6 +1139,7 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("NURS", 3200),
             ("Foundations of Nursing".into(), Some(3), Fall),
         ),
+        (CC!("NURS", 3350), ("Pharmacology".into(), Some(4), Fall)),
         (CC!("NURS", 4200), ("Population Care".into(), Some(3), Fall)),
         (
             CC!("NURS", 4210),
@@ -1211,6 +1221,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Aesthetics".into(), Some(3), Infrequently),
         ),
         (
+            CC!("PHIL", 4860),
+            ("Philosophy of Law".into(), Some(3), Infrequently),
+        ),
+        (
             CC!("PHIL", 4920),
             ("Senior Thesis".into(), Some(3), Discretion),
         ),
@@ -1218,6 +1232,7 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("PHYS", 1100),
             ("Concepts in Physics".into(), Some(4), Both),
         ),
+        (CC!("PHYS", 1200), ("Acoustics".into(), Some(4), Fall)),
         (
             CC!("PHYS", 1300),
             ("Our Strange Universe".into(), Some(3), Fall),
@@ -1517,6 +1532,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("THEO", 2020),
             ("Biblical Hebrew II".into(), Some(4), Discretion),
+        ),
+        (
+            CC!("THEO", 2100),
+            ("Old Testament 1: Pentateuch".into(), Some(3), Both),
         ),
         (
             CC!("THEO", 2144),

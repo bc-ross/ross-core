@@ -69,21 +69,30 @@ def repr_rs(x: str) -> str:
     return repr(x).replace("'", '"')
 
 
-def format_course(course, course_info) -> str:
-    title = course_info["title"].replace('"', '\\"')
-    credits = course_info["credits"]
+def format_course(course, assoc_info) -> str:
+    title, credits, term = assoc_info
+    title = title.replace('"', '\\"')
     if credits is None:
         credits_str = "None"
     else:
         credits_str = f"Some({credits})"
 
-    return f"(CC!({repr_rs(course['stem'])}, {repr_rs(list(course['code'].values())[0])}), ({repr_rs(title)}.into(), {credits_str}, {course_info['term'].title()})),\n"
+    return f"({format_cc(course)} ({repr_rs(title)}.into(), {credits_str}, {term.title()})),\n"
+
+
+def format_cc(course) -> str:
+    stem, code = course.split("-")
+    if code.isnumeric():
+        code = int(code)
+
+    return f"CC!({repr_rs(stem)}, {repr_rs(code)}),"
 
 
 def main():
-    with open("../script_assistant/courses.json") as file:
+    with open("../script_assistant/new_courses.json") as file:
         courses = json.load(file)
-    new_courses = []
+    with open("../script_assistant/old_courses.json") as file:
+        export_courses = json.load(file)
     for course in courses:
         code = format_code(course)
         try:
@@ -91,7 +100,9 @@ def main():
             print(
                 f"Course: {course_info['code']}, Title: {course_info['title']}, Credits: {course_info['credits']}, Term: {course_info['term']}, URL: {course_info['url']}"
             )
-            new_courses.append((course, course_info))
+            export_courses.append(
+                (format_code(course), (course_info["title"], course_info["credits"], course_info["term"]))
+            )
         except requests.RequestException as e:
             logger.error("Failed to fetch course %s: %s", code, e)
         except Exception as e:
@@ -100,8 +111,8 @@ def main():
             time.sleep(random.randrange(1, 15) / 100)  # Sleep to avoid overwhelming the server
     with open("../resources/courses.rs", "w", encoding="utf-8") as f:
         f.write(PREAMBLE)
-        for course, course_info in new_courses:
-            f.write(format_course(course, course_info))
+        for course, assoc_info in sorted(export_courses, key=lambda x: x[0]):
+            f.write(format_course(course, assoc_info))
         f.write(POSTAMBLE)
     subprocess.run(["rustfmt", "../resources/courses.rs"], check=True)
 
