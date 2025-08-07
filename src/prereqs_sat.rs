@@ -3,8 +3,8 @@ use crate::schedule::CourseCode;
 use std::collections::HashMap;
 use varisat::{CnfFormula, ExtendFormula, Lit, Var, solver::Solver};
 
-// Maximum total credits allowed for optimization (typical bachelor's degree)
-pub const MAX_TOTAL_CREDITS: u32 = 120;
+// Maximum credits allowed per semester
+pub const MAX_CREDITS_PER_SEMESTER: u32 = 18;
 
 // Maximum number of different SAT solutions to explore for optimization
 pub const MAX_SAT_ITERATIONS: usize = 100;
@@ -251,7 +251,16 @@ impl PrereqSatSolver {
                 original_credits += self.course_credits.get(course).unwrap_or(&3);
             }
         }
-        println!("Original schedule has {} credits", original_credits);
+        println!("Original schedule has {} credits total", original_credits);
+
+        // Debug: show credits per semester in original schedule
+        for (sem_idx, semester) in original_schedule.iter().enumerate() {
+            let mut sem_credits = 0u32;
+            for course in semester {
+                sem_credits += self.course_credits.get(course).unwrap_or(&3);
+            }
+            println!("  Semester {}: {} credits", sem_idx, sem_credits);
+        }
 
         self.add_credit_constraint();
 
@@ -415,31 +424,46 @@ impl PrereqSatSolver {
         }
     }
 
-    /// Add hard constraint to ensure total credits don't exceed MAX_TOTAL_CREDITS
+    /// Add hard constraint to ensure no semester exceeds MAX_CREDITS_PER_SEMESTER
     fn add_credit_constraint(&mut self) {
         if self.course_credits.is_empty() {
             return; // No credit information available
         }
 
-        // Collect all course variables with their credit weights
-        let mut weighted_vars: Vec<(Var, u32)> = Vec::new();
-
-        for (course, &var) in &self.course_taken_vars {
-            let credits = self.course_credits.get(course).cloned().unwrap_or(3);
-            weighted_vars.push((var, credits));
-        }
-
         println!(
-            "Adding credit constraint for {} courses (max {} credits)",
-            weighted_vars.len(),
-            MAX_TOTAL_CREDITS
+            "Adding per-semester credit constraints (max {} credits per semester)",
+            MAX_CREDITS_PER_SEMESTER
         );
 
-        // Add weighted cardinality constraint to ensure total credits <= MAX_TOTAL_CREDITS
-        self.add_weighted_cardinality_constraint(&weighted_vars, MAX_TOTAL_CREDITS);
+        // For each semester, add a constraint that the total credits <= MAX_CREDITS_PER_SEMESTER
+        for sem in 0..self.num_semesters {
+            let mut semester_vars_with_credits = Vec::new();
+
+            // Collect all courses that could be taken in this semester with their credits
+            for ((course, semester), &var) in &self.course_semester_vars {
+                if *semester == sem {
+                    let credits = self.course_credits.get(course).cloned().unwrap_or(3);
+                    semester_vars_with_credits.push((var, credits));
+                }
+            }
+
+            if !semester_vars_with_credits.is_empty() {
+                println!(
+                    "Adding credit constraint for semester {}: {} courses, max {} credits",
+                    sem,
+                    semester_vars_with_credits.len(),
+                    MAX_CREDITS_PER_SEMESTER
+                );
+                self.add_weighted_cardinality_constraint(
+                    &semester_vars_with_credits,
+                    MAX_CREDITS_PER_SEMESTER,
+                );
+            }
+        }
     }
 
     /// Add weighted cardinality constraint: sum of credits for true variables <= max_credits
+    /// Uses comprehensive encoding for optimal results
     fn add_weighted_cardinality_constraint(
         &mut self,
         weighted_vars: &[(Var, u32)],
@@ -457,65 +481,25 @@ impl PrereqSatSolver {
         }
 
         println!(
-            "Adding credit constraint: max {} credits from {} possible courses (total possible: {})",
+            "Adding comprehensive credit constraint: max {} credits from {} courses (total possible: {})",
             max_credits,
             weighted_vars.len(),
             total_possible
         );
 
-        // For efficiency, we'll use a simplified approach for large problems
-        if weighted_vars.len() > 30 {
-            println!("Large problem detected, using simplified credit constraint");
-            // For large problems, just add constraints for obviously violating combinations
-            self.add_simple_credit_constraints(weighted_vars, max_credits);
-        } else {
-            // For smaller problems, use the more comprehensive approach
-            self.add_credit_constraint_clauses(weighted_vars, max_credits, 0, 0, Vec::new());
-        }
+        // Use comprehensive approach for optimal results (no efficiency shortcuts)
+        self.add_comprehensive_credit_constraint_clauses(
+            weighted_vars,
+            max_credits,
+            0,
+            0,
+            Vec::new(),
+        );
     }
 
-    /// Add simplified credit constraints for large problems
-    fn add_simple_credit_constraints(&mut self, weighted_vars: &[(Var, u32)], max_credits: u32) {
-        // Sort by weight (descending) to prioritize high-credit courses
-        let mut sorted_vars = weighted_vars.to_vec();
-        sorted_vars.sort_by(|a, b| b.1.cmp(&a.1));
-
-        // Add constraints to prevent obviously violating combinations
-        for i in 0..sorted_vars.len() {
-            for j in i + 1..sorted_vars.len() {
-                let (var1, weight1) = sorted_vars[i];
-                let (var2, weight2) = sorted_vars[j];
-
-                // If just these two courses exceed the limit, forbid them together
-                if weight1 + weight2 > max_credits {
-                    self.formula
-                        .add_clause(&[!Lit::from_var(var1, true), !Lit::from_var(var2, true)]);
-                }
-            }
-        }
-
-        // Add constraints for triplets of high-credit courses
-        for i in 0..std::cmp::min(sorted_vars.len(), 10) {
-            for j in i + 1..std::cmp::min(sorted_vars.len(), 10) {
-                for k in j + 1..std::cmp::min(sorted_vars.len(), 10) {
-                    let (var1, weight1) = sorted_vars[i];
-                    let (var2, weight2) = sorted_vars[j];
-                    let (var3, weight3) = sorted_vars[k];
-
-                    if weight1 + weight2 + weight3 > max_credits {
-                        self.formula.add_clause(&[
-                            !Lit::from_var(var1, true),
-                            !Lit::from_var(var2, true),
-                            !Lit::from_var(var3, true),
-                        ]);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Recursively add clauses to forbid combinations that exceed credit limit
-    fn add_credit_constraint_clauses(
+    /// Comprehensively add clauses to forbid all combinations that exceed credit limit
+    /// No efficiency shortcuts - prioritizes optimal results
+    fn add_comprehensive_credit_constraint_clauses(
         &mut self,
         weighted_vars: &[(Var, u32)],
         max_credits: u32,
@@ -523,11 +507,6 @@ impl PrereqSatSolver {
         current_credits: u32,
         current_selection: Vec<Var>,
     ) {
-        // Limit recursion depth to prevent exponential blowup
-        if current_selection.len() > 10 {
-            return;
-        }
-
         // Base case: if we've exceeded the limit, add a clause to forbid this combination
         if current_credits > max_credits {
             if !current_selection.is_empty() {
@@ -557,22 +536,19 @@ impl PrereqSatSolver {
 
         let (var, weight) = weighted_vars[current_index];
 
-        // Try including this variable (only if it doesn't immediately violate)
-        if current_credits + weight <= max_credits + 20 {
-            // Allow some buffer for recursion
-            let mut new_selection = current_selection.clone();
-            new_selection.push(var);
-            self.add_credit_constraint_clauses(
-                weighted_vars,
-                max_credits,
-                current_index + 1,
-                current_credits + weight,
-                new_selection,
-            );
-        }
+        // Try including this variable
+        let mut new_selection = current_selection.clone();
+        new_selection.push(var);
+        self.add_comprehensive_credit_constraint_clauses(
+            weighted_vars,
+            max_credits,
+            current_index + 1,
+            current_credits + weight,
+            new_selection,
+        );
 
         // Try not including this variable
-        self.add_credit_constraint_clauses(
+        self.add_comprehensive_credit_constraint_clauses(
             weighted_vars,
             max_credits,
             current_index + 1,
