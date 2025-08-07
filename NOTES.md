@@ -12,3 +12,4 @@
   - [ ] Validate geneds properly
   - [ ] Add gened resources
   - [ ] Properly count max used geneds per course (and options thereof)
+  - [ ] Add GenEd courses to the `scripts_assistant` exporter
