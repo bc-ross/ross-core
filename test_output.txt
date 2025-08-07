@@ -1,0 +1,62 @@
+   Compiling ross v0.1.0 (D:\ross)
+warning: unused imports: `Catalog` and `Semester`
+ --> src\prereqs.rs:4:23
+  |
+4 | use crate::schedule::{Catalog, CourseCode, Schedule, Semester};
+  |                       ^^^^^^^                        ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `GenEdReq`
+   --> src\prereqs_cp.rs:222:32
+    |
+222 |     use crate::geneds::{GenEd, GenEdReq};
+    |                                ^^^^^^^^
+
+warning: unused import: `crate::schedule_sorter::BestSchedule`
+  --> src\schedule.rs:11:5
+   |
+11 | use crate::schedule_sorter::BestSchedule;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `read_excel_file::read_file`
+  --> src\main.rs:16:5
+   |
+16 | use read_excel_file::read_file;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0425]: cannot find function `place_geneds_balanced` in this scope
+  --> src\prereqs_cp.rs:77:9
+   |
+77 |         place_geneds_balanced(solution, missing_geneds.clone(), courses);
+   |         ^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `find_best_solution` in this scope
+  --> src\prereqs_cp.rs:81:25
+   |
+81 |     let best_solution = find_best_solution(schedule_solutions.clone(), sched);
+   |                         ^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `find_foundation_gened_assignment` in this scope
+   --> src\prereqs_cp.rs:363:51
+    |
+363 |             if let Some(foundation_assignments) = find_foundation_gened_assignment(
+    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `find_skills_perspective_gened_assignment` in this scope
+   --> src\prereqs_cp.rs:390:46
+    |
+390 |             if let Some(skill_assignments) = find_skills_perspective_gened_assignment(
+    |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+warning: unused variable: `catalog`
+   --> src\prereqs_cp.rs:839:5
+    |
+839 |     catalog: &Catalog,
+    |     ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_catalog`
+    |
+    = note: `#[warn(unused_variables)]` on by default
+
+For more information about this error, try `rustc --explain E0425`.
+warning: `ross` (bin "ross") generated 5 warnings
+error: could not compile `ross` (bin "ross") due to 4 previous errors; 5 warnings emitted

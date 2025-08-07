@@ -438,3 +438,97 @@ fn backtrack_skills_assignment<'a>(
 
     false
 }
+
+/// Smart validation for Foundation geneds: students must complete 5 of 7 Foundation areas
+fn validate_foundation_geneds_smart_5_of_7(
+    foundation_geneds: &[(usize, &GenEd)],
+    all_codes: &HashSet<&CourseCode>,
+    catalog: &Catalog,
+) -> Result<bool> {
+    // Try to find a valid assignment where 5 out of 7 Foundation geneds are satisfied
+    // and no course is used by multiple Foundation geneds
+    let foundation_assignments =
+        find_foundation_assignment_5_of_7(foundation_geneds, all_codes, catalog);
+
+    match foundation_assignments {
+        Some(assignments) => {
+            println!("PASSED Foundation validation (5 of 7 areas):");
+            for (gened_idx, gened, used_courses) in assignments {
+                if let GenEd::Foundation { name, .. } = gened {
+                    println!(
+                        "  PASSED Foundation gened {}: {} (used {} courses: {:?})",
+                        gened_idx,
+                        name,
+                        used_courses.len(),
+                        used_courses.iter().cloned().collect::<Vec<_>>()
+                    );
+                }
+            }
+            Ok(true)
+        }
+        None => {
+            println!("FAILED: Could not find valid Foundation gened assignment (5 of 7)");
+            // Show which geneds could be satisfied individually
+            for (gened_idx, gened) in foundation_geneds {
+                if let GenEd::Foundation { req, name, .. } = gened {
+                    if req.fulfilled_courses(all_codes, catalog).is_none() {
+                        println!(
+                            "  Foundation gened {} ({}) cannot be satisfied individually",
+                            gened_idx, name
+                        );
+                    } else {
+                        println!(
+                            "  Foundation gened {} ({}) CAN be satisfied individually",
+                            gened_idx, name
+                        );
+                    }
+                }
+            }
+            Ok(false)
+        }
+    }
+}
+
+/// Find a valid assignment for 5 out of 7 Foundation geneds using backtracking
+fn find_foundation_assignment_5_of_7<'a>(
+    foundation_geneds: &[(usize, &'a GenEd)],
+    all_codes: &HashSet<&'a CourseCode>,
+    catalog: &Catalog,
+) -> Option<Vec<(usize, &'a GenEd, HashSet<&'a CourseCode>)>> {
+    // Generate all combinations of 5 Foundation geneds out of 7
+    let gened_combinations = generate_combinations(foundation_geneds, 5);
+
+    // Try each combination to see if it can be satisfied
+    for combination in gened_combinations {
+        if let Some(assignment) = find_foundation_assignment(&combination, all_codes, catalog) {
+            return Some(assignment);
+        }
+    }
+
+    None
+}
+
+/// Generate all combinations of k items from a slice
+fn generate_combinations<T: Clone>(items: &[T], k: usize) -> Vec<Vec<T>> {
+    if k == 0 {
+        return vec![vec![]];
+    }
+    if items.is_empty() || k > items.len() {
+        return vec![];
+    }
+
+    let mut result = Vec::new();
+
+    // Include the first item
+    let with_first = generate_combinations(&items[1..], k - 1);
+    for mut combo in with_first {
+        combo.insert(0, items[0].clone());
+        result.push(combo);
+    }
+
+    // Exclude the first item
+    let without_first = generate_combinations(&items[1..], k);
+    result.extend(without_first);
+
+    result
+}
