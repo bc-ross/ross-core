@@ -200,9 +200,11 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(dbg!(self.are_programs_valid()?)
-            && dbg!(self.validate_prereqs()?)
-            && dbg!(self.are_geneds_fulfilled()?))
+        Ok(
+            self.are_programs_valid()?
+                && self.validate_prereqs()?
+                && self.are_geneds_fulfilled()?,
+        )
     }
 
     fn are_geneds_fulfilled(&self) -> Result<bool> {

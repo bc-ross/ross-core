@@ -5,8 +5,8 @@ use anyhow::Result;
 use std::any;
 use std::collections::HashMap;
 
-// Normally 18 but adjusted to 12 for small-scale testing
-const MAX_OVERLOAD_SEMESTER: u32 = 12; // Maximum credits per semester
+// Normally 18 but adjusted to 9 for small-scale testing
+const MAX_OVERLOAD_SEMESTER: u32 = 9; // Maximum credits per semester
 
 /// CP-style solution that wraps SAT solver results
 #[derive(Debug, Clone)]
@@ -481,7 +481,7 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
     .unwrap() as u8 as f64
         * 1000000.0;
 
-    credit_penalty + balance_penalty + course_penalty + overload_penalty + dbg!(validation_penalty)
+    credit_penalty + balance_penalty + course_penalty + overload_penalty + validation_penalty
 }
 
 /// Intelligently place gened courses to balance semesters
@@ -871,6 +871,16 @@ pub fn solve_schedule_cp(
             // Calculate solution score
             let score = calculate_solution_score(solution, sched);
             println!("  Optimization score: {:.2}", score);
+            println!(
+                "  Valid schedule? {}",
+                Schedule {
+                    courses: solution.clone(),
+                    programs: sched.programs.clone(),
+                    catalog: sched.catalog.clone(),
+                }
+                .is_valid()
+                .unwrap_or(false)
+            );
         }
         solutions
             .pop()
