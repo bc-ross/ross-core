@@ -196,6 +196,19 @@ impl Schedule {
         Ok(self.are_programs_valid()? && self.validate_prereqs()?)
     }
 
+    fn are_geneds_fulfilled(&self) -> Result<bool> {
+        let all_sched_codes = self
+            .courses
+            .iter()
+            .flatten()
+            .collect::<HashSet<&CourseCode>>();
+        Ok(self
+            .catalog
+            .geneds
+            .iter()
+            .all(|gened| gened.is_fulfilled(&all_sched_codes)))
+    }
+
     fn are_programs_valid(&self) -> Result<bool> {
         let all_sched_codes = self
             .courses
