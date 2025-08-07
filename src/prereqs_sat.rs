@@ -69,18 +69,18 @@ impl PrereqSatSolver {
             let taken_var = self.get_course_taken_var(course);
             // If course is taken in semester, then it's taken overall: semester_var -> taken_var
             self.formula.add_clause(&[
-                !Lit::from_var(semester_var, false),
-                Lit::from_var(taken_var, false),
+                !Lit::from_var(semester_var, true),
+                Lit::from_var(taken_var, true),
             ]);
         }
 
         // If course is taken overall, it must be taken in at least one semester
         let course_taken_vars = self.course_taken_vars.clone();
         for (course, &taken_var) in &course_taken_vars {
-            let mut clause = vec![!Lit::from_var(taken_var, false)];
+            let mut clause = vec![!Lit::from_var(taken_var, true)];
             for sem in 0..self.num_semesters {
                 if let Some(&sem_var) = self.course_semester_vars.get(&(course.clone(), sem)) {
-                    clause.push(Lit::from_var(sem_var, false));
+                    clause.push(Lit::from_var(sem_var, true));
                 }
             }
             if clause.len() > 1 {
@@ -108,7 +108,7 @@ impl PrereqSatSolver {
                     let (_, var2) = semesters[j];
                     // ¬var1 ∨ ¬var2 (at most one can be true)
                     self.formula
-                        .add_clause(&[!Lit::from_var(var1, false), !Lit::from_var(var2, false)]);
+                        .add_clause(&[!Lit::from_var(var1, true), !Lit::from_var(var2, true)]);
                 }
             }
         }
@@ -127,13 +127,13 @@ impl PrereqSatSolver {
                 // this_var <=> (sub1 & sub2 & ...)
                 for &v in &sub_vars {
                     self.formula
-                        .add_clause(&[!Lit::from_var(this_var, false), Lit::from_var(v, false)]);
+                        .add_clause(&[!Lit::from_var(this_var, true), Lit::from_var(v, true)]);
                 }
                 let mut clause = sub_vars
                     .iter()
-                    .map(|&v| !Lit::from_var(v, false))
+                    .map(|&v| !Lit::from_var(v, true))
                     .collect::<Vec<_>>();
-                clause.push(Lit::from_var(this_var, false));
+                clause.push(Lit::from_var(this_var, true));
                 self.formula.add_clause(&clause);
                 this_var
             }
@@ -147,39 +147,39 @@ impl PrereqSatSolver {
                 // this_var <=> (sub1 | sub2 | ...)
                 for &v in &sub_vars {
                     self.formula
-                        .add_clause(&[Lit::from_var(this_var, false), !Lit::from_var(v, false)]);
+                        .add_clause(&[Lit::from_var(this_var, true), !Lit::from_var(v, true)]);
                 }
                 let mut clause = sub_vars
                     .iter()
-                    .map(|&v| Lit::from_var(v, false))
+                    .map(|&v| Lit::from_var(v, true))
                     .collect::<Vec<_>>();
-                clause.push(!Lit::from_var(this_var, false));
+                clause.push(!Lit::from_var(this_var, true));
                 self.formula.add_clause(&clause);
                 this_var
             }
             CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
                 // Course must be taken in a previous semester (0..sem_idx)
                 let this_var = self.new_var();
-                let mut clause = vec![!Lit::from_var(this_var, false)];
+                let mut clause = vec![!Lit::from_var(this_var, true)];
                 for prev_sem in 0..sem_idx {
                     let course_var = self.get_course_semester_var(code, prev_sem);
-                    clause.push(Lit::from_var(course_var, false));
+                    clause.push(Lit::from_var(course_var, true));
                 }
                 if clause.len() > 1 {
                     self.formula.add_clause(&clause);
                 } else {
                     // No previous semesters, so prereq cannot be satisfied
-                    self.formula.add_clause(&[!Lit::from_var(this_var, false)]);
+                    self.formula.add_clause(&[!Lit::from_var(this_var, true)]);
                 }
                 this_var
             }
             CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => {
                 // Course must be taken in this semester or earlier (0..=sem_idx)
                 let this_var = self.new_var();
-                let mut clause = vec![!Lit::from_var(this_var, false)];
+                let mut clause = vec![!Lit::from_var(this_var, true)];
                 for co_sem in 0..=sem_idx {
                     let course_var = self.get_course_semester_var(code, co_sem);
-                    clause.push(Lit::from_var(course_var, false));
+                    clause.push(Lit::from_var(course_var, true));
                 }
                 self.formula.add_clause(&clause);
                 this_var
@@ -187,7 +187,7 @@ impl PrereqSatSolver {
             CourseReq::Program(_) | CourseReq::Instructor | CourseReq::None => {
                 // Always satisfied
                 let var = self.new_var();
-                self.formula.add_clause(&[Lit::from_var(var, false)]);
+                self.formula.add_clause(&[Lit::from_var(var, true)]);
                 var
             }
         }
@@ -199,7 +199,7 @@ impl PrereqSatSolver {
             for course in semester {
                 let var = self.get_course_semester_var(course, sem_idx);
                 // Force this course to be taken in this semester
-                self.formula.add_clause(&[Lit::from_var(var, false)]);
+                self.formula.add_clause(&[Lit::from_var(var, true)]);
             }
         }
     }
@@ -218,8 +218,8 @@ impl PrereqSatSolver {
                     let prereq_var = self.encode_course_req(req, sem_idx);
                     // course_var -> prereq_var
                     self.formula.add_clause(&[
-                        !Lit::from_var(course_var, false),
-                        Lit::from_var(prereq_var, false),
+                        !Lit::from_var(course_var, true),
+                        Lit::from_var(prereq_var, true),
                     ]);
                 }
             }
@@ -241,8 +241,17 @@ impl PrereqSatSolver {
             // Extract which courses are taken in which semesters
             for ((course, semester), &var) in &self.course_semester_vars {
                 let idx = var.index();
-                if idx < model.len() && model[idx].is_positive() {
-                    total_courses[*semester].push(course.clone());
+                if idx < model.len() {
+                    let assignment = model[idx];
+                    if assignment.is_positive() {
+                        total_courses[*semester].push(course.clone());
+                    }
+                } else {
+                    eprintln!(
+                        "Warning: Variable index {} out of bounds for model length {}",
+                        idx,
+                        model.len()
+                    );
                 }
             }
 
