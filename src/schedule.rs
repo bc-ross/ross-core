@@ -188,11 +188,7 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
-    sched.courses = crate::prereqs_cp::solve_schedule_cp(
-        sched.courses,
-        &sched.catalog.prereqs,
-        &sched.catalog.courses,
-    )?;
+    sched.courses = crate::prereqs_cp::solve_schedule_cp(&sched)?;
     // let scheds = sched.ensure_prereqs()?;
     // println!("{} different prereq filling options", scheds.len());
 
@@ -299,11 +295,7 @@ impl Schedule {
     pub fn ensure_prereqs_cp(&self) -> Result<Vec<Self>> {
         use crate::prereqs_cp;
 
-        let solutions = prereqs_cp::solve_prereqs_cp(
-            self.courses.clone(),
-            &self.catalog.prereqs,
-            &self.catalog.courses,
-        )?;
+        let solutions = prereqs_cp::solve_prereqs_cp(&self)?;
 
         Ok(solutions
             .into_iter()

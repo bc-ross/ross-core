@@ -1,5 +1,5 @@
 use crate::prereqs::CourseReq;
-use crate::schedule::{CourseCode, CourseTermOffering};
+use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
 use std::any;
 use std::collections::HashMap;
@@ -15,14 +15,17 @@ pub struct CpSolution {
 /// Simple prerequisite solver using optimization principles
 /// This is currently a wrapper around the SAT solver with optimization-focused logic
 pub fn solve_prereqs_cp(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+    sched: &Schedule, // schedule: Vec<Vec<CourseCode>>,
+                      // prereqs: &HashMap<CourseCode, CourseReq>,
+                      // courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
 ) -> Result<Vec<Vec<Vec<CourseCode>>>> {
     // For now, we'll use the SAT solver as the backend but with optimization-focused logic
     // In the future, this can be replaced with a true CP/IP implementation
 
     use crate::prereqs_sat;
+    let schedule = &sched.courses;
+    let prereqs = &sched.catalog.prereqs;
+    let courses = &sched.catalog.courses;
 
     // Use the SAT solver to get multiple valid solutions
     let sat_solutions = prereqs_sat::solve_multiple_prereqs(schedule.clone(), prereqs, 10);
@@ -49,7 +52,7 @@ pub fn solve_prereqs_cp(
         .collect();
 
     // Apply optimization logic to choose the best solution
-    let best_solution = find_best_solution(schedule_solutions.clone(), courses);
+    let best_solution = find_best_solution(schedule_solutions.clone(), sched);
 
     Ok(vec![best_solution])
 }
@@ -95,7 +98,7 @@ pub fn solve_prereqs_cp_all_solutions(
 /// 3. Minimize number of additional courses
 fn find_best_solution(
     solutions: Vec<Vec<Vec<CourseCode>>>,
-    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+    ref_sched: &Schedule,
 ) -> Vec<Vec<CourseCode>> {
     if solutions.is_empty() {
         return vec![];
@@ -109,7 +112,7 @@ fn find_best_solution(
     let mut scored_solutions: Vec<(f64, Vec<Vec<CourseCode>>)> = solutions
         .into_iter()
         .map(|solution| {
-            let score = calculate_solution_score(&solution, courses);
+            let score = calculate_solution_score(&solution, ref_sched);
             (score, solution)
         })
         .collect();
@@ -123,13 +126,12 @@ fn find_best_solution(
 
 /// Calculate a score for a solution (lower is better)
 /// Combines multiple optimization objectives
-fn calculate_solution_score(
-    solution: &[Vec<CourseCode>],
-    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
-) -> f64 {
+fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) -> f64 {
     let mut total_credits = 0;
     let mut semester_credits = Vec::new();
     let mut total_courses = 0;
+
+    let courses = &ref_sched.catalog.courses;
 
     // Calculate credits per semester
     for semester in solution {
@@ -171,6 +173,13 @@ fn calculate_solution_score(
 
     // Objective 4: Ensure all semester are under 18 credits (oneshot)
     let overload_penalty: f64 = semester_credits
+        .iter()
+        .filter(|&&credits| credits > 18)
+        .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
+        .sum();
+
+    // Objective 5: Ensure schedule is valid
+    let validation_penalty: f64 = semester_credits
         .iter()
         .filter(|&&credits| credits > 18)
         .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
@@ -270,14 +279,30 @@ pub fn test_cp_solver() {
             CourseTermOffering::Both,
         ),
     );
-    solve_schedule_cp(schedule, &prereqs, &courses).unwrap();
+    solve_schedule_cp(&Schedule {
+        courses: schedule,
+        programs: vec![],
+        catalog: Catalog {
+            geneds: vec![],
+            prereqs: prereqs,
+            programs: vec![],
+            courses: courses,
+            low_year: 0,
+        },
+    })
+    .unwrap();
 }
 
 pub fn solve_schedule_cp(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+    sched: &Schedule,
+    // schedule: Vec<Vec<CourseCode>>,
+    // prereqs: &HashMap<CourseCode, CourseReq>,
+    // courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
 ) -> Result<Vec<Vec<CourseCode>>> {
+    let schedule = &sched.courses;
+    let prereqs = &sched.catalog.prereqs;
+    let courses = &sched.catalog.courses;
+
     println!("Testing optimization-focused CP solver:");
     println!("Original schedule with prerequisite violations:");
     for (i, sem) in schedule.iter().enumerate() {
@@ -308,7 +333,7 @@ pub fn solve_schedule_cp(
                 println!("  Total credits: {}", total_credits);
 
                 // Calculate solution score
-                let score = calculate_solution_score(solution, &courses);
+                let score = calculate_solution_score(solution, sched);
                 println!("  Optimization score: {:.2}", score);
             }
         }
@@ -319,7 +344,7 @@ pub fn solve_schedule_cp(
 
     // Then show the optimized choice
     println!("\nNow finding the BEST solution via optimization:");
-    solve_prereqs_cp(schedule, &prereqs, &courses).and_then(|mut solutions| {
+    solve_prereqs_cp(sched).and_then(|mut solutions| {
         println!("Optimized solution chosen:");
         for (sol_idx, solution) in solutions.iter().enumerate() {
             println!("Best Solution {}:", sol_idx + 1);
@@ -338,7 +363,7 @@ pub fn solve_schedule_cp(
             println!("  Total credits: {}", total_credits);
 
             // Calculate solution score
-            let score = calculate_solution_score(solution, &courses);
+            let score = calculate_solution_score(solution, sched);
             println!("  Optimization score: {:.2}", score);
         }
         solutions
