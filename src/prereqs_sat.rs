@@ -3,6 +3,9 @@ use crate::schedule::CourseCode;
 use std::collections::HashMap;
 use varisat::{CnfFormula, ExtendFormula, Lit, Var, solver::Solver};
 
+// Maximum number of different SAT solutions to explore for optimization
+pub const MAX_SAT_ITERATIONS: usize = 100;
+
 #[derive(Debug, Clone)]
 pub struct SatSolution {
     pub additional_courses: HashMap<usize, Vec<CourseCode>>, // semester -> courses to add
@@ -392,6 +395,7 @@ impl PrereqSatSolver {
 }
 
 /// Enhanced SAT solver that finds multiple solutions by iteratively excluding previous ones
+/// Now includes optimization scoring and early termination for better efficiency
 pub fn solve_multiple_prereqs(
     schedule: Vec<Vec<CourseCode>>,
     prereqs: &HashMap<CourseCode, CourseReq>,
@@ -399,8 +403,16 @@ pub fn solve_multiple_prereqs(
 ) -> Vec<SatSolution> {
     let mut solutions = Vec::new();
     let mut forbidden_patterns: Vec<Vec<(CourseCode, usize)>> = Vec::new();
+    let mut best_score = f64::INFINITY;
+    let mut solutions_since_improvement = 0;
+    const MAX_STAGNANT_ITERATIONS: usize = 20; // Stop if no improvement for this many iterations
 
-    for _attempt in 0..max_solutions {
+    println!(
+        "SAT solver exploring up to {} solutions for optimization...",
+        max_solutions
+    );
+
+    for attempt in 0..max_solutions {
         let num_semesters = schedule.len();
         let mut solver = PrereqSatSolver::new(num_semesters);
 
@@ -413,6 +425,32 @@ pub fn solve_multiple_prereqs(
         }
 
         if let Some(solution) = solver.solve(&schedule) {
+            // Calculate a score for this solution (lower is better)
+            let score = score_solution(&solution, &schedule);
+
+            if score < best_score {
+                best_score = score;
+                solutions_since_improvement = 0;
+                println!(
+                    "SAT iteration {}: Found better solution with score {:.2} ({} additional courses)",
+                    attempt + 1,
+                    score,
+                    count_total_additional_courses(&solution)
+                );
+            } else {
+                solutions_since_improvement += 1;
+            }
+
+            // Early termination if we haven't improved in a while
+            if solutions_since_improvement >= MAX_STAGNANT_ITERATIONS {
+                println!(
+                    "SAT solver: No improvement for {} iterations, terminating early at iteration {}",
+                    MAX_STAGNANT_ITERATIONS,
+                    attempt + 1
+                );
+                break;
+            }
+
             // Extract the pattern of additional courses for this solution
             let mut pattern = Vec::new();
             for (sem_idx, additional_courses) in &solution.additional_courses {
@@ -425,10 +463,62 @@ pub fn solve_multiple_prereqs(
                 forbidden_patterns.push(pattern);
             }
             solutions.push(solution);
+
+            // Very early termination if we find a solution with very few additional courses
+            let total_additional = count_total_additional_courses(&solutions.last().unwrap());
+            if total_additional <= 2 {
+                println!(
+                    "SAT solver: Found excellent solution with only {} additional courses, terminating early",
+                    total_additional
+                );
+                break;
+            }
         } else {
+            println!(
+                "SAT solver: No more solutions found at iteration {}",
+                attempt + 1
+            );
             break; // No more solutions
         }
     }
 
+    println!(
+        "SAT solver completed: Found {} solutions, best score: {:.2}",
+        solutions.len(),
+        best_score
+    );
     solutions
+}
+
+/// Score a solution based on number of additional courses and distribution
+/// Lower scores are better
+fn score_solution(solution: &SatSolution, original_schedule: &[Vec<CourseCode>]) -> f64 {
+    let total_additional = count_total_additional_courses(solution);
+
+    // Calculate distribution penalty (prefer even spread across semesters)
+    let mut distribution_penalty = 0.0;
+    let avg_additional = total_additional as f64 / original_schedule.len() as f64;
+
+    for sem_idx in 0..original_schedule.len() {
+        let sem_additional = solution
+            .additional_courses
+            .get(&sem_idx)
+            .map(|courses| courses.len())
+            .unwrap_or(0) as f64;
+
+        // Penalty for deviation from average
+        distribution_penalty += (sem_additional - avg_additional).abs();
+    }
+
+    // Main score: total additional courses + small distribution penalty
+    total_additional as f64 + (distribution_penalty * 0.1)
+}
+
+/// Count total number of additional courses in a solution
+fn count_total_additional_courses(solution: &SatSolution) -> usize {
+    solution
+        .additional_courses
+        .values()
+        .map(|courses| courses.len())
+        .sum()
 }

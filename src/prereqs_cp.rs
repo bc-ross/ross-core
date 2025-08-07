@@ -22,7 +22,11 @@ pub fn solve_prereqs_cp(
     let courses = &sched.catalog.courses;
 
     // Use the SAT solver to get multiple valid solutions
-    let sat_solutions = prereqs_sat::solve_multiple_prereqs(schedule.clone(), prereqs, 10);
+    let sat_solutions = prereqs_sat::solve_multiple_prereqs(
+        schedule.clone(),
+        prereqs,
+        prereqs_sat::MAX_SAT_ITERATIONS,
+    );
 
     println!(
         "SAT solver found {} prerequisite solutions",
@@ -533,17 +537,30 @@ fn find_best_solution(
         return None;
     }
 
+    println!(
+        "Evaluating {} schedule solutions to find the best one...",
+        solutions.len()
+    );
+
     let mut best_solution = &solutions[0];
     let mut best_score = evaluate_solution(&solutions[0], sched);
+    println!("Initial solution score: {:.2}", best_score);
 
-    for solution in &solutions[1..] {
+    for (i, solution) in solutions[1..].iter().enumerate() {
         let score = evaluate_solution(solution, sched);
         if score < best_score {
+            println!(
+                "Found better solution at index {}: score {:.2} (improvement: {:.2})",
+                i + 1,
+                score,
+                best_score - score
+            );
             best_score = score;
             best_solution = solution;
         }
     }
 
+    println!("Best solution selected with final score: {:.2}", best_score);
     Some(best_solution.clone())
 }
 
