@@ -4,6 +4,7 @@ use std::path::Path;
 mod load_catalogs;
 mod prereqs;
 mod prereqs_sat;
+mod prereqs_cp;
 mod read_excel_file;
 mod schedule;
 mod schedule_sorter;
@@ -19,7 +20,15 @@ use write_excel_file::save_schedule;
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
+    // Test the CP solver
+    println!("=== Testing CP Solver ===");
+    prereqs_cp::test_cp_solver();
+    println!();
+
+    // Test the SAT solver
+    println!("=== Testing SAT Solver ===");
     prereqs_sat::test_prereq_sat();
+    println!();
 
     const FNAME: &str = "ross_test.xlsx";
 

@@ -250,7 +250,14 @@ impl Schedule {
     }
 
     pub fn ensure_prereqs(self) -> Result<Vec<Self>> {
-        // Try SAT solver first for better performance
+        // Try CP solver first for better optimization
+        if let Ok(cp_results) = self.ensure_prereqs_cp() {
+            if !cp_results.is_empty() {
+                return Ok(cp_results);
+            }
+        }
+
+        // Try SAT solver second for good performance
         if let Ok(sat_results) = self.ensure_prereqs_sat() {
             if !sat_results.is_empty() {
                 return Ok(sat_results);
@@ -267,6 +274,26 @@ impl Schedule {
 
         let solutions =
             prereqs_sat::ensure_prereqs_sat(self.courses.clone(), &self.catalog.prereqs);
+
+        Ok(solutions
+            .into_iter()
+            .map(|course_schedule| Self {
+                courses: course_schedule,
+                programs: self.programs.clone(),
+                catalog: self.catalog.clone(),
+            })
+            .collect())
+    }
+
+    /// CP-based prerequisite resolution using constraint programming
+    pub fn ensure_prereqs_cp(&self) -> Result<Vec<Self>> {
+        use crate::prereqs_cp;
+
+        let solutions = prereqs_cp::solve_prereqs_cp(
+            self.courses.clone(),
+            &self.catalog.prereqs,
+            &self.catalog.courses,
+        )?;
 
         Ok(solutions
             .into_iter()
