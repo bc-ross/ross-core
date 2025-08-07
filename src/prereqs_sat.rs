@@ -6,7 +6,6 @@ use varisat::{CnfFormula, ExtendFormula, Lit, Var, solver::Solver};
 #[derive(Debug, Clone)]
 pub struct SatSolution {
     pub additional_courses: HashMap<usize, Vec<CourseCode>>, // semester -> courses to add
-    pub total_courses: Vec<Vec<CourseCode>>,                 // complete schedule including prereqs
 }
 
 /// SAT-based prerequisite solver
@@ -277,10 +276,7 @@ impl PrereqSatSolver {
                 }
             }
 
-            Some(SatSolution {
-                additional_courses,
-                total_courses,
-            })
+            Some(SatSolution { additional_courses })
         } else {
             None
         }
@@ -395,86 +391,6 @@ impl PrereqSatSolver {
     }
 }
 
-/// Helper function to check if a prerequisite is satisfied
-fn is_prereq_satisfied(req: &CourseReq, schedule: &[Vec<CourseCode>], sem_idx: usize) -> bool {
-    match req {
-        CourseReq::And(reqs) => reqs
-            .iter()
-            .all(|r| is_prereq_satisfied(r, schedule, sem_idx)),
-        CourseReq::Or(reqs) => reqs
-            .iter()
-            .any(|r| is_prereq_satisfied(r, schedule, sem_idx)),
-        CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
-            schedule.iter().take(sem_idx).flatten().any(|c| c == code)
-        }
-        CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => schedule
-            .iter()
-            .take(sem_idx + 1)
-            .flatten()
-            .any(|c| c == code),
-        CourseReq::Program(_) | CourseReq::Instructor | CourseReq::None => true,
-    }
-}
-
-/// Helper function to recursively add all courses mentioned in prerequisites
-fn add_all_course_prereqs(
-    req: &CourseReq,
-    original_prereqs: &HashMap<CourseCode, CourseReq>,
-    expanded_prereqs: &mut HashMap<CourseCode, CourseReq>,
-) {
-    match req {
-        CourseReq::And(reqs) | CourseReq::Or(reqs) => {
-            for sub_req in reqs {
-                add_all_course_prereqs(sub_req, original_prereqs, expanded_prereqs);
-            }
-        }
-        CourseReq::PreCourse(code)
-        | CourseReq::CoCourse(code)
-        | CourseReq::PreCourseGrade(code, _)
-        | CourseReq::CoCourseGrade(code, _) => {
-            if !expanded_prereqs.contains_key(code) {
-                if let Some(course_req) = original_prereqs.get(code) {
-                    expanded_prereqs.insert(code.clone(), course_req.clone());
-                    add_all_course_prereqs(course_req, original_prereqs, expanded_prereqs);
-                } else {
-                    expanded_prereqs.insert(code.clone(), CourseReq::None);
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Public interface function to solve prerequisites for a schedule
-pub fn solve_prereqs(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-) -> Option<SatSolution> {
-    let num_semesters = schedule.len();
-    let mut solver = PrereqSatSolver::new(num_semesters);
-
-    solver.add_existing_schedule(&schedule);
-    solver.add_prereq_constraints(&schedule, prereqs);
-
-    solver.solve(&schedule)
-}
-
-/// Enhanced SAT solver that tries to find optimal solutions
-pub fn solve_prereqs_optimized(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-) -> Option<SatSolution> {
-    // First, find any valid solution
-    let initial_solution = solve_prereqs(schedule.clone(), prereqs)?;
-
-    // For now, return the first solution. In a more advanced version, we could:
-    // 1. Use a MaxSAT solver for true optimization
-    // 2. Iteratively add constraints to find better solutions
-    // 3. Use multiple solving rounds with different constraints
-
-    Some(initial_solution)
-}
-
 /// Enhanced SAT solver that finds multiple solutions by iteratively excluding previous ones
 pub fn solve_multiple_prereqs(
     schedule: Vec<Vec<CourseCode>>,
@@ -515,146 +431,4 @@ pub fn solve_multiple_prereqs(
     }
 
     solutions
-}
-
-/// SAT-based equivalent of Schedule::ensure_prereqs that uses the SAT solver
-pub fn ensure_prereqs_sat(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-) -> Vec<Vec<Vec<CourseCode>>> {
-    // Find courses with unmet prerequisites
-    let mut courses_needing_prereqs = Vec::new();
-    for (sem_idx, semester) in schedule.iter().enumerate() {
-        for course in semester {
-            if let Some(req) = prereqs.get(course) {
-                if !is_prereq_satisfied(req, &schedule, sem_idx) {
-                    courses_needing_prereqs.push((course.clone(), req.clone(), sem_idx));
-                }
-            }
-        }
-    }
-
-    if courses_needing_prereqs.is_empty() {
-        return vec![schedule];
-    }
-
-    // Build a comprehensive prerequisite map including all potential prereq courses
-    let mut expanded_prereqs = prereqs.clone();
-    for (_, req, _) in &courses_needing_prereqs {
-        add_all_course_prereqs(req, prereqs, &mut expanded_prereqs);
-    }
-
-    // Use SAT solver to find solutions
-    if let Some(solution) = solve_prereqs(schedule.clone(), &expanded_prereqs) {
-        vec![solution.total_courses]
-    } else {
-        vec![]
-    }
-}
-
-pub fn test_prereq_sat() {
-    // Create a more complex test case with three semesters
-    let math_calc1 = CourseCode {
-        stem: "MATH".to_string(),
-        code: 1350.into(),
-    };
-    let math_calc2 = CourseCode {
-        stem: "MATH".to_string(),
-        code: 1360.into(),
-    };
-    let phys_mech = CourseCode {
-        stem: "PHYS".to_string(),
-        code: 2100.into(),
-    };
-    let phys_em = CourseCode {
-        stem: "PHYS".to_string(),
-        code: 2200.into(),
-    };
-    let chem_gen = CourseCode {
-        stem: "CHEM".to_string(),
-        code: 1210.into(),
-    };
-    let chem_org = CourseCode {
-        stem: "CHEM".to_string(),
-        code: 2300.into(),
-    };
-    let eng_comp = CourseCode {
-        stem: "ENGL".to_string(),
-        code: 1100.into(),
-    };
-
-    // Create a three-semester schedule with some existing courses
-    let schedule = vec![
-        vec![eng_comp.clone(), math_calc1.clone()], // Semester 0: English Comp + Calc 1
-        vec![chem_gen.clone()],                     // Semester 1: General Chemistry
-        vec![phys_em.clone()],                      // Semester 2: E&M Physics
-    ];
-
-    // Set up a chain of prerequisites:
-    // - Calc 2 requires Calc 1
-    // - Physics Mechanics requires Calc 1
-    // - E&M Physics requires both Physics Mechanics AND Calc 2
-    // - Organic Chemistry requires General Chemistry
-    let mut prereqs = HashMap::new();
-
-    prereqs.insert(math_calc2.clone(), CourseReq::PreCourse(math_calc1.clone()));
-
-    prereqs.insert(phys_mech.clone(), CourseReq::PreCourse(math_calc1.clone()));
-
-    prereqs.insert(
-        phys_em.clone(),
-        CourseReq::And(vec![
-            CourseReq::PreCourse(phys_mech.clone()),
-            CourseReq::PreCourse(math_calc2.clone()),
-        ]),
-    );
-
-    prereqs.insert(chem_org.clone(), CourseReq::PreCourse(chem_gen.clone()));
-
-    println!("Testing SAT solver with 3-semester schedule:");
-    for (i, sem) in schedule.iter().enumerate() {
-        println!("  Semester {}: {:?}", i, sem);
-    }
-    println!("Prerequisites:");
-    println!("  - MATH-1360 requires MATH-1350");
-    println!("  - PHYS-2100 requires MATH-1350");
-    println!("  - PHYS-2200 requires PHYS-2100 AND MATH-1360");
-    println!("  - CHEM-2300 requires CHEM-1210");
-
-    match solve_prereqs(schedule.clone(), &prereqs) {
-        Some(solution) => {
-            println!("\nSAT solution found!");
-            println!("Additional courses needed:");
-            for (semester, courses) in &solution.additional_courses {
-                println!("  Semester {}: {:?}", semester, courses);
-            }
-            println!("Complete schedule:");
-            let mut total_courses = 0;
-            for (semester, courses) in solution.total_courses.iter().enumerate() {
-                println!(
-                    "  Semester {}: {:?} ({} courses)",
-                    semester,
-                    courses,
-                    courses.len()
-                );
-                total_courses += courses.len();
-            }
-            println!("Total courses: {}", total_courses);
-
-            // Calculate distribution evenness
-            let course_counts: Vec<usize> =
-                solution.total_courses.iter().map(|s| s.len()).collect();
-            let min_courses = *course_counts.iter().min().unwrap_or(&0);
-            let max_courses = *course_counts.iter().max().unwrap_or(&0);
-            println!(
-                "Distribution: min={}, max={}, difference={}",
-                min_courses,
-                max_courses,
-                max_courses - min_courses
-            );
-        }
-        None => {
-            println!("No solution found - prerequisites cannot be satisfied!");
-        }
-    }
 }

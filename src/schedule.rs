@@ -8,7 +8,6 @@ use std::{
 
 use crate::geneds::{GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
-use crate::schedule_sorter::BestSchedule;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
@@ -179,30 +178,23 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
 
     // Use the CP solver with gened support instead of just prerequisites
     println!("Calling CP solver with gened support...");
-    match crate::prereqs_cp::solve_prereqs_cp(&sched) {
-        Ok(complete_schedules) => {
-            println!(
-                "CP solver returned {} schedule(s)",
-                complete_schedules.len()
-            );
+    let complete_schedules = crate::prereqs_cp::solve_prereqs_cp(&sched)?;
+    println!(
+        "CP solver returned {} schedule(s)",
+        complete_schedules.len()
+    );
 
-            if let Some(best_schedule) = complete_schedules.first() {
-                sched.courses = best_schedule.clone();
+    if let Some(best_schedule) = complete_schedules.first() {
+        sched.courses = best_schedule.clone();
 
-                // Debug: Print the final schedule
-                println!("Final schedule after CP solver:");
-                for (i, sem) in sched.courses.iter().enumerate() {
-                    println!("  Semester {}: {:?}", i, sem);
-                }
-                println!("Final schedule validation: {}", sched.is_valid()?);
-            } else {
-                return Err(anyhow::anyhow!("No valid schedule found with CP solver"));
-            }
+        // Debug: Print the final schedule
+        println!("Final schedule after CP solver:");
+        for (i, sem) in sched.courses.iter().enumerate() {
+            println!("  Semester {}: {:?}", i, sem);
         }
-        Err(e) => {
-            println!("CP solver error: {}", e);
-            return Err(e);
-        }
+        println!("Final schedule validation: {}", sched.is_valid()?);
+    } else {
+        return Err(anyhow::anyhow!("No valid schedule found with CP solver"));
     }
     // let scheds = sched.ensure_prereqs()?;
     // println!("{} different prereq filling options", scheds.len());
@@ -274,112 +266,5 @@ impl Schedule {
             }
         }
         Ok(true)
-    }
-
-    pub fn ensure_prereqs(self) -> Result<Vec<Self>> {
-        // Try CP solver first for better optimization
-        if let Ok(cp_results) = self.ensure_prereqs_cp() {
-            if !cp_results.is_empty() {
-                return Ok(cp_results);
-            }
-        }
-
-        // Try SAT solver second for good performance
-        if let Ok(sat_results) = self.ensure_prereqs_sat() {
-            if !sat_results.is_empty() {
-                return Ok(sat_results);
-            }
-        }
-
-        // Fallback to original combinatorial approach
-        self.ensure_prereqs_combinatorial()
-    }
-
-    /// SAT-based prerequisite resolution
-    pub fn ensure_prereqs_sat(&self) -> Result<Vec<Self>> {
-        use crate::prereqs_sat;
-
-        let solutions =
-            prereqs_sat::ensure_prereqs_sat(self.courses.clone(), &self.catalog.prereqs);
-
-        Ok(solutions
-            .into_iter()
-            .map(|course_schedule| Self {
-                courses: course_schedule,
-                programs: self.programs.clone(),
-                catalog: self.catalog.clone(),
-            })
-            .collect())
-    }
-
-    /// CP-based prerequisite resolution using constraint programming
-    pub fn ensure_prereqs_cp(&self) -> Result<Vec<Self>> {
-        use crate::prereqs_cp;
-
-        let solutions = prereqs_cp::solve_prereqs_cp(&self)?;
-
-        Ok(solutions
-            .into_iter()
-            .map(|course_schedule| Self {
-                courses: course_schedule,
-                programs: self.programs.clone(),
-                catalog: self.catalog.clone(),
-            })
-            .collect())
-    }
-
-    /// Original combinatorial prerequisite resolution  
-    pub fn ensure_prereqs_combinatorial(self) -> Result<Vec<Self>> {
-        let mut unimplemented_prereqs: HashMap<&CourseReq, usize> = HashMap::new();
-        for (sem_idx, sem) in self.courses.iter().enumerate() {
-            for code in sem {
-                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
-                if !req.is_satisfied(&self, sem_idx) {
-                    unimplemented_prereqs
-                        .entry(req)
-                        .and_modify(|idx| {
-                            if sem_idx > *idx {
-                                *idx = sem_idx
-                            }
-                        })
-                        .or_insert(sem_idx);
-                    #[cfg(debug_assertions)]
-                    println!(
-                        "Unimplemented prereq for {}: {:?} at semester {}",
-                        code, req, sem_idx
-                    );
-                }
-            }
-        }
-        if unimplemented_prereqs.is_empty() {
-            println!("All prereqs are satisfied.");
-            return Ok(vec![self]);
-        }
-        println!(
-            "{} unimplemented prereqs found",
-            unimplemented_prereqs.len()
-        );
-        let mut sched_opts = Vec::new();
-        for (req, _) in unimplemented_prereqs {
-            for seq in req.get_course_options() {
-                let mut this_sched = self.clone();
-                this_sched
-                    .courses
-                    .get_mut(0)
-                    .ok_or(anyhow::anyhow!(
-                        "No semesters found in schedule, cannot add prereq courses"
-                    ))?
-                    .extend(seq.iter().map(|x| (*x).clone()));
-                this_sched.reduce()?;
-                for mut fixed_sched_opt in this_sched.ensure_prereqs()? {
-                    fixed_sched_opt.reduce()?;
-                    if !sched_opts.contains(&fixed_sched_opt) {
-                        sched_opts.push(fixed_sched_opt);
-                    }
-                }
-            }
-        }
-
-        Ok(sched_opts)
     }
 }

@@ -1,7 +1,7 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{Catalog, CourseCode, Schedule, Semester};
+use crate::schedule::{CourseCode, Schedule};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -162,52 +162,6 @@ impl CourseReq {
             }),
             CourseReq::Instructor => todo!(),
             CourseReq::None => true,
-        }
-    }
-
-    pub fn get_course_options<'a>(&'a self) -> Vec<Vec<&'a CourseCode>> {
-        match self {
-            CourseReq::Or(reqs) => {
-                // For Or nodes, collect all options from subreqs into a single list
-                reqs.iter()
-                    .flat_map(|req| req.get_course_options())
-                    .collect()
-            }
-            CourseReq::And(reqs) => {
-                // For And nodes, compute Cartesian product of all subreq options
-                let mut result = vec![vec![]];
-                for req in reqs {
-                    let subreq_options = req.get_course_options();
-                    if subreq_options.is_empty() {
-                        continue; // Skip empty requirements (like None, Instructor, etc.)
-                    }
-                    // Compute Cartesian product with current result
-                    result = result
-                        .into_iter()
-                        .flat_map(|current| {
-                            subreq_options.iter().map(move |option| {
-                                let mut new_option = current.clone();
-                                new_option.extend(option.iter().cloned());
-                                new_option
-                            })
-                        })
-                        .collect();
-                }
-                if result.len() == 1 && result[0].is_empty() {
-                    vec![] // Return empty if no actual requirements
-                } else {
-                    result
-                }
-            }
-            CourseReq::PreCourse(code)
-            | CourseReq::CoCourse(code)
-            | CourseReq::PreCourseGrade(code, _)
-            | CourseReq::CoCourseGrade(code, _) => {
-                // Single course is a single option
-                vec![vec![&code]]
-            }
-            // Ignore these cases as requested
-            CourseReq::Program(_) | CourseReq::Instructor | CourseReq::None => vec![],
         }
     }
 }

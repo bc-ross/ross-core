@@ -8,12 +8,10 @@ mod prereqs_cp;
 mod prereqs_sat;
 mod read_excel_file;
 mod schedule;
-mod schedule_sorter;
 mod version;
 mod write_excel_file;
 
 use load_catalogs::CATALOGS;
-use read_excel_file::read_file;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
