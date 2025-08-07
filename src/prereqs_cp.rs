@@ -5,6 +5,9 @@ use anyhow::Result;
 use std::any;
 use std::collections::HashMap;
 
+// Normally 18 but adjusted to 9 for small-scale testing
+const MAX_OVERLOAD_SEMESTER: u32 = 9; // Maximum credits per semester
+
 /// CP-style solution that wraps SAT solver results
 #[derive(Debug, Clone)]
 pub struct CpSolution {
@@ -62,29 +65,8 @@ pub fn solve_prereqs_cp(
 
         let missing_geneds = find_missing_geneds(&temp_schedule);
 
-        // Add missing gened courses to the first available semester (simple strategy)
-        for missing_course in missing_geneds {
-            // Find a semester with reasonable capacity (< 15 credits)
-            let mut placed = false;
-            for semester in solution.iter_mut() {
-                let sem_credits: u32 = semester
-                    .iter()
-                    .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
-                    .sum();
-
-                if sem_credits < 15 {
-                    // Leave room for more courses
-                    semester.push(missing_course.clone());
-                    placed = true;
-                    break;
-                }
-            }
-
-            // If no semester has room, add to the last one
-            if !placed && !solution.is_empty() {
-                solution.last_mut().unwrap().push(missing_course);
-            }
-        }
+        // Improved gened placement: distribute courses to balance semesters
+        place_geneds_balanced(solution, missing_geneds, courses);
     }
 
     // Apply optimization logic to choose the best solution
@@ -252,8 +234,8 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
     // Objective 4: Ensure all semester are under 18 credits (oneshot)
     let overload_penalty: f64 = semester_credits
         .iter()
-        .filter(|&&credits| credits > 18)
-        .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
+        .filter(|&&credits| credits > MAX_OVERLOAD_SEMESTER)
+        .map(|&credits| (credits - MAX_OVERLOAD_SEMESTER) as f64 * 100000.0) // Hefty penalty for overload
         .sum();
 
     // Objective 5: Ensure schedule is valid (oneshot)
@@ -267,6 +249,72 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
         * 1000000.0;
 
     credit_penalty + balance_penalty + course_penalty + overload_penalty + dbg!(validation_penalty)
+}
+
+/// Intelligently place gened courses to balance semesters
+fn place_geneds_balanced(
+    solution: &mut [Vec<CourseCode>],
+    missing_geneds: Vec<CourseCode>,
+    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+) {
+    // Sort semesters by current credit load (ascending)
+    let mut semester_loads: Vec<(usize, u32)> = solution
+        .iter()
+        .enumerate()
+        .map(|(idx, semester)| {
+            let credits = semester
+                .iter()
+                .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
+                .sum();
+            (idx, credits)
+        })
+        .collect();
+
+    // Sort by credits (lowest first) to fill lighter semesters first
+    semester_loads.sort_by_key(|(_, credits)| *credits);
+
+    // Place each gened course in the semester with the least load
+    for missing_course in missing_geneds {
+        let course_credits = courses
+            .get(&missing_course)
+            .and_then(|(_, c, _)| *c)
+            .unwrap_or(3);
+
+        // Find the semester with the lowest load that can accommodate this course
+        let mut best_semester_idx = None;
+        let mut min_resulting_load = u32::MAX;
+
+        for &(sem_idx, current_load) in &semester_loads {
+            let resulting_load = current_load + course_credits;
+
+            // Prefer semesters under the overload limit
+            if resulting_load <= MAX_OVERLOAD_SEMESTER && resulting_load < min_resulting_load {
+                best_semester_idx = Some(sem_idx);
+                min_resulting_load = resulting_load;
+            }
+        }
+
+        // If no semester can accommodate without overload, place in the least loaded one anyway
+        if best_semester_idx.is_none() {
+            best_semester_idx = Some(semester_loads[0].0);
+            min_resulting_load = semester_loads[0].1 + course_credits;
+        }
+
+        if let Some(sem_idx) = best_semester_idx {
+            solution[sem_idx].push(missing_course);
+
+            // Update the load for this semester in our tracking
+            for load_entry in &mut semester_loads {
+                if load_entry.0 == sem_idx {
+                    load_entry.1 = min_resulting_load;
+                    break;
+                }
+            }
+
+            // Re-sort to maintain order by load
+            semester_loads.sort_by_key(|(_, credits)| *credits);
+        }
+    }
 }
 
 /// Test function for the CP solver that uses optimization principles
