@@ -21,6 +21,9 @@ use write_excel_file::save_schedule;
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
+    // // Test multi-course gened functionality first
+    // prereqs_cp::test_multi_course_gened();
+
     // Test the CP solver
     println!("=== Testing CP Solver ===");
     prereqs_cp::test_cp_solver();

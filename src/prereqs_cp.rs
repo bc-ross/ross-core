@@ -206,6 +206,18 @@ fn find_optimal_gened_courses(
     let mut selected_courses = Vec::new();
     let mut remaining_geneds = unsatisfied_geneds.to_vec();
 
+    // Track how many courses we've selected for each gened that needs multiple courses
+    let mut gened_progress: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::new();
+
+    // Initialize progress based on courses already in schedule
+    for (gened_idx, gened, _) in &remaining_geneds {
+        let already_satisfied_count = count_satisfied_courses_for_gened(gened, already_in_schedule);
+        if already_satisfied_count > 0 {
+            gened_progress.insert(*gened_idx, already_satisfied_count);
+        }
+    }
+
     // Build a map of course -> list of geneds it can satisfy
     let mut course_to_geneds: std::collections::HashMap<CourseCode, Vec<usize>> =
         std::collections::HashMap::new();
@@ -220,25 +232,56 @@ fn find_optimal_gened_courses(
     }
 
     // Greedy selection: prioritize courses with best cost/benefit ratio
-    while !remaining_geneds.is_empty() {
+    let mut iteration_count = 0;
+    let max_iterations = 50; // Prevent infinite loops
+
+    while !remaining_geneds.is_empty() && iteration_count < max_iterations {
+        iteration_count += 1;
+
         let mut best_course = None;
         let mut best_score = f64::NEG_INFINITY;
-        let mut best_geneds_satisfied = Vec::new();
+        let mut best_geneds_affected = Vec::new();
         let mut best_total_courses = Vec::new();
 
         for (course, gened_indices) in &course_to_geneds {
-            // Count how many unsatisfied geneds this course would satisfy
-            let satisfied_geneds: Vec<_> = gened_indices
-                .iter()
-                .filter(|&&idx| {
-                    remaining_geneds
-                        .iter()
-                        .any(|(gened_idx, _, _)| *gened_idx == idx)
-                })
-                .cloned()
-                .collect();
+            // Skip if this course is already selected or in the schedule
+            if selected_courses.contains(course) || already_in_schedule.contains(course) {
+                continue;
+            }
 
-            if !satisfied_geneds.is_empty() {
+            // Count how many unsatisfied geneds this course would help satisfy
+            let mut affected_geneds = Vec::new();
+            let mut benefit_score = 0.0;
+
+            for &gened_idx in gened_indices {
+                if let Some((_, gened, _)) = remaining_geneds
+                    .iter()
+                    .find(|(idx, _, _)| *idx == gened_idx)
+                {
+                    // Check if this gened can be helped by this course
+                    let courses_needed = get_courses_needed_for_gened(gened);
+                    let current_progress = gened_progress.get(&gened_idx).unwrap_or(&0);
+
+                    if *current_progress < courses_needed {
+                        // Check if this course actually contributes to this gened
+                        if can_course_satisfy_gened(course, gened) {
+                            affected_geneds.push(gened_idx);
+
+                            // Calculate benefit: how much closer this gets us to completion
+                            if courses_needed == 1 {
+                                benefit_score += 1.0; // Fully satisfies the gened
+                            } else {
+                                // Partial satisfaction - weight by how much it helps
+                                let completion_ratio =
+                                    (*current_progress + 1) as f64 / courses_needed as f64;
+                                benefit_score += completion_ratio;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !affected_geneds.is_empty() {
                 // Calculate total courses needed (including unsatisfied prerequisites)
                 // Combine already selected courses with courses already in the schedule
                 let mut all_existing_courses = selected_courses.clone();
@@ -248,7 +291,6 @@ fn find_optimal_gened_courses(
                     calculate_total_course_cost(course, catalog, &all_existing_courses);
 
                 // Calculate benefit/cost ratio
-                let geneds_satisfied = satisfied_geneds.len() as f64;
                 let total_credits: f64 = total_courses_needed
                     .iter()
                     .map(|c| {
@@ -260,18 +302,18 @@ fn find_optimal_gened_courses(
                     })
                     .sum();
 
-                // Score = (geneds satisfied * 1000) / (total credits needed)
-                // Higher score is better (more geneds per credit)
+                // Score = (benefit score * 1000) / (total credits needed)
+                // Higher score is better (more benefit per credit)
                 let score = if total_credits > 0.0 {
-                    (geneds_satisfied * 1000.0) / total_credits
+                    (benefit_score * 1000.0) / total_credits
                 } else {
-                    geneds_satisfied * 1000.0
+                    benefit_score * 1000.0
                 };
 
                 if score > best_score {
                     best_score = score;
                     best_course = Some(course.clone());
-                    best_geneds_satisfied = satisfied_geneds;
+                    best_geneds_affected = affected_geneds;
                     best_total_courses = total_courses_needed;
                 }
             }
@@ -285,26 +327,130 @@ fn find_optimal_gened_courses(
                 }
             }
 
-            // Remove satisfied geneds from remaining list
-            remaining_geneds.retain(|(gened_idx, _, _)| !best_geneds_satisfied.contains(gened_idx));
+            // Update progress for affected geneds
+            for &gened_idx in &best_geneds_affected {
+                let current = gened_progress.get(&gened_idx).unwrap_or(&0);
+                gened_progress.insert(gened_idx, current + 1);
+            }
 
-            // Remove this course from the course_to_geneds map
+            // Check if any geneds are now fully satisfied and remove them
+            let mut geneds_to_remove = Vec::new();
+            for &gened_idx in &best_geneds_affected {
+                if let Some((_, gened, _)) = remaining_geneds
+                    .iter()
+                    .find(|(idx, _, _)| *idx == gened_idx)
+                {
+                    let courses_needed = get_courses_needed_for_gened(gened);
+                    let current_progress = gened_progress.get(&gened_idx).unwrap_or(&0);
+
+                    if *current_progress >= courses_needed {
+                        geneds_to_remove.push(gened_idx);
+                    }
+                }
+            }
+
+            // Remove fully satisfied geneds
+            remaining_geneds.retain(|(gened_idx, _, _)| !geneds_to_remove.contains(gened_idx));
+
+            // Update course_to_geneds map to remove fully satisfied geneds
+            for geneds_list in course_to_geneds.values_mut() {
+                geneds_list.retain(|idx| !geneds_to_remove.contains(idx));
+            }
+
+            // Remove the selected course from course_to_geneds to prevent re-selection
             course_to_geneds.remove(&course);
 
             println!(
-                "Selected {} to satisfy {} gened(s) (cost: {} total courses, score: {:.2})",
+                "Selected {} to help satisfy {} gened(s) (cost: {} total courses, score: {:.2})",
                 format!("{}-{}", course.stem, course.code),
-                best_geneds_satisfied.len(),
+                best_geneds_affected.len(),
                 best_total_courses.len(),
                 best_score
             );
         } else {
             // No course found, something went wrong
+            println!(
+                "No more beneficial courses found, stopping gened selection (iteration {})",
+                iteration_count
+            );
+            break;
+        }
+
+        // Add extra termination condition if we've satisfied all geneds
+        if remaining_geneds.is_empty() {
+            println!("All geneds satisfied after {} iterations", iteration_count);
             break;
         }
     }
 
+    if iteration_count >= max_iterations {
+        println!(
+            "Warning: Reached maximum iterations ({}) in gened selection",
+            max_iterations
+        );
+    }
+
     selected_courses
+}
+
+/// Count how many courses in the given list satisfy a specific gened
+fn count_satisfied_courses_for_gened(gened: &GenEd, courses: &[CourseCode]) -> usize {
+    match gened {
+        GenEd::Core { req, .. }
+        | GenEd::Foundation { req, .. }
+        | GenEd::SkillAndPerspective { req, .. } => match req {
+            GenEdReq::Set(set_courses) => {
+                if set_courses.iter().all(|c| courses.contains(c)) {
+                    1
+                } else {
+                    0
+                }
+            }
+            GenEdReq::SetOpts(opts) => opts
+                .iter()
+                .filter(|opt| opt.iter().all(|c| courses.contains(c)))
+                .count(),
+            GenEdReq::Courses {
+                courses: gened_courses,
+                ..
+            } => gened_courses.iter().filter(|c| courses.contains(c)).count(),
+            GenEdReq::Credits {
+                courses: gened_courses,
+                ..
+            } => gened_courses.iter().filter(|c| courses.contains(c)).count(),
+        },
+    }
+}
+
+/// Check if a specific course can contribute to satisfying a gened
+fn can_course_satisfy_gened(course: &CourseCode, gened: &GenEd) -> bool {
+    match gened {
+        GenEd::Core { req, .. }
+        | GenEd::Foundation { req, .. }
+        | GenEd::SkillAndPerspective { req, .. } => match req {
+            GenEdReq::Set(courses) => courses.contains(course),
+            GenEdReq::SetOpts(opts) => opts.iter().any(|opt| opt.contains(course)),
+            GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+                courses.contains(course)
+            }
+        },
+    }
+}
+
+/// Get the number of courses needed to satisfy a gened
+fn get_courses_needed_for_gened(gened: &GenEd) -> usize {
+    match gened {
+        GenEd::Core { req, .. }
+        | GenEd::Foundation { req, .. }
+        | GenEd::SkillAndPerspective { req, .. } => {
+            match req {
+                GenEdReq::Set(_) => 1,     // Need all courses in the set (treated as 1 unit)
+                GenEdReq::SetOpts(_) => 1, // Need one of the option sets
+                GenEdReq::Courses { num, .. } => *num, // Need exactly num courses
+                GenEdReq::Credits { .. } => 1, // Need enough courses to meet credit requirement (simplified)
+            }
+        }
+    }
 }
 
 /// Calculate the total courses needed for a given course (including unsatisfied prerequisites)
@@ -669,7 +815,7 @@ pub fn test_cp_solver() {
         GenEd::SkillAndPerspective {
             name: "Ethics and Philosophy".to_string(),
             req: GenEdReq::Courses {
-                num: 1,
+                num: 2,
                 courses: vec![
                     theo_advanced.clone(), // Satisfies 2 geneds but needs prereq
                     phil_ethics.clone(),   // Needs prereq (phil_natural)
@@ -886,4 +1032,135 @@ pub fn solve_schedule_cp(
             .pop()
             .ok_or(anyhow::anyhow!("No optimized solution found"))
     })
+}
+
+/// Test specifically for multi-course geneds
+pub fn test_multi_course_gened() {
+    use crate::geneds::{GenEd, GenEdReq};
+    use crate::schedule::CourseCode;
+    use std::collections::HashMap;
+
+    println!("=== Testing Multi-Course Gened Functionality ===");
+
+    // Create simple courses
+    let course_a = CourseCode {
+        stem: "TEST".to_string(),
+        code: 100.into(),
+    };
+    let course_b = CourseCode {
+        stem: "TEST".to_string(),
+        code: 200.into(),
+    };
+    let course_c = CourseCode {
+        stem: "TEST".to_string(),
+        code: 300.into(),
+    };
+
+    // Empty schedule
+    let schedule = vec![vec![], vec![], vec![]];
+
+    // No prerequisites
+    let prereqs = HashMap::new();
+
+    // Create a gened that requires 2 courses
+    let geneds = vec![GenEd::Core {
+        name: "Multi-Course Test".to_string(),
+        req: GenEdReq::Courses {
+            num: 2,
+            courses: vec![course_a.clone(), course_b.clone(), course_c.clone()],
+        },
+    }];
+
+    // Course catalog
+    let mut courses = HashMap::new();
+    courses.insert(
+        course_a.clone(),
+        (
+            "Test Course A".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        course_b.clone(),
+        (
+            "Test Course B".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        course_c.clone(),
+        (
+            "Test Course C".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+
+    let test_schedule = Schedule {
+        courses: schedule,
+        programs: vec![],
+        catalog: Catalog {
+            geneds: geneds,
+            prereqs: prereqs,
+            programs: vec![],
+            courses: courses,
+            low_year: 0,
+        },
+    };
+
+    // Test the gened finding logic
+    let missing_geneds = find_missing_geneds(&test_schedule);
+    println!(
+        "Missing geneds returned {} courses: {:?}",
+        missing_geneds.len(),
+        missing_geneds
+            .iter()
+            .map(|c| format!("{}-{}", c.stem, c.code))
+            .collect::<Vec<_>>()
+    );
+
+    // Should return exactly 2 courses since the gened requires 2
+    if missing_geneds.len() == 2 {
+        println!("✓ Correctly identified need for 2 courses");
+    } else {
+        println!(
+            "✗ Expected 2 courses but got {} courses",
+            missing_geneds.len()
+        );
+    }
+
+    // Test the full solver
+    match solve_prereqs_cp(&test_schedule) {
+        Ok(solutions) => {
+            if let Some(solution) = solutions.first() {
+                let final_schedule = Schedule {
+                    courses: solution.clone(),
+                    programs: vec![],
+                    catalog: test_schedule.catalog.clone(),
+                };
+
+                let total_courses: usize = solution.iter().map(|sem| sem.len()).sum();
+                println!("Final solution has {} total courses", total_courses);
+
+                // Check if geneds are satisfied
+                let geneds_satisfied = are_geneds_satisfied(&final_schedule).unwrap_or(false);
+                println!("Geneds satisfied: {}", geneds_satisfied);
+
+                if geneds_satisfied && total_courses >= 2 {
+                    println!("✓ Multi-course gened test PASSED");
+                } else {
+                    println!("✗ Multi-course gened test FAILED");
+                }
+            } else {
+                println!("✗ No solution found");
+            }
+        }
+        Err(e) => {
+            println!("✗ Solver error: {}", e);
+        }
+    }
+
+    println!("=== End Multi-Course Gened Test ===\n");
 }
