@@ -66,7 +66,7 @@ impl Display for CourseCodeSuffix {
     }
 }
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Savefile, Serialize, Deserialize, Clone, Hash, PartialEq, Eq)]
 pub struct CourseCode {
     pub stem: String,
     pub code: CourseCodeSuffix,
@@ -86,6 +86,12 @@ macro_rules! CC {
 impl Display for CourseCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}-{}", self.stem, self.code.to_string())
+    }
+}
+
+impl std::fmt::Debug for CourseCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "CC({}-{})", self.stem, self.code.to_string())
     }
 }
 
@@ -182,11 +188,15 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
+    sched.courses = crate::prereqs_cp::solve_schedule_cp(
+        sched.courses,
+        &sched.catalog.prereqs,
+        &sched.catalog.courses,
+    )?;
+    // let scheds = sched.ensure_prereqs()?;
+    // println!("{} different prereq filling options", scheds.len());
 
-    let scheds = sched.ensure_prereqs()?;
-    println!("{} different prereq filling options", scheds.len());
-
-    Ok(scheds.best()?)
+    Ok(sched)
 }
 
 impl Schedule {

@@ -1,6 +1,7 @@
 use crate::prereqs::CourseReq;
 use crate::schedule::{CourseCode, CourseTermOffering};
 use anyhow::Result;
+use std::any;
 use std::collections::HashMap;
 
 /// CP-style solution that wraps SAT solver results
@@ -168,7 +169,14 @@ fn calculate_solution_score(
     // Objective 3: Minimize total courses (weight: 10)
     let course_penalty = total_courses as f64 * 10.0;
 
-    credit_penalty + balance_penalty + course_penalty
+    // Objective 4: Ensure all semester are under 18 credits (oneshot)
+    let overload_penalty: f64 = semester_credits
+        .iter()
+        .filter(|&&credits| credits > 18)
+        .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
+        .sum();
+
+    credit_penalty + balance_penalty + course_penalty + overload_penalty
 }
 
 /// Test function for the CP solver that uses optimization principles
@@ -262,7 +270,14 @@ pub fn test_cp_solver() {
             CourseTermOffering::Both,
         ),
     );
+    solve_schedule_cp(schedule, &prereqs, &courses).unwrap();
+}
 
+pub fn solve_schedule_cp(
+    schedule: Vec<Vec<CourseCode>>,
+    prereqs: &HashMap<CourseCode, CourseReq>,
+    courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
+) -> Result<Vec<Vec<CourseCode>>> {
     println!("Testing optimization-focused CP solver:");
     println!("Original schedule with prerequisite violations:");
     for (i, sem) in schedule.iter().enumerate() {
@@ -304,32 +319,30 @@ pub fn test_cp_solver() {
 
     // Then show the optimized choice
     println!("\nNow finding the BEST solution via optimization:");
-    match solve_prereqs_cp(schedule, &prereqs, &courses) {
-        Ok(solutions) => {
-            println!("Optimized solution chosen:");
-            for (sol_idx, solution) in solutions.iter().enumerate() {
-                println!("Best Solution {}:", sol_idx + 1);
-                let mut total_credits = 0;
-                for (sem_idx, semester) in solution.iter().enumerate() {
-                    let sem_credits: u32 = semester
-                        .iter()
-                        .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
-                        .sum();
-                    total_credits += sem_credits;
-                    println!(
-                        "  Semester {}: {:?} ({} credits)",
-                        sem_idx, semester, sem_credits
-                    );
-                }
-                println!("  Total credits: {}", total_credits);
-
-                // Calculate solution score
-                let score = calculate_solution_score(solution, &courses);
-                println!("  Optimization score: {:.2}", score);
+    solve_prereqs_cp(schedule, &prereqs, &courses).and_then(|mut solutions| {
+        println!("Optimized solution chosen:");
+        for (sol_idx, solution) in solutions.iter().enumerate() {
+            println!("Best Solution {}:", sol_idx + 1);
+            let mut total_credits = 0;
+            for (sem_idx, semester) in solution.iter().enumerate() {
+                let sem_credits: u32 = semester
+                    .iter()
+                    .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
+                    .sum();
+                total_credits += sem_credits;
+                println!(
+                    "  Semester {}: {:?} ({} credits)",
+                    sem_idx, semester, sem_credits
+                );
             }
+            println!("  Total credits: {}", total_credits);
+
+            // Calculate solution score
+            let score = calculate_solution_score(solution, &courses);
+            println!("  Optimization score: {:.2}", score);
         }
-        Err(e) => {
-            println!("CP solver failed: {}", e);
-        }
-    }
+        solutions
+            .pop()
+            .ok_or(anyhow::anyhow!("No optimized solution found"))
+    })
 }
