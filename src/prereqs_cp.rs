@@ -110,45 +110,214 @@ pub fn solve_prereqs_cp_all_solutions(
     Ok(schedule_solutions)
 }
 
-/// Find missing gened requirements in a schedule
+/// Find missing gened requirements in a schedule using smart selection
 pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
-    let mut missing_courses = Vec::new();
-
     // Check if geneds are already satisfied
     if are_geneds_satisfied(sched).unwrap_or(false) {
-        return missing_courses;
+        return vec![];
     }
 
-    // Simple strategy: add one course from each gened requirement
-    // This is a heuristic approach - a more sophisticated solver would enumerate all options
-    for gened in &sched.catalog.geneds {
-        let potential_courses = match gened {
-            GenEd::Core { req, .. }
-            | GenEd::Foundation { req, .. }
-            | GenEd::SkillAndPerspective { req, .. } => get_satisfying_courses(req),
-        };
+    // Get all courses currently in the schedule
+    let current_courses: std::collections::HashSet<_> = sched.courses.iter().flatten().collect();
 
-        // Add the first course that could satisfy this gened
-        if let Some(course) = potential_courses.first() {
-            missing_courses.push(course.clone());
+    // Find which geneds are unsatisfied and get all possible courses for each
+    let mut unsatisfied_geneds = Vec::new();
+    for (idx, gened) in sched.catalog.geneds.iter().enumerate() {
+        if !is_gened_satisfied(gened, &current_courses, &sched.catalog) {
+            let possible_courses = get_all_satisfying_courses(gened);
+            unsatisfied_geneds.push((idx, gened.clone(), possible_courses));
         }
     }
 
-    missing_courses
+    if unsatisfied_geneds.is_empty() {
+        return vec![];
+    }
+
+    // Use intelligent selection to find optimal course combination
+    find_optimal_gened_courses(&unsatisfied_geneds, &sched.catalog)
 }
 
-/// Get courses that could satisfy a gened requirement
-fn get_satisfying_courses(req: &GenEdReq) -> Vec<CourseCode> {
+/// Check if a specific gened is satisfied by current courses
+fn is_gened_satisfied(
+    gened: &GenEd,
+    current_courses: &std::collections::HashSet<&CourseCode>,
+    catalog: &Catalog,
+) -> bool {
+    match gened {
+        GenEd::Core { req, .. }
+        | GenEd::Foundation { req, .. }
+        | GenEd::SkillAndPerspective { req, .. } => {
+            // We need to implement our own satisfaction check since fulfilled_courses is private
+            match req {
+                GenEdReq::Set(courses) => courses.iter().all(|c| current_courses.contains(c)),
+                GenEdReq::SetOpts(opts) => opts
+                    .iter()
+                    .any(|opt| opt.iter().all(|c| current_courses.contains(c))),
+                GenEdReq::Courses { num, courses } => {
+                    let satisfied_count = courses
+                        .iter()
+                        .filter(|c| current_courses.contains(c))
+                        .count();
+                    satisfied_count >= *num
+                }
+                GenEdReq::Credits { num, courses } => {
+                    let satisfied_credits: u32 = courses
+                        .iter()
+                        .filter(|c| current_courses.contains(c))
+                        .filter_map(|c| catalog.courses.get(c).and_then(|(_, creds, _)| *creds))
+                        .sum();
+                    satisfied_credits >= *num
+                }
+            }
+        }
+    }
+}
+
+/// Get all courses that could potentially satisfy a gened
+fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
+    match gened {
+        GenEd::Core { req, .. }
+        | GenEd::Foundation { req, .. }
+        | GenEd::SkillAndPerspective { req, .. } => {
+            match req {
+                GenEdReq::Set(courses) => courses.clone(),
+                GenEdReq::SetOpts(opts) => {
+                    // Return all courses from all options
+                    opts.iter().flatten().cloned().collect()
+                }
+                GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+                    courses.clone()
+                }
+            }
+        }
+    }
+}
+
+/// Find optimal combination of courses to satisfy all unsatisfied geneds
+/// This uses a greedy approach that considers course overlap and prerequisites
+fn find_optimal_gened_courses(
+    unsatisfied_geneds: &[(usize, GenEd, Vec<CourseCode>)],
+    catalog: &Catalog,
+) -> Vec<CourseCode> {
+    let mut selected_courses = Vec::new();
+    let mut remaining_geneds = unsatisfied_geneds.to_vec();
+
+    // Build a map of course -> list of geneds it can satisfy
+    let mut course_to_geneds: std::collections::HashMap<CourseCode, Vec<usize>> =
+        std::collections::HashMap::new();
+
+    for (gened_idx, _gened, possible_courses) in &remaining_geneds {
+        for course in possible_courses {
+            course_to_geneds
+                .entry(course.clone())
+                .or_default()
+                .push(*gened_idx);
+        }
+    }
+
+    // Greedy selection: prioritize courses that satisfy multiple geneds
+    while !remaining_geneds.is_empty() {
+        // Find the course that satisfies the most remaining geneds
+        let mut best_course = None;
+        let mut best_score = 0;
+        let mut best_geneds_satisfied = Vec::new();
+
+        for (course, gened_indices) in &course_to_geneds {
+            // Count how many unsatisfied geneds this course would satisfy
+            let satisfied_geneds: Vec<_> = gened_indices
+                .iter()
+                .filter(|&&idx| {
+                    remaining_geneds
+                        .iter()
+                        .any(|(gened_idx, _, _)| *gened_idx == idx)
+                })
+                .cloned()
+                .collect();
+
+            if !satisfied_geneds.is_empty() {
+                // Score = number of geneds satisfied + bonus for fewer total credits
+                let course_credits = catalog
+                    .courses
+                    .get(course)
+                    .and_then(|(_, creds, _)| *creds)
+                    .unwrap_or(3);
+
+                // Prefer courses that satisfy more geneds, but also prefer lower credit courses
+                let score = satisfied_geneds.len() * 1000 - course_credits as usize;
+
+                if score > best_score {
+                    best_score = score;
+                    best_course = Some(course.clone());
+                    best_geneds_satisfied = satisfied_geneds;
+                }
+            }
+        }
+
+        if let Some(course) = best_course {
+            selected_courses.push(course.clone());
+
+            // Remove satisfied geneds from remaining list
+            remaining_geneds.retain(|(gened_idx, _, _)| !best_geneds_satisfied.contains(gened_idx));
+
+            // Remove this course from the course_to_geneds map
+            course_to_geneds.remove(&course);
+
+            println!(
+                "Selected {} to satisfy {} gened(s)",
+                format!("{}-{}", course.stem, course.code),
+                best_geneds_satisfied.len()
+            );
+        } else {
+            // No course found, something went wrong
+            break;
+        }
+    }
+
+    // Now handle prerequisites for selected gened courses recursively
+    expand_with_prerequisites(selected_courses, catalog)
+}
+
+/// Recursively add prerequisites for the given courses
+fn expand_with_prerequisites(courses: Vec<CourseCode>, catalog: &Catalog) -> Vec<CourseCode> {
+    let mut all_needed_courses = Vec::new();
+    let mut to_process = courses;
+    let mut processed = std::collections::HashSet::new();
+
+    while let Some(course) = to_process.pop() {
+        if processed.contains(&course) {
+            continue;
+        }
+
+        processed.insert(course.clone());
+        all_needed_courses.push(course.clone());
+
+        // Check if this course has prerequisites
+        if let Some(prereq) = catalog.prereqs.get(&course) {
+            let prereq_courses = extract_prerequisite_courses(prereq);
+            for prereq_course in prereq_courses {
+                if !processed.contains(&prereq_course) {
+                    to_process.push(prereq_course);
+                }
+            }
+        }
+    }
+
+    // Return in dependency order (prerequisites first)
+    all_needed_courses.reverse();
+    all_needed_courses
+}
+
+/// Extract all courses mentioned in a prerequisite requirement
+fn extract_prerequisite_courses(req: &CourseReq) -> Vec<CourseCode> {
     match req {
-        GenEdReq::Set(courses) => courses.clone(),
-        GenEdReq::SetOpts(opts) => {
-            // Return the first option for simplicity
-            opts.first().cloned().unwrap_or_default()
+        CourseReq::PreCourse(course) | CourseReq::CoCourse(course) => vec![course.clone()],
+        CourseReq::PreCourseGrade(course, _) | CourseReq::CoCourseGrade(course, _) => {
+            vec![course.clone()]
         }
-        GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
-            // Return the first course for simplicity
-            courses.iter().take(1).cloned().collect()
+        CourseReq::And(reqs) | CourseReq::Or(reqs) => {
+            reqs.iter().flat_map(extract_prerequisite_courses).collect()
         }
+        CourseReq::Program(_) | CourseReq::Instructor | CourseReq::None => vec![],
     }
 }
 
@@ -362,6 +531,16 @@ pub fn test_cp_solver() {
         stem: "PHIL".to_string(),
         code: 2100.into(),
     };
+    // Add a multi-gened course that can satisfy both Foundation and SkillAndPerspective
+    let theo_advanced = CourseCode {
+        stem: "THEO".to_string(),
+        code: 3100.into(),
+    };
+    // Add a gened course with prerequisites
+    let phil_ethics = CourseCode {
+        stem: "PHIL".to_string(),
+        code: 3200.into(),
+    };
 
     // Create a schedule that violates prerequisites and is missing geneds
     let schedule = vec![
@@ -370,7 +549,7 @@ pub fn test_cp_solver() {
         vec![phys_em.clone()],    // Semester 2: E&M Physics (missing prereqs!)
     ];
 
-    // Set up prerequisites
+    // Set up prerequisites (including for gened courses)
     let mut prereqs = HashMap::new();
     prereqs.insert(math_calc2.clone(), CourseReq::PreCourse(math_calc1.clone()));
     prereqs.insert(phys_mech.clone(), CourseReq::PreCourse(math_calc1.clone()));
@@ -384,8 +563,18 @@ pub fn test_cp_solver() {
             CourseReq::PreCourse(math_linalg.clone()),
         ]),
     );
+    // Add prerequisite for advanced theology (requires intro theology)
+    prereqs.insert(
+        theo_advanced.clone(),
+        CourseReq::PreCourse(theo_intro.clone()),
+    );
+    // Add prerequisite for ethics (requires natural philosophy)
+    prereqs.insert(
+        phil_ethics.clone(),
+        CourseReq::PreCourse(phil_natural.clone()),
+    );
 
-    // Set up geneds (simplified example)
+    // Set up geneds (enhanced example with overlapping courses and prerequisites)
     let geneds = vec![
         GenEd::Core {
             name: "English Composition".to_string(),
@@ -402,10 +591,17 @@ pub fn test_cp_solver() {
             },
         },
         GenEd::Foundation {
-            name: "Natural Philosophy".to_string(),
+            name: "Faith Foundation".to_string(),
             req: GenEdReq::Courses {
                 num: 1,
-                courses: vec![phil_natural.clone()],
+                courses: vec![theo_advanced.clone(), phil_natural.clone()], // Multiple options
+            },
+        },
+        GenEd::SkillAndPerspective {
+            name: "Ethics and Philosophy".to_string(),
+            req: GenEdReq::Courses {
+                num: 1,
+                courses: vec![theo_advanced.clone(), phil_ethics.clone()], // theo_advanced satisfies multiple!
             },
         },
     ];
@@ -470,6 +666,22 @@ pub fn test_cp_solver() {
         (
             "Natural Philosophy".to_string(),
             Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        theo_advanced.clone(),
+        (
+            "Advanced Theology".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        phil_ethics.clone(),
+        (
+            "Philosophy Ethics".to_string(),
+            Some(4),
             CourseTermOffering::Both,
         ),
     );
