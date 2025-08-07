@@ -4,8 +4,8 @@ use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
 use std::collections::HashMap;
 
-// Normally 18 but adjusted to 9 for small-scale testing
-const MAX_OVERLOAD_SEMESTER: u32 = 9; // Maximum credits per semester
+// Normally 18 but adjusted to 18 for small-scale testing
+const MAX_OVERLOAD_SEMESTER: u32 = 18; // Maximum credits per semester
 
 /// CP-style solution that wraps SAT solver results
 #[derive(Debug, Clone)]
@@ -54,18 +54,22 @@ pub fn solve_prereqs_cp(
         })
         .collect();
 
-    // Now handle geneds for each solution
-    for solution in &mut schedule_solutions {
+    // Calculate geneds once for the first solution (they should be the same for all prerequisite solutions)
+    let missing_geneds = if !schedule_solutions.is_empty() {
         let temp_schedule = Schedule {
-            courses: solution.clone(),
+            courses: schedule_solutions[0].clone(),
             programs: sched.programs.clone(),
             catalog: sched.catalog.clone(),
         };
+        find_missing_geneds(&temp_schedule)
+    } else {
+        vec![]
+    };
 
-        let missing_geneds = find_missing_geneds(&temp_schedule);
-
+    // Apply the same gened courses to all solutions
+    for solution in &mut schedule_solutions {
         // Improved gened placement: distribute courses to balance semesters
-        place_geneds_balanced(solution, missing_geneds, courses);
+        place_geneds_balanced(solution, missing_geneds.clone(), courses);
     }
 
     // Apply optimization logic to choose the best solution
@@ -196,7 +200,7 @@ fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
 }
 
 /// Find optimal combination of courses to satisfy all unsatisfied geneds
-/// This uses a greedy approach that considers course overlap and total prerequisite cost
+/// This uses a greedy approach that heavily favors course overlap and minimal additions
 fn find_optimal_gened_courses(
     unsatisfied_geneds: &[(usize, GenEd, Vec<CourseCode>)],
     catalog: &Catalog,
@@ -204,18 +208,6 @@ fn find_optimal_gened_courses(
 ) -> Vec<CourseCode> {
     let mut selected_courses = Vec::new();
     let mut remaining_geneds = unsatisfied_geneds.to_vec();
-
-    // Track progress for each gened - for Credits variant we track actual credits, for others we track course count
-    let mut gened_progress: std::collections::HashMap<usize, f64> =
-        std::collections::HashMap::new();
-
-    // Initialize progress based on courses already in schedule
-    for (gened_idx, gened, _) in &remaining_geneds {
-        let progress = calculate_gened_progress(gened, already_in_schedule, catalog);
-        if progress > 0.0 {
-            gened_progress.insert(*gened_idx, progress);
-        }
-    }
 
     // Build a map of course -> list of geneds it can satisfy
     let mut course_to_geneds: std::collections::HashMap<CourseCode, Vec<usize>> =
@@ -230,9 +222,22 @@ fn find_optimal_gened_courses(
         }
     }
 
-    // Greedy selection: prioritize courses with best cost/benefit ratio
+    // Track which geneds we've already satisfied
+    let mut satisfied_geneds = std::collections::HashSet::new();
+
+    // Initialize with already satisfied geneds
+    for (gened_idx, gened, _) in &remaining_geneds {
+        let current_courses: Vec<_> = already_in_schedule.iter().cloned().collect();
+        if is_gened_fully_satisfied(gened, &current_courses, catalog) {
+            satisfied_geneds.insert(*gened_idx);
+        }
+    }
+
+    // Remove already satisfied geneds
+    remaining_geneds.retain(|(gened_idx, _, _)| !satisfied_geneds.contains(gened_idx));
+
     let mut iteration_count = 0;
-    let max_iterations = 50; // Prevent infinite loops
+    let max_iterations = 20; // Much more conservative limit
 
     while !remaining_geneds.is_empty() && iteration_count < max_iterations {
         iteration_count += 1;
@@ -240,12 +245,10 @@ fn find_optimal_gened_courses(
         let mut best_course = None;
         let mut best_score = f64::NEG_INFINITY;
         let mut best_geneds_affected = Vec::new();
-        let mut best_total_courses = Vec::new();
 
         // Sort course keys to make iteration deterministic
         let mut course_keys: Vec<_> = course_to_geneds.keys().collect();
         course_keys.sort_by(|a, b| {
-            // Sort by stem first, then by course code
             a.stem.cmp(&b.stem).then_with(|| {
                 a.code
                     .partial_cmp(&b.code)
@@ -263,133 +266,102 @@ fn find_optimal_gened_courses(
 
             // Count how many unsatisfied geneds this course would help satisfy
             let mut affected_geneds = Vec::new();
-            let mut benefit_score = 0.0;
+            let mut geneds_that_would_be_completed = 0;
 
             for &gened_idx in gened_indices {
+                if satisfied_geneds.contains(&gened_idx) {
+                    continue; // Skip already satisfied geneds
+                }
+
                 if let Some((_, gened, _)) = remaining_geneds
                     .iter()
                     .find(|(idx, _, _)| *idx == gened_idx)
                 {
-                    // Check if this course can contribute to this gened
                     if can_course_satisfy_gened(course, gened) {
-                        // Calculate contribution this course would make
-                        let contribution = calculate_course_contribution(course, gened, catalog);
-                        let current_progress = gened_progress.get(&gened_idx).unwrap_or(&0.0);
-                        let target_progress = get_gened_target_progress(gened, catalog);
+                        // Check if this course would complete the gened
+                        let mut test_courses = already_in_schedule.to_vec();
+                        test_courses.extend(selected_courses.iter().cloned());
+                        test_courses.push(course.clone());
 
-                        // Only consider if we haven't already satisfied this gened
-                        if *current_progress < target_progress {
-                            affected_geneds.push(gened_idx);
-
-                            // Calculate benefit: how much closer this gets us to completion
-                            let new_progress = current_progress + contribution;
-                            let completion_ratio = (new_progress / target_progress).min(1.0);
-
-                            // Give bonus for completing a gened entirely
-                            if new_progress >= target_progress {
-                                benefit_score += 2.0; // Bonus for completion
-                            } else {
-                                benefit_score += completion_ratio;
-                            }
+                        if is_gened_fully_satisfied(gened, &test_courses, catalog) {
+                            geneds_that_would_be_completed += 1;
                         }
+                        affected_geneds.push(gened_idx);
                     }
                 }
             }
 
             if !affected_geneds.is_empty() {
-                // Calculate total courses needed (including unsatisfied prerequisites)
-                // Combine already selected courses with courses already in the schedule
-                let mut all_existing_courses = selected_courses.clone();
-                all_existing_courses.extend_from_slice(already_in_schedule);
+                // Score heavily favors courses that:
+                // 1. Complete multiple geneds (massive bonus)
+                // 2. Affect many geneds
+                // 3. Have low credit cost
+                let course_credits = catalog
+                    .courses
+                    .get(course)
+                    .and_then(|(_, creds, _)| *creds)
+                    .unwrap_or(3) as f64;
 
-                let total_courses_needed =
-                    calculate_total_course_cost(course, catalog, &all_existing_courses);
-
-                // Calculate benefit/cost ratio
-                let total_credits: f64 = total_courses_needed
-                    .iter()
-                    .map(|c| {
-                        catalog
-                            .courses
-                            .get(c)
-                            .and_then(|(_, creds, _)| *creds)
-                            .unwrap_or(3) as f64
-                    })
-                    .sum();
-
-                // Score = (benefit score * 1000) / (total credits needed)
-                // Higher score is better (more benefit per credit)
-                let score = if total_credits > 0.0 {
-                    (benefit_score * 1000.0) / total_credits
+                // Heavily favor courses that complete geneds, especially multiple ones
+                let completion_bonus = if geneds_that_would_be_completed > 0 {
+                    1000.0
+                        * geneds_that_would_be_completed as f64
+                        * geneds_that_would_be_completed as f64
                 } else {
-                    benefit_score * 1000.0
+                    0.0
                 };
+
+                // Bonus for affecting multiple geneds (even if not completing them)
+                let overlap_bonus = (affected_geneds.len() as f64 - 1.0) * 100.0;
+
+                // Score = completion bonus + overlap bonus - credit penalty
+                let score = completion_bonus + overlap_bonus - course_credits;
 
                 if score > best_score {
                     best_score = score;
                     best_course = Some(course.clone());
                     best_geneds_affected = affected_geneds;
-                    best_total_courses = total_courses_needed;
                 }
             }
         }
 
         if let Some(course) = best_course {
-            // Add all needed courses (including prerequisites)
-            for needed_course in &best_total_courses {
-                if !selected_courses.contains(needed_course) {
-                    selected_courses.push(needed_course.clone());
-                }
-            }
+            selected_courses.push(course.clone());
 
-            // Update progress for affected geneds
+            // Check which geneds this course completes and mark them as satisfied
+            let mut test_courses = already_in_schedule.to_vec();
+            test_courses.extend(selected_courses.iter().cloned());
+
             for &gened_idx in &best_geneds_affected {
                 if let Some((_, gened, _)) = remaining_geneds
                     .iter()
                     .find(|(idx, _, _)| *idx == gened_idx)
                 {
-                    let contribution = calculate_course_contribution(&course, gened, catalog);
-                    let current = gened_progress.get(&gened_idx).unwrap_or(&0.0);
-                    gened_progress.insert(gened_idx, current + contribution);
-                }
-            }
-
-            // Check if any geneds are now fully satisfied and remove them
-            let mut geneds_to_remove = Vec::new();
-            for &gened_idx in &best_geneds_affected {
-                if let Some((_, gened, _)) = remaining_geneds
-                    .iter()
-                    .find(|(idx, _, _)| *idx == gened_idx)
-                {
-                    let current_progress = gened_progress.get(&gened_idx).unwrap_or(&0.0);
-                    let target_progress = get_gened_target_progress(gened, catalog);
-
-                    if *current_progress >= target_progress {
-                        geneds_to_remove.push(gened_idx);
+                    if is_gened_fully_satisfied(gened, &test_courses, catalog) {
+                        satisfied_geneds.insert(gened_idx);
                     }
                 }
             }
 
-            // Remove fully satisfied geneds
-            remaining_geneds.retain(|(gened_idx, _, _)| !geneds_to_remove.contains(gened_idx));
+            // Remove satisfied geneds from remaining list
+            remaining_geneds.retain(|(gened_idx, _, _)| !satisfied_geneds.contains(gened_idx));
 
-            // Update course_to_geneds map to remove fully satisfied geneds
+            // Update course_to_geneds map to remove satisfied geneds
             for geneds_list in course_to_geneds.values_mut() {
-                geneds_list.retain(|idx| !geneds_to_remove.contains(idx));
+                geneds_list.retain(|idx| !satisfied_geneds.contains(idx));
             }
 
-            // Remove the selected course from course_to_geneds to prevent re-selection
-            course_to_geneds.remove(&course);
-
             println!(
-                "Selected {} to help satisfy {} gened(s) (cost: {} total courses, score: {:.2})",
+                "Selected {} to help satisfy {} gened(s) (would complete {} geneds, score: {:.2})",
                 format!("{}-{}", course.stem, course.code),
                 best_geneds_affected.len(),
-                best_total_courses.len(),
+                best_geneds_affected
+                    .iter()
+                    .filter(|&&gened_idx| satisfied_geneds.contains(&gened_idx))
+                    .count(),
                 best_score
             );
         } else {
-            // No course found, something went wrong
             println!(
                 "No more beneficial courses found, stopping gened selection (iteration {})",
                 iteration_count
@@ -397,7 +369,6 @@ fn find_optimal_gened_courses(
             break;
         }
 
-        // Add extra termination condition if we've satisfied all geneds
         if remaining_geneds.is_empty() {
             println!("All geneds satisfied after {} iterations", iteration_count);
             break;
@@ -411,6 +382,7 @@ fn find_optimal_gened_courses(
         );
     }
 
+    println!("Total gened courses selected: {}", selected_courses.len());
     selected_courses
 }
 

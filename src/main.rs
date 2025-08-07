@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     prereqs_cp::test_all_gened_variants();
     println!();
 
-    return Ok(()); // Don't clutter the terminal when just testing the CP solver
+    // return Ok(()); // Don't clutter the terminal when just testing the CP solver
 
     // Test the SAT solver
     println!("=== Testing SAT Solver ===");
