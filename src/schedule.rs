@@ -6,6 +6,7 @@ use std::{
     fmt::{self, Display},
 };
 
+use crate::geneds::GenEd;
 use crate::prereqs::CourseReq;
 use crate::schedule_sorter::BestSchedule;
 
@@ -106,20 +107,6 @@ pub struct Program {
     pub(crate) semesters: Vec<Semester>,
     pub(crate) electives: Vec<Elective>,
     pub(crate) assoc_stems: Vec<String>,
-}
-
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub enum GenEdKind {
-    Core,
-    Foundation,
-    SkillAndPerspective,
-}
-
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub struct GenEd {
-    name: String,
-    reqs: Elective,
-    kind: GenEdKind,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
