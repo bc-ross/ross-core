@@ -5,8 +5,8 @@ use anyhow::Result;
 use std::any;
 use std::collections::HashMap;
 
-// Normally 18 but adjusted to 9 for small-scale testing
-const MAX_OVERLOAD_SEMESTER: u32 = 9; // Maximum credits per semester
+// Normally 18 but adjusted to 12 for small-scale testing
+const MAX_OVERLOAD_SEMESTER: u32 = 12; // Maximum credits per semester
 
 /// CP-style solution that wraps SAT solver results
 #[derive(Debug, Clone)]
@@ -133,8 +133,11 @@ pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
         return vec![];
     }
 
+    // Convert current courses to owned Vec for the cost calculation
+    let current_courses_owned: Vec<CourseCode> = current_courses.into_iter().cloned().collect();
+
     // Use intelligent selection to find optimal course combination
-    find_optimal_gened_courses(&unsatisfied_geneds, &sched.catalog)
+    find_optimal_gened_courses(&unsatisfied_geneds, &sched.catalog, &current_courses_owned)
 }
 
 /// Check if a specific gened is satisfied by current courses
@@ -194,10 +197,11 @@ fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
 }
 
 /// Find optimal combination of courses to satisfy all unsatisfied geneds
-/// This uses a greedy approach that considers course overlap and prerequisites
+/// This uses a greedy approach that considers course overlap and total prerequisite cost
 fn find_optimal_gened_courses(
     unsatisfied_geneds: &[(usize, GenEd, Vec<CourseCode>)],
     catalog: &Catalog,
+    already_in_schedule: &[CourseCode],
 ) -> Vec<CourseCode> {
     let mut selected_courses = Vec::new();
     let mut remaining_geneds = unsatisfied_geneds.to_vec();
@@ -215,12 +219,12 @@ fn find_optimal_gened_courses(
         }
     }
 
-    // Greedy selection: prioritize courses that satisfy multiple geneds
+    // Greedy selection: prioritize courses with best cost/benefit ratio
     while !remaining_geneds.is_empty() {
-        // Find the course that satisfies the most remaining geneds
         let mut best_course = None;
-        let mut best_score = 0;
+        let mut best_score = f64::NEG_INFINITY;
         let mut best_geneds_satisfied = Vec::new();
+        let mut best_total_courses = Vec::new();
 
         for (course, gened_indices) in &course_to_geneds {
             // Count how many unsatisfied geneds this course would satisfy
@@ -235,26 +239,51 @@ fn find_optimal_gened_courses(
                 .collect();
 
             if !satisfied_geneds.is_empty() {
-                // Score = number of geneds satisfied + bonus for fewer total credits
-                let course_credits = catalog
-                    .courses
-                    .get(course)
-                    .and_then(|(_, creds, _)| *creds)
-                    .unwrap_or(3);
+                // Calculate total courses needed (including unsatisfied prerequisites)
+                // Combine already selected courses with courses already in the schedule
+                let mut all_existing_courses = selected_courses.clone();
+                all_existing_courses.extend_from_slice(already_in_schedule);
 
-                // Prefer courses that satisfy more geneds, but also prefer lower credit courses
-                let score = satisfied_geneds.len() * 1000 - course_credits as usize;
+                let total_courses_needed =
+                    calculate_total_course_cost(course, catalog, &all_existing_courses);
+
+                // Calculate benefit/cost ratio
+                let geneds_satisfied = satisfied_geneds.len() as f64;
+                let total_credits: f64 = total_courses_needed
+                    .iter()
+                    .map(|c| {
+                        catalog
+                            .courses
+                            .get(c)
+                            .and_then(|(_, creds, _)| *creds)
+                            .unwrap_or(3) as f64
+                    })
+                    .sum();
+
+                // Score = (geneds satisfied * 1000) / (total credits needed)
+                // Higher score is better (more geneds per credit)
+                let score = if total_credits > 0.0 {
+                    (geneds_satisfied * 1000.0) / total_credits
+                } else {
+                    geneds_satisfied * 1000.0
+                };
 
                 if score > best_score {
                     best_score = score;
                     best_course = Some(course.clone());
                     best_geneds_satisfied = satisfied_geneds;
+                    best_total_courses = total_courses_needed;
                 }
             }
         }
 
         if let Some(course) = best_course {
-            selected_courses.push(course.clone());
+            // Add all needed courses (including prerequisites)
+            for needed_course in &best_total_courses {
+                if !selected_courses.contains(needed_course) {
+                    selected_courses.push(needed_course.clone());
+                }
+            }
 
             // Remove satisfied geneds from remaining list
             remaining_geneds.retain(|(gened_idx, _, _)| !best_geneds_satisfied.contains(gened_idx));
@@ -263,9 +292,11 @@ fn find_optimal_gened_courses(
             course_to_geneds.remove(&course);
 
             println!(
-                "Selected {} to satisfy {} gened(s)",
+                "Selected {} to satisfy {} gened(s) (cost: {} total courses, score: {:.2})",
                 format!("{}-{}", course.stem, course.code),
-                best_geneds_satisfied.len()
+                best_geneds_satisfied.len(),
+                best_total_courses.len(),
+                best_score
             );
         } else {
             // No course found, something went wrong
@@ -273,8 +304,41 @@ fn find_optimal_gened_courses(
         }
     }
 
-    // Now handle prerequisites for selected gened courses recursively
-    expand_with_prerequisites(selected_courses, catalog)
+    selected_courses
+}
+
+/// Calculate the total courses needed for a given course (including unsatisfied prerequisites)
+/// Returns only courses that aren't already selected or don't satisfy other needed geneds
+fn calculate_total_course_cost(
+    course: &CourseCode,
+    catalog: &Catalog,
+    already_selected: &[CourseCode],
+) -> Vec<CourseCode> {
+    let mut needed_courses = Vec::new();
+    let mut to_process = vec![course.clone()];
+    let mut processed = std::collections::HashSet::new();
+
+    while let Some(current_course) = to_process.pop() {
+        if processed.contains(&current_course) || already_selected.contains(&current_course) {
+            continue;
+        }
+
+        processed.insert(current_course.clone());
+        needed_courses.push(current_course.clone());
+
+        // Check if this course has prerequisites
+        if let Some(prereq) = catalog.prereqs.get(&current_course) {
+            let prereq_courses = extract_prerequisite_courses(prereq);
+            for prereq_course in prereq_courses {
+                if !processed.contains(&prereq_course) && !already_selected.contains(&prereq_course)
+                {
+                    to_process.push(prereq_course);
+                }
+            }
+        }
+    }
+
+    needed_courses
 }
 
 /// Recursively add prerequisites for the given courses
@@ -541,6 +605,11 @@ pub fn test_cp_solver() {
         stem: "PHIL".to_string(),
         code: 3200.into(),
     };
+    // Add a simple alternative that doesn't need prerequisites
+    let theo_simple = CourseCode {
+        stem: "THEO".to_string(),
+        code: 2000.into(),
+    };
 
     // Create a schedule that violates prerequisites and is missing geneds
     let schedule = vec![
@@ -601,7 +670,11 @@ pub fn test_cp_solver() {
             name: "Ethics and Philosophy".to_string(),
             req: GenEdReq::Courses {
                 num: 1,
-                courses: vec![theo_advanced.clone(), phil_ethics.clone()], // theo_advanced satisfies multiple!
+                courses: vec![
+                    theo_advanced.clone(), // Satisfies 2 geneds but needs prereq
+                    phil_ethics.clone(),   // Needs prereq (phil_natural)
+                    theo_simple.clone(),   // Simple option with no prereqs!
+                ],
             },
         },
     ];
@@ -682,6 +755,14 @@ pub fn test_cp_solver() {
         (
             "Philosophy Ethics".to_string(),
             Some(4),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        theo_simple.clone(),
+        (
+            "Simple Theology".to_string(),
+            Some(3),
             CourseTermOffering::Both,
         ),
     );
