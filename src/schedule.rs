@@ -6,7 +6,7 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::geneds::GenEd;
+use crate::geneds::{GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 use crate::schedule_sorter::BestSchedule;
 
@@ -193,20 +193,15 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(self.are_programs_valid()? && self.validate_prereqs()?)
+        Ok(
+            self.are_programs_valid()?
+                && self.validate_prereqs()?
+                && self.are_geneds_fulfilled()?,
+        )
     }
 
     fn are_geneds_fulfilled(&self) -> Result<bool> {
-        let all_sched_codes = self
-            .courses
-            .iter()
-            .flatten()
-            .collect::<HashSet<&CourseCode>>();
-        Ok(self
-            .catalog
-            .geneds
-            .iter()
-            .all(|gened| gened.is_fulfilled(&all_sched_codes)))
+        are_geneds_satisfied(self)
     }
 
     fn are_programs_valid(&self) -> Result<bool> {

@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::schedule::{CourseCode, Schedule};
+use crate::schedule::{Catalog, CourseCode, Schedule};
 use anyhow::Result;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
+
+const MAX_SKILLS_AND_PERSPECTIVES: u8 = 3;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
 pub enum GenEd {
@@ -21,26 +23,17 @@ pub enum GenEdReq {
         courses: Vec<CourseCode>,
     },
     Credits {
-        num: usize,
+        num: u32,
         courses: Vec<CourseCode>,
     },
 }
 
-impl GenEd {
-    pub fn fulfilled_courses(
+impl GenEdReq {
+    fn fulfilled_courses(
         &self,
         all_codes: &HashSet<&CourseCode>,
+        catalog: &Catalog,
     ) -> Option<HashSet<&CourseCode>> {
-        match self {
-            GenEd::Core { req, .. } => req.fulfilled_courses(all_codes),
-            GenEd::Foundation { req, .. } => req.fulfilled_courses(all_codes),
-            GenEd::SkillAndPerspective { req, .. } => req.fulfilled_courses(all_codes),
-        }
-    }
-}
-
-impl GenEdReq {
-    fn fulfilled_courses(&self, all_codes: &HashSet<&CourseCode>) -> Option<HashSet<&CourseCode>> {
         match self {
             GenEdReq::Set(codes) => {
                 let fulfilled: HashSet<_> = codes
@@ -81,7 +74,12 @@ impl GenEdReq {
                     .iter()
                     .filter(|code| all_codes.contains(*code))
                     .collect();
-                if fulfilled.len() >= *num {
+                if fulfilled
+                    .iter()
+                    .filter_map(|c| catalog.courses.get(c).and_then(|(_, creds, _)| *creds))
+                    .sum::<u32>()
+                    >= *num
+                {
                     Some(fulfilled)
                 } else {
                     None
@@ -98,24 +96,58 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         .flatten()
         .collect::<HashSet<&CourseCode>>();
     let mut foundation_courses = HashSet::new();
-    let mut skill_and_perspective_courses = HashMap::new();
+    let mut skill_and_perspective_courses: HashMap<&CourseCode, u8> = HashMap::new();
     for gened in &sched.catalog.geneds {
-        match gened.fulfilled_courses(&all_codes) {
-            Some(fulfilled) => match &gened {
-                GenEd::Foundation { .. } => {
-                    foundation_courses.extend(fulfilled);
+        match gened {
+            GenEd::Core { req, .. } => {
+                if req.fulfilled_courses(&all_codes, &sched.catalog).is_none() {
+                    return Ok(false);
                 }
-                GenEd::SkillAndPerspective { .. } => {
-                    fulfilled.into_iter().for_each(|code| {
-                        skill_and_perspective_courses
-                            .entry(code)
-                            .and_modify(|e| *e += 1)
-                            .or_insert(1);
-                    });
+            }
+            GenEd::Foundation { req, .. } => {
+                match req.fulfilled_courses(
+                    &all_codes
+                        .difference(&foundation_courses)
+                        .map(|x| *x)
+                        .collect(),
+                    &sched.catalog,
+                ) {
+                    Some(fulfilled) => {
+                        foundation_courses.extend(fulfilled);
+                    }
+                    None => return Ok(false),
                 }
-                _ => {}
-            },
-            None => return Ok(false),
+            }
+            GenEd::SkillAndPerspective { req, .. } => {
+                match req.fulfilled_courses(
+                    &all_codes
+                        .difference(
+                            &skill_and_perspective_courses
+                                .iter()
+                                .filter_map(|(x, count)| {
+                                    if *count > MAX_SKILLS_AND_PERSPECTIVES {
+                                        None
+                                    } else {
+                                        Some(*x)
+                                    }
+                                })
+                                .collect(),
+                        )
+                        .map(|x| *x)
+                        .collect(),
+                    &sched.catalog,
+                ) {
+                    Some(fulfilled) => {
+                        fulfilled.into_iter().for_each(|code| {
+                            skill_and_perspective_courses
+                                .entry(code)
+                                .and_modify(|e| *e += 1)
+                                .or_insert(1);
+                        });
+                    }
+                    None => return Ok(false),
+                }
+            }
         }
     }
     Ok(true)
