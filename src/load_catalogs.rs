@@ -9,11 +9,14 @@ mod programs;
 #[path = "../resources/courses.rs"]
 mod courses;
 
+#[path = "../resources/general_education.rs"]
+mod general_education;
+
 use crate::schedule::Catalog;
 
 lazy_static! {
     pub static ref CATALOGS: Vec<Catalog> = vec![Catalog {
-        geneds: vec![],
+        geneds: general_education::geneds(),
         programs: programs::programs(),
         prereqs: course_reqs::prereqs(),
         courses: courses::courses(),
