@@ -179,13 +179,16 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
         .sum();
 
     // Objective 5: Ensure schedule is valid
-    let validation_penalty: f64 = semester_credits
-        .iter()
-        .filter(|&&credits| credits > 18)
-        .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
-        .sum();
+    let validation_penalty: f64 = (Schedule {
+        courses: solution.to_vec(),
+        programs: ref_sched.programs.clone(),
+        catalog: ref_sched.catalog.clone(),
+    })
+    .is_valid()
+    .unwrap() as u8 as f64
+        * 1000000.0;
 
-    credit_penalty + balance_penalty + course_penalty + overload_penalty
+    credit_penalty + balance_penalty + course_penalty + overload_penalty + dbg!(validation_penalty)
 }
 
 /// Test function for the CP solver that uses optimization principles
