@@ -178,7 +178,7 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
         .map(|&credits| (credits - 18) as f64 * 100000.0) // Hefty penalty for overload
         .sum();
 
-    // Objective 5: Ensure schedule is valid
+    // Objective 5: Ensure schedule is valid (oneshot)
     let validation_penalty: f64 = !(Schedule {
         courses: solution.to_vec(),
         programs: ref_sched.programs.clone(),
