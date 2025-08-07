@@ -250,6 +250,36 @@ impl Schedule {
     }
 
     pub fn ensure_prereqs(self) -> Result<Vec<Self>> {
+        // Try SAT solver first for better performance
+        if let Ok(sat_results) = self.ensure_prereqs_sat() {
+            if !sat_results.is_empty() {
+                return Ok(sat_results);
+            }
+        }
+
+        // Fallback to original combinatorial approach
+        self.ensure_prereqs_combinatorial()
+    }
+
+    /// SAT-based prerequisite resolution
+    pub fn ensure_prereqs_sat(&self) -> Result<Vec<Self>> {
+        use crate::prereqs_sat;
+
+        let solutions =
+            prereqs_sat::ensure_prereqs_sat(self.courses.clone(), &self.catalog.prereqs);
+
+        Ok(solutions
+            .into_iter()
+            .map(|course_schedule| Self {
+                courses: course_schedule,
+                programs: self.programs.clone(),
+                catalog: self.catalog.clone(),
+            })
+            .collect())
+    }
+
+    /// Original combinatorial prerequisite resolution  
+    pub fn ensure_prereqs_combinatorial(self) -> Result<Vec<Self>> {
         let mut unimplemented_prereqs: HashMap<&CourseReq, usize> = HashMap::new();
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
