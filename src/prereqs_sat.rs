@@ -1,7 +1,6 @@
 use crate::prereqs::CourseReq;
 use crate::schedule::CourseCode;
 use std::collections::HashMap;
-use std::io::Write;
 use varisat::{CnfFormula, ExtendFormula, Lit, Var, solver::Solver};
 
 // Maximum credits allowed per semester
@@ -289,83 +288,6 @@ impl PrereqSatSolver {
             print!("\r✓ SAT problem solved! Extracting solution...");
             std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
-            let model = solver.model().unwrap();
-            let mut total_courses = vec![Vec::new(); self.num_semesters];
-
-            // Extract which courses are taken in which semesters
-            for ((course, semester), &var) in &self.course_semester_vars {
-                let idx = var.index();
-                if idx < model.len() {
-                    let assignment = model[idx];
-                    if assignment.is_positive() {
-                        total_courses[*semester].push(course.clone());
-                    }
-                } else {
-                    eprintln!(
-                        "Warning: Variable index {} out of bounds for model length {}",
-                        idx,
-                        model.len()
-                    );
-                }
-            }
-
-            // Calculate additional courses (courses not in original schedule)
-            let mut additional_courses = HashMap::new();
-            for (sem_idx, total_sem_courses) in total_courses.iter().enumerate() {
-                let original_sem_courses = original_schedule
-                    .get(sem_idx)
-                    .map(|s| s.as_slice())
-                    .unwrap_or(&[]);
-                let additional: Vec<CourseCode> = total_sem_courses
-                    .iter()
-                    .filter(|course| !original_sem_courses.contains(course))
-                    .cloned()
-                    .collect();
-
-                if !additional.is_empty() {
-                    additional_courses.insert(sem_idx, additional);
-                }
-            }
-
-            Some(SatSolution { additional_courses })
-        } else {
-            None
-        }
-    }
-
-    /// Solve the SAT problem and return a solution
-    pub fn solve(&mut self, original_schedule: &[Vec<CourseCode>]) -> Option<SatSolution> {
-        self.add_course_taken_constraints();
-        self.add_uniqueness_constraints();
-
-        // Debug: calculate credits in original schedule
-        let mut original_credits = 0u32;
-        for semester in original_schedule {
-            for course in semester {
-                original_credits += self.course_credits.get(course).unwrap_or(&3);
-            }
-        }
-        println!("Original schedule has {} credits total", original_credits);
-
-        // Debug: show credits per semester in original schedule
-        for (sem_idx, semester) in original_schedule.iter().enumerate() {
-            let mut sem_credits = 0u32;
-            for course in semester {
-                sem_credits += self.course_credits.get(course).unwrap_or(&3);
-            }
-            println!("  Semester {}: {} credits", sem_idx, sem_credits);
-        }
-
-        self.add_credit_constraint();
-
-        // Add optimization constraints
-        self.add_minimization_constraints();
-        self.add_distribution_constraints();
-
-        let mut solver = Solver::new();
-        solver.add_formula(&self.formula);
-
-        if solver.solve().unwrap() {
             let model = solver.model().unwrap();
             let mut total_courses = vec![Vec::new(); self.num_semesters];
 
@@ -723,7 +645,7 @@ impl PrereqSatSolver {
         &mut self,
         req: &crate::geneds::GenEdReq,
         catalog: &crate::schedule::Catalog,
-        gened_name: &str,
+        _gened_name: &str,
     ) {
         match req {
             crate::geneds::GenEdReq::Courses { num, courses } => {
@@ -1017,133 +939,6 @@ impl PrereqSatSolver {
             current_selection,
         );
     }
-}
-
-/// Enhanced SAT solver that finds multiple solutions by iteratively excluding previous ones
-/// Now includes optimization scoring and early termination for better efficiency
-pub fn solve_multiple_prereqs(
-    schedule: Vec<Vec<CourseCode>>,
-    prereqs: &HashMap<CourseCode, CourseReq>,
-    course_credits: &HashMap<
-        CourseCode,
-        (String, Option<u32>, crate::schedule::CourseTermOffering),
-    >,
-    max_solutions: usize,
-) -> Vec<SatSolution> {
-    let mut solutions = Vec::new();
-    let mut forbidden_patterns: Vec<Vec<(CourseCode, usize)>> = Vec::new();
-    let mut best_score = f64::INFINITY;
-    let mut solutions_since_improvement = 0;
-    const MAX_STAGNANT_ITERATIONS: usize = 20; // Stop if no improvement for this many iterations
-
-    // Convert course credits to a simpler format
-    let credit_map: HashMap<CourseCode, u32> = course_credits
-        .iter()
-        .map(|(code, (_, credits, _))| (code.clone(), credits.unwrap_or(3)))
-        .collect();
-
-    println!(
-        "SAT solver exploring up to {} solutions for optimization...",
-        max_solutions
-    );
-
-    for attempt in 0..max_solutions {
-        let num_semesters = schedule.len();
-        let mut solver = PrereqSatSolver::new(num_semesters);
-
-        // Set course credit information for optimization
-        solver.set_course_credits(credit_map.clone());
-
-        solver.add_existing_schedule(&schedule);
-        solver.add_prereq_constraints(&schedule, prereqs);
-
-        // Add constraints to exclude previous solutions
-        for forbidden in &forbidden_patterns {
-            solver.add_forbidden_pattern(forbidden);
-        }
-
-        if let Some(solution) = solver.solve(&schedule) {
-            // Calculate a score for this solution (lower is better)
-            let score = score_solution(&solution, &schedule, &credit_map);
-
-            if score < best_score {
-                best_score = score;
-                solutions_since_improvement = 0;
-
-                // Calculate total credits for this solution
-                let mut total_additional_credits = 0u32;
-                for additional_courses in solution.additional_courses.values() {
-                    for course in additional_courses {
-                        total_additional_credits += credit_map.get(course).unwrap_or(&3);
-                    }
-                }
-
-                println!(
-                    "SAT iteration {}: Found better solution with score {:.2} ({} additional courses, {} additional credits)",
-                    attempt + 1,
-                    score,
-                    count_total_additional_courses(&solution),
-                    total_additional_credits
-                );
-            } else {
-                solutions_since_improvement += 1;
-            }
-
-            // Early termination if we haven't improved in a while
-            if solutions_since_improvement >= MAX_STAGNANT_ITERATIONS {
-                println!(
-                    "SAT solver: No improvement for {} iterations, terminating early at iteration {}",
-                    MAX_STAGNANT_ITERATIONS,
-                    attempt + 1
-                );
-                break;
-            }
-
-            // Extract the pattern of additional courses for this solution
-            let mut pattern = Vec::new();
-            for (sem_idx, additional_courses) in &solution.additional_courses {
-                for course in additional_courses {
-                    pattern.push((course.clone(), *sem_idx));
-                }
-            }
-
-            if !pattern.is_empty() {
-                forbidden_patterns.push(pattern);
-            }
-            solutions.push(solution);
-
-            // Very early termination based on credit efficiency
-            let last_solution = solutions.last().unwrap();
-            let total_additional = count_total_additional_courses(last_solution);
-            let mut total_additional_credits = 0u32;
-            for additional_courses in last_solution.additional_courses.values() {
-                for course in additional_courses {
-                    total_additional_credits += credit_map.get(course).unwrap_or(&3);
-                }
-            }
-
-            if total_additional <= 2 || total_additional_credits <= 6 {
-                println!(
-                    "SAT solver: Found excellent solution with only {} additional courses ({} credits), terminating early",
-                    total_additional, total_additional_credits
-                );
-                break;
-            }
-        } else {
-            println!(
-                "SAT solver: No more solutions found at iteration {}",
-                attempt + 1
-            );
-            break; // No more solutions
-        }
-    }
-
-    println!(
-        "SAT solver completed: Found {} solutions, best score: {:.2}",
-        solutions.len(),
-        best_score
-    );
-    solutions
 }
 
 /// Score a solution based on number of additional courses and distribution
