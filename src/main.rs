@@ -3,6 +3,7 @@ use std::path::Path;
 
 mod load_catalogs;
 mod prereqs;
+mod prereqs_sat;
 mod read_excel_file;
 mod schedule;
 mod schedule_sorter;
@@ -18,6 +19,8 @@ use write_excel_file::save_schedule;
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
+    prereqs_sat::test_prereq_sat();
+
     const FNAME: &str = "ross_test.xlsx";
 
     let sched = generate_schedule(

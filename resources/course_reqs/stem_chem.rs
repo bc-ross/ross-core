@@ -11,7 +11,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
     vec![
         (CC!("CHEM", 1010), CoCourse(CC!("CHEM", 1011))),
         (CC!("CHEM", 1011), CoCourse(CC!("CHEM", 1010))),
-        (CC!("CHEM", 1200), CoCourse(CC!("CHEM", 1201))),
+        (CC!("CHEM", 1200), CoCourse(CC!("BIOL", 1121))), // (CC!("CHEM", 1200), CoCourse(CC!("CHEM", 1201))),
         (CC!("CHEM", 1201), CoCourse(CC!("CHEM", 1200))),
         (
             CC!("CHEM", 1210),
