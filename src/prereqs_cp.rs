@@ -20,19 +20,19 @@ pub fn solve_prereqs_cp(
 ) -> Result<Vec<Vec<Vec<CourseCode>>>> {
     // For now, we'll use the SAT solver as the backend but with optimization-focused logic
     // In the future, this can be replaced with a true CP/IP implementation
-    
+
     use crate::prereqs_sat;
-    
+
     // Use the SAT solver to get valid solutions
     let sat_solutions = prereqs_sat::ensure_prereqs_sat(schedule.clone(), prereqs);
-    
+
     if sat_solutions.is_empty() {
         return Ok(vec![]); // Return empty if no solution found
     }
-    
+
     // Apply optimization logic to choose the best solution
     let best_solution = find_best_solution(sat_solutions, courses);
-    
+
     Ok(vec![best_solution])
 }
 
@@ -47,11 +47,11 @@ fn find_best_solution(
     if solutions.is_empty() {
         return vec![];
     }
-    
+
     if solutions.len() == 1 {
         return solutions.into_iter().next().unwrap();
     }
-    
+
     // Score each solution based on optimization criteria
     let mut scored_solutions: Vec<(f64, Vec<Vec<CourseCode>>)> = solutions
         .into_iter()
@@ -60,10 +60,10 @@ fn find_best_solution(
             (score, solution)
         })
         .collect();
-    
+
     // Sort by score (lower is better)
     scored_solutions.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-    
+
     // Return the best solution
     scored_solutions.into_iter().next().unwrap().1
 }
@@ -77,7 +77,7 @@ fn calculate_solution_score(
     let mut total_credits = 0;
     let mut semester_credits = Vec::new();
     let mut total_courses = 0;
-    
+
     // Calculate credits per semester
     for semester in solution {
         let mut sem_credits = 0;
@@ -93,27 +93,29 @@ fn calculate_solution_score(
         }
         semester_credits.push(sem_credits);
     }
-    
+
     // Objective 1: Minimize total credits (weight: 1000)
     let credit_penalty = total_credits as f64 * 1000.0;
-    
+
     // Objective 2: Balance semesters (weight: 100)
     let balance_penalty = if !semester_credits.is_empty() {
         let avg_credits = total_credits as f64 / semester_credits.len() as f64;
-        let variance: f64 = semester_credits.iter()
+        let variance: f64 = semester_credits
+            .iter()
             .map(|&credits| {
                 let diff = credits as f64 - avg_credits;
                 diff * diff
             })
-            .sum::<f64>() / semester_credits.len() as f64;
+            .sum::<f64>()
+            / semester_credits.len() as f64;
         variance * 100.0
     } else {
         0.0
     };
-    
+
     // Objective 3: Minimize total courses (weight: 10)
     let course_penalty = total_courses as f64 * 10.0;
-    
+
     credit_penalty + balance_penalty + course_penalty
 }
 
@@ -131,6 +133,10 @@ pub fn test_cp_solver() {
         stem: "MATH".to_string(),
         code: 1360.into(),
     };
+    let phys_basic = CourseCode {
+        stem: "PHYS".to_string(),
+        code: 1500.into(),
+    };
     let phys_mech = CourseCode {
         stem: "PHYS".to_string(),
         code: 2100.into(),
@@ -139,12 +145,16 @@ pub fn test_cp_solver() {
         stem: "PHYS".to_string(),
         code: 2200.into(),
     };
+    let math_linalg = CourseCode {
+        stem: "MATH".to_string(),
+        code: 2400.into(),
+    };
 
     // Create a schedule that violates prerequisites
     let schedule = vec![
-        vec![math_calc1.clone()],           // Semester 0: Calc 1
-        vec![],                             // Semester 1: Empty  
-        vec![phys_em.clone()],              // Semester 2: E&M Physics (missing prereqs!)
+        vec![math_calc1.clone()], // Semester 0: Calc 1
+        vec![],                   // Semester 1: Empty
+        vec![phys_em.clone()],    // Semester 2: E&M Physics (missing prereqs!)
     ];
 
     // Set up prerequisites
@@ -153,18 +163,53 @@ pub fn test_cp_solver() {
     prereqs.insert(phys_mech.clone(), CourseReq::PreCourse(math_calc1.clone()));
     prereqs.insert(
         phys_em.clone(),
-        CourseReq::And(vec![
-            CourseReq::PreCourse(phys_mech.clone()),
-            CourseReq::PreCourse(math_calc2.clone()),
+        CourseReq::Or(vec![
+            CourseReq::And(vec![
+                CourseReq::PreCourse(phys_mech.clone()),
+                CourseReq::PreCourse(math_calc2.clone()),
+            ]),
+            CourseReq::PreCourse(math_linalg.clone()),
         ]),
     );
 
     // Course catalog
     let mut courses = HashMap::new();
-    courses.insert(math_calc1.clone(), ("Calculus I".to_string(), Some(4), CourseTermOffering::Both));
-    courses.insert(math_calc2.clone(), ("Calculus II".to_string(), Some(4), CourseTermOffering::Both));
-    courses.insert(phys_mech.clone(), ("Physics Mechanics".to_string(), Some(3), CourseTermOffering::Both));
-    courses.insert(phys_em.clone(), ("Physics E&M".to_string(), Some(3), CourseTermOffering::Both));
+    courses.insert(
+        math_calc1.clone(),
+        ("Calculus I".to_string(), Some(4), CourseTermOffering::Both),
+    );
+    courses.insert(
+        math_calc2.clone(),
+        ("Calculus II".to_string(), Some(4), CourseTermOffering::Both),
+    );
+    courses.insert(
+        phys_mech.clone(),
+        (
+            "Physics Mechanics".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        phys_em.clone(),
+        ("Physics E&M".to_string(), Some(3), CourseTermOffering::Both),
+    );
+    courses.insert(
+        math_linalg.clone(),
+        (
+            "Math Linear Algebra".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
+    courses.insert(
+        phys_basic.clone(),
+        (
+            "Physics Basics".to_string(),
+            Some(3),
+            CourseTermOffering::Both,
+        ),
+    );
 
     println!("Testing optimization-focused CP solver:");
     println!("Original schedule with prerequisite violations:");
@@ -172,21 +217,25 @@ pub fn test_cp_solver() {
         println!("  Semester {}: {:?}", i, sem);
     }
 
-        match solve_prereqs_cp(schedule, &prereqs, &courses) {
+    match solve_prereqs_cp(schedule, &prereqs, &courses) {
         Ok(solutions) => {
             println!("CP solver found {} solution(s):", solutions.len());
             for (sol_idx, solution) in solutions.iter().enumerate() {
                 println!("Solution {}:", sol_idx + 1);
                 let mut total_credits = 0;
                 for (sem_idx, semester) in solution.iter().enumerate() {
-                    let sem_credits: u32 = semester.iter()
+                    let sem_credits: u32 = semester
+                        .iter()
                         .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
                         .sum();
                     total_credits += sem_credits;
-                    println!("  Semester {}: {:?} ({} credits)", sem_idx, semester, sem_credits);
+                    println!(
+                        "  Semester {}: {:?} ({} credits)",
+                        sem_idx, semester, sem_credits
+                    );
                 }
                 println!("  Total credits: {}", total_credits);
-                
+
                 // Calculate solution score
                 let score = calculate_solution_score(solution, &courses);
                 println!("  Optimization score: {:.2}", score);

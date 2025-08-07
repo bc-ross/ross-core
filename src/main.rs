@@ -3,8 +3,8 @@ use std::path::Path;
 
 mod load_catalogs;
 mod prereqs;
-mod prereqs_sat;
 mod prereqs_cp;
+mod prereqs_sat;
 mod read_excel_file;
 mod schedule;
 mod schedule_sorter;
