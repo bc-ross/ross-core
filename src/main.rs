@@ -22,11 +22,16 @@ pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 
 fn main() -> Result<()> {
     // // Test multi-course gened functionality first
-    prereqs_cp::test_multi_course_gened();
+    // prereqs_cp::test_multi_course_gened();
 
     // Test the CP solver
     println!("=== Testing CP Solver ===");
     prereqs_cp::test_cp_solver();
+    println!();
+
+    // Test all GenEdReq variants
+    println!("=== Testing All GenEdReq Variants ===");
+    prereqs_cp::test_all_gened_variants();
     println!();
 
     return Ok(()); // Don't clutter the terminal when just testing the CP solver
