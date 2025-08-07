@@ -13,3 +13,6 @@
   - [ ] Add gened resources
   - [ ] Properly count max used geneds per course (and options thereof)
   - [ ] Add GenEd courses to the `scripts_assistant` exporter
+  - [ ] Add these constraints to `Natural World`:
+    - [ ] "Must be taken in two different disciplines."
+    - [ ] "including one lab"
