@@ -1,5 +1,4 @@
 use crate::geneds::{GenEd, GenEdReq, are_geneds_satisfied};
-use crate::prereqs_sat;
 use crate::schedule::{Catalog, CourseCode, CourseTermOffering, Schedule};
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
@@ -8,39 +7,36 @@ use std::collections::{HashMap, HashSet};
 const MAX_OVERLOAD_SEMESTER: u32 = 18; // Maximum credits per semester
 
 /// Simple prerequisite solver using optimization principles
-/// This is currently a wrapper around the SAT solver with optimization-focused logic
-pub fn solve_prereqs_cp(
-    sched: &Schedule, // schedule: Vec<Vec<CourseCode>>,
-                      // prereqs: &HashMap<CourseCode, CourseReq>,
-                      // courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
-) -> Result<Vec<Vec<Vec<CourseCode>>>> {
-    // For now, we'll use the SAT solver as the backend but with optimization-focused logic
-    // In the future, this can be replaced with a true CP/IP implementation
-
+/// Now uses the unified SAT solver that handles prerequisites, geneds, and credits together
+pub fn solve_prereqs_cp(sched: &Schedule) -> Result<Vec<Vec<Vec<CourseCode>>>> {
     use crate::prereqs_sat;
     let schedule = &sched.courses;
     let prereqs = &sched.catalog.prereqs;
     let courses = &sched.catalog.courses;
+    let geneds = &sched.catalog.geneds;
 
-    // Use the SAT solver to get multiple valid solutions
-    let sat_solutions = prereqs_sat::solve_multiple_prereqs(
+    // Use the unified SAT solver that handles prerequisites, geneds, and credit constraints together
+    let sat_solutions = prereqs_sat::solve_unified_schedule(
         schedule.clone(),
         prereqs,
+        geneds,
+        &sched.catalog,
         courses,
         prereqs_sat::MAX_SAT_ITERATIONS,
     );
 
     println!(
-        "SAT solver found {} prerequisite solutions",
+        "Unified SAT solver found {} complete solutions (prereqs + geneds + credits)",
         sat_solutions.len()
     );
+
     if sat_solutions.is_empty() {
-        println!("No SAT solutions found - returning empty schedule list");
+        println!("No unified solutions found - returning empty schedule list");
         return Ok(vec![]); // Return empty if no solution found
     }
 
     // Convert SAT solutions to schedule format
-    let mut schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
+    let schedule_solutions: Vec<Vec<Vec<CourseCode>>> = sat_solutions
         .iter()
         .map(|sat_sol| {
             let mut full_schedule = schedule.clone();
@@ -56,42 +52,38 @@ pub fn solve_prereqs_cp(
         })
         .collect();
 
-    // Calculate geneds once for the first solution (they should be the same for all prerequisite solutions)
-    let missing_geneds = if !schedule_solutions.is_empty() {
-        let temp_schedule = Schedule {
-            courses: schedule_solutions[0].clone(),
-            programs: sched.programs.clone(),
-            catalog: sched.catalog.clone(),
-        };
-        find_missing_geneds(&temp_schedule)
+    // The unified SAT solver already handles optimization, so just return the best solution(s)
+    if let Some(best_solution) = schedule_solutions.first() {
+        println!(
+            "Unified solution found with {} semesters",
+            best_solution.len()
+        );
+        for (i, sem) in best_solution.iter().enumerate() {
+            let semester_credits: u32 = sem
+                .iter()
+                .filter_map(|course| courses.get(course).and_then(|(_, credits, _)| *credits))
+                .sum();
+            println!(
+                "  Semester {}: {} courses, {} credits",
+                i,
+                sem.len(),
+                semester_credits
+            );
+        }
+        Ok(vec![best_solution.clone()])
     } else {
-        vec![]
-    };
-
-    // Apply the same gened courses to all solutions
-    for solution in &mut schedule_solutions {
-        // Improved gened placement: distribute courses to balance semesters
-        place_geneds_balanced(solution, missing_geneds.clone(), courses);
-    }
-
-    // Apply optimization logic to choose the best solution
-    let best_solution = find_best_solution(schedule_solutions.clone(), sched);
-
-    match best_solution {
-        Some(solution) => {
-            println!("Best solution found with {} semesters", solution.len());
-            for (i, sem) in solution.iter().enumerate() {
-                println!("  Best Semester {}: {} courses", i, sem.len());
-            }
-            Ok(vec![solution])
-        }
-        None => {
-            println!("No valid solution found!");
-            Ok(vec![])
-        }
+        println!("No valid unified solution found!");
+        Ok(vec![])
     }
 }
+// =============================================================================
+// LEGACY GENED PROCESSING FUNCTIONS (NO LONGER USED)
+// The unified SAT solver now handles geneds directly, so these functions are deprecated
+// =============================================================================
+
 /// Find missing gened requirements in a schedule using smart selection
+/// DEPRECATED: Geneds are now handled directly in the unified SAT solver
+#[allow(dead_code)]
 pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
     // Check if geneds are already satisfied
     if are_geneds_satisfied(sched).unwrap_or(false) {
@@ -122,6 +114,8 @@ pub fn find_missing_geneds(sched: &Schedule) -> Vec<CourseCode> {
 }
 
 /// Check if a specific gened is satisfied by current courses
+/// DEPRECATED: Geneds are now handled directly in the unified SAT solver
+#[allow(dead_code)]
 fn is_gened_satisfied(
     gened: &GenEd,
     current_courses: &std::collections::HashSet<&CourseCode>,
@@ -158,6 +152,8 @@ fn is_gened_satisfied(
 }
 
 /// Get all courses that could potentially satisfy a gened
+/// DEPRECATED: Geneds are now handled directly in the unified SAT solver
+#[allow(dead_code)]
 fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
     match gened {
         GenEd::Core { req, .. }
@@ -182,6 +178,8 @@ fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
 /// - Foundation geneds: no overlap between foundation courses
 /// - Skills & Perspective geneds: limited reuse (MAX_SKILLS_AND_PERSPECTIVES times)
 /// - Core geneds: can overlap with others
+/// DEPRECATED: Geneds are now handled directly in the unified SAT solver
+#[allow(dead_code)]
 fn find_optimal_gened_courses(
     unsatisfied_geneds: &[(usize, GenEd, Vec<CourseCode>)],
     catalog: &Catalog,
