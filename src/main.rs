@@ -1,6 +1,7 @@
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
+mod geneds;
 mod load_catalogs;
 mod prereqs;
 mod prereqs_cp;

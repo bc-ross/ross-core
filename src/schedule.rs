@@ -6,16 +6,18 @@ use std::{
     fmt::{self, Display},
 };
 
+use crate::geneds::{GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 use crate::schedule_sorter::BestSchedule;
 
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
     Fall,
     Spring,
     Both,
     Discretion,
     Infrequently,
+    Summer,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
@@ -115,20 +117,6 @@ pub struct Program {
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub enum GenEdKind {
-    Core,
-    Foundation,
-    SkillAndPerspective,
-}
-
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub struct GenEd {
-    name: String,
-    reqs: Elective,
-    kind: GenEdKind,
-}
-
-#[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
 pub struct Catalog {
     pub programs: Vec<Program>,
     pub geneds: Vec<GenEd>,
@@ -212,7 +200,13 @@ impl Schedule {
     }
 
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(dbg!(self.are_programs_valid()?) && dbg!(self.validate_prereqs()?))
+        Ok(dbg!(self.are_programs_valid()?)
+            && dbg!(self.validate_prereqs()?)
+            && dbg!(self.are_geneds_fulfilled()?))
+    }
+
+    fn are_geneds_fulfilled(&self) -> Result<bool> {
+        are_geneds_satisfied(self)
     }
 
     fn are_programs_valid(&self) -> Result<bool> {

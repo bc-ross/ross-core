@@ -9,3 +9,12 @@
   - [x] Check fulfillment for course validity
   - [ ] Automatically fix unfulfilled
 - [ ] Investigate SAT dependency solvers
+- [ ] GenEds
+  - [ ] Validate geneds properly
+  - [ ] Add gened resources
+  - [ ] Properly count max used geneds per course (and options thereof)
+    - [ ] Since course assignment to gened is based on gened order iterate through permutations of geneds until satisfied?
+  - [ ] Add GenEd courses to the `scripts_assistant` exporter
+  - [ ] Add these constraints to `Natural World`:
+    - [ ] "Must be taken in two different disciplines."
+    - [ ] "including one lab"
