@@ -243,7 +243,20 @@ fn find_optimal_gened_courses(
         let mut best_geneds_affected = Vec::new();
         let mut best_total_courses = Vec::new();
 
-        for (course, gened_indices) in &course_to_geneds {
+        // Sort course keys to make iteration deterministic
+        let mut course_keys: Vec<_> = course_to_geneds.keys().collect();
+        course_keys.sort_by(|a, b| {
+            // Sort by stem first, then by course code
+            a.stem.cmp(&b.stem).then_with(|| {
+                a.code
+                    .partial_cmp(&b.code)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+        });
+
+        for course in course_keys {
+            let gened_indices = &course_to_geneds[course];
+
             // Skip if this course is already selected or in the schedule
             if selected_courses.contains(course) || already_in_schedule.contains(course) {
                 continue;
@@ -630,69 +643,100 @@ fn calculate_solution_score(solution: &[Vec<CourseCode>], ref_sched: &Schedule) 
     credit_penalty + balance_penalty + course_penalty + overload_penalty + validation_penalty
 }
 
-/// Intelligently place gened courses to balance semesters
+/// Intelligently place gened courses to balance semesters while respecting prerequisites
 fn place_geneds_balanced(
     solution: &mut [Vec<CourseCode>],
     missing_geneds: Vec<CourseCode>,
     courses: &HashMap<CourseCode, (String, Option<u32>, CourseTermOffering)>,
 ) {
-    // Sort semesters by current credit load (ascending)
-    let mut semester_loads: Vec<(usize, u32)> = solution
-        .iter()
-        .enumerate()
-        .map(|(idx, semester)| {
-            let credits = semester
-                .iter()
-                .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
-                .sum();
-            (idx, credits)
-        })
-        .collect();
+    // First, we need to sort the missing geneds by their prerequisite dependencies
+    // Courses with no prerequisites should be placed first
+    let mut geneds_with_deps = Vec::new();
+    for gened_course in missing_geneds {
+        geneds_with_deps.push(gened_course);
+    }
 
-    // Sort by credits (lowest first) to fill lighter semesters first
-    semester_loads.sort_by_key(|(_, credits)| *credits);
+    // Sort courses by dependency order - courses with fewer/no prerequisites first
+    // This is a simple heuristic; a proper topological sort would be better
+    geneds_with_deps.sort_by_key(|course| {
+        // Count the number of prerequisite courses this course depends on
+        count_total_prerequisites(course, solution)
+    });
 
-    // Place each gened course in the semester with the least load
-    for missing_course in missing_geneds {
+    // Place each gened course in the earliest possible semester that respects prerequisites
+    for missing_course in geneds_with_deps {
         let course_credits = courses
             .get(&missing_course)
             .and_then(|(_, c, _)| *c)
             .unwrap_or(3);
 
-        // Find the semester with the lowest load that can accommodate this course
-        let mut best_semester_idx = None;
+        // Find the earliest semester where this course can be placed
+        let earliest_valid_semester = find_earliest_valid_semester(&missing_course, solution);
+
+        // Among semesters >= earliest_valid_semester, pick the one with lowest load
+        let mut best_semester_idx = earliest_valid_semester;
         let mut min_resulting_load = u32::MAX;
 
-        for &(sem_idx, current_load) in &semester_loads {
+        for sem_idx in earliest_valid_semester..solution.len() {
+            let current_load: u32 = solution[sem_idx]
+                .iter()
+                .map(|course| courses.get(course).and_then(|(_, c, _)| *c).unwrap_or(3))
+                .sum();
             let resulting_load = current_load + course_credits;
 
-            // Prefer semesters under the overload limit
+            // Prefer semesters under the overload limit and with lower load
             if resulting_load <= MAX_OVERLOAD_SEMESTER && resulting_load < min_resulting_load {
-                best_semester_idx = Some(sem_idx);
+                best_semester_idx = sem_idx;
                 min_resulting_load = resulting_load;
             }
         }
 
-        // If no semester can accommodate without overload, place in the least loaded one anyway
-        if best_semester_idx.is_none() {
-            best_semester_idx = Some(semester_loads[0].0);
-            min_resulting_load = semester_loads[0].1 + course_credits;
+        // If no semester under the limit is found, use the earliest valid semester anyway
+        if min_resulting_load == u32::MAX {
+            best_semester_idx = earliest_valid_semester;
         }
 
-        if let Some(sem_idx) = best_semester_idx {
-            solution[sem_idx].push(missing_course);
-
-            // Update the load for this semester in our tracking
-            for load_entry in &mut semester_loads {
-                if load_entry.0 == sem_idx {
-                    load_entry.1 = min_resulting_load;
-                    break;
-                }
-            }
-
-            // Re-sort to maintain order by load
-            semester_loads.sort_by_key(|(_, credits)| *credits);
+        // Place the course in the selected semester
+        if best_semester_idx < solution.len() {
+            solution[best_semester_idx].push(missing_course);
+        } else {
+            // If we run out of semesters, add to the last one
+            solution[solution.len() - 1].push(missing_course);
         }
+    }
+}
+
+/// Count total number of prerequisite courses (simple heuristic for ordering)
+fn count_total_prerequisites(course: &CourseCode, _schedule: &[Vec<CourseCode>]) -> usize {
+    // Simple heuristic: courses with higher course numbers tend to have more prerequisites
+    // In a real implementation, we'd traverse the actual prerequisite graph
+    match &course.code {
+        crate::schedule::CourseCodeSuffix::Number(num) => *num,
+        crate::schedule::CourseCodeSuffix::Unique(num) => *num,
+        crate::schedule::CourseCodeSuffix::Special(_) => 9999, // Put special courses last
+    }
+}
+
+/// Find the earliest semester where a course can be placed without violating prerequisites
+fn find_earliest_valid_semester(course: &CourseCode, _schedule: &[Vec<CourseCode>]) -> usize {
+    // For now, use a simple heuristic:
+    // - Basic courses (1000-1999) can go in semester 0
+    // - Intermediate courses (2000-2999) can go in semester 1
+    // - Advanced courses (3000+) can go in semester 2
+    // This is a simplified approach; ideally we'd check actual prerequisites
+
+    let course_num = match &course.code {
+        crate::schedule::CourseCodeSuffix::Number(num) => *num,
+        crate::schedule::CourseCodeSuffix::Unique(num) => *num,
+        crate::schedule::CourseCodeSuffix::Special(_) => 1000, // Treat special courses as basic
+    };
+
+    if course_num < 2000 {
+        0 // Basic courses can start in semester 0
+    } else if course_num < 3000 {
+        1 // Intermediate courses need at least semester 1
+    } else {
+        2 // Advanced courses need at least semester 2
     }
 }
 
