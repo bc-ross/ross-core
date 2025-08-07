@@ -26,6 +26,8 @@ fn main() -> Result<()> {
     prereqs_cp::test_cp_solver();
     println!();
 
+    return Ok(()); // Don't clutter the terminal when just testing the CP solver
+
     // Test the SAT solver
     println!("=== Testing SAT Solver ===");
     prereqs_sat::test_prereq_sat();
