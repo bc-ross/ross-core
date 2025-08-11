@@ -1,9 +1,9 @@
 use crate::{
+    CC,
     schedule::{
         CourseCode,
         CourseTermOffering::{self, *},
     },
-    CC,
 };
 use std::collections::HashMap;
 

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schedule::{Schedule, Semester, CourseCode};
     use crate::load_catalogs::CATALOGS;
+    use crate::schedule::{CourseCode, Schedule, Semester};
 
     #[test]
     fn test_fake_schedule_from_catalog() {
@@ -35,7 +35,11 @@ fn build_model_from_schedule(
     sched: &schedule::Schedule,
     max_credits_per_semester: i64,
     min_credits: Option<i64>,
-) -> (CpModelBuilder, Vec<Vec<cp_sat::builder::BoolVar>>, LinearExpr) {
+) -> (
+    CpModelBuilder,
+    Vec<Vec<cp_sat::builder::BoolVar>>,
+    LinearExpr,
+) {
     let num_semesters = sched.courses.len();
     use std::collections::{HashSet, VecDeque};
     // Collect all assigned and transitive prereq courses
@@ -54,7 +58,12 @@ fn build_model_from_schedule(
     }
 
     // Helper: recursively collect all CourseCodes from a CourseReq
-    fn collect_prereq_codes(req: &prereqs::CourseReq, all_codes: &mut HashSet<CourseCode>, catalog: &schedule::Catalog, queue: &mut VecDeque<CourseCode>) {
+    fn collect_prereq_codes(
+        req: &prereqs::CourseReq,
+        all_codes: &mut HashSet<CourseCode>,
+        catalog: &schedule::Catalog,
+        queue: &mut VecDeque<CourseCode>,
+    ) {
         use prereqs::CourseReq::*;
         match req {
             And(reqs) | Or(reqs) => {
@@ -77,7 +86,12 @@ fn build_model_from_schedule(
         let (credits, prereqs) = match sched.catalog.courses.get(code) {
             Some((_name, credits_opt, _offering)) => {
                 let credits = credits_opt.unwrap_or(0) as i64;
-                let prereqs = sched.catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
+                let prereqs = sched
+                    .catalog
+                    .prereqs
+                    .get(code)
+                    .cloned()
+                    .unwrap_or(prereqs::CourseReq::NotRequired);
                 (credits, prereqs)
             }
             None => (0, prereqs::CourseReq::NotRequired),
@@ -91,12 +105,16 @@ fn build_model_from_schedule(
             prereqs,
         });
     }
-    build_model(&courses, num_semesters, max_credits_per_semester, min_credits)
+    build_model(
+        &courses,
+        num_semesters,
+        max_credits_per_semester,
+        min_credits,
+    )
 }
 use cp_sat::builder::{CpModelBuilder, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
 use std::collections::HashMap;
-
 
 #[path = "../../src/schedule.rs"]
 mod schedule;
@@ -124,7 +142,16 @@ struct Course<'a> {
 }
 
 /// Build the model and return (model, vars, total_credits LinearExpr)
-fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_per_semester: i64, min_credits: Option<i64>) -> (CpModelBuilder, Vec<Vec<cp_sat::builder::BoolVar>>, LinearExpr) {
+fn build_model<'a>(
+    courses: &'a [Course<'a>],
+    num_semesters: usize,
+    max_credits_per_semester: i64,
+    min_credits: Option<i64>,
+) -> (
+    CpModelBuilder,
+    Vec<Vec<cp_sat::builder::BoolVar>>,
+    LinearExpr,
+) {
     let mut model = CpModelBuilder::default();
     let mut vars = Vec::new();
     for i in 0..courses.len() {
@@ -148,7 +175,11 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
         }
     }
     // Prerequisite constraints
-    let idx_map: HashMap<_, _> = courses.iter().enumerate().map(|(i, c)| (c.code.clone(), i)).collect();
+    let idx_map: HashMap<_, _> = courses
+        .iter()
+        .enumerate()
+        .map(|(i, c)| (c.code.clone(), i))
+        .collect();
     // Recursively add prerequisite constraints for each course and semester
     fn add_prereq_constraints(
         model: &mut CpModelBuilder,
@@ -166,7 +197,15 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
             }
             And(reqs) => {
                 for r in reqs {
-                    add_prereq_constraints(model, vars, idx_map, courses, course_idx, r, num_semesters);
+                    add_prereq_constraints(
+                        model,
+                        vars,
+                        idx_map,
+                        courses,
+                        course_idx,
+                        r,
+                        num_semesters,
+                    );
                 }
             }
             Or(reqs) => {
@@ -187,13 +226,18 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
                                         // If s == 0, can't satisfy PreCourse, so or_var must be false if cur is true
                                         // Instead, just don't add or_var to or_exprs in this case
                                     } else {
-                                        let earlier_vars: Vec<_> = vars[pre_idx][..s].iter().copied().collect();
+                                        let earlier_vars: Vec<_> =
+                                            vars[pre_idx][..s].iter().copied().collect();
                                         if !earlier_vars.is_empty() {
-                                            let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
+                                            let sum_earlier: LinearExpr =
+                                                earlier_vars.into_iter().collect();
                                             // If cur is taken, require sum_earlier >= 1
                                             // or_var = 1 <=> sum_earlier >= 1
                                             // We approximate: sum_earlier >= or_var
-                                            model.add_linear_constraint(sum_earlier - or_var, [(0, i64::MAX)]);
+                                            model.add_linear_constraint(
+                                                sum_earlier - or_var,
+                                                [(0, i64::MAX)],
+                                            );
                                             or_exprs.push(or_var);
                                         }
                                     }
@@ -201,17 +245,29 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
                             }
                             CoCourse(code) => {
                                 if let Some(&co_idx) = idx_map.get(code) {
-                                    let upto_vars: Vec<_> = vars[co_idx][..=s].iter().copied().collect();
+                                    let upto_vars: Vec<_> =
+                                        vars[co_idx][..=s].iter().copied().collect();
                                     if !upto_vars.is_empty() {
                                         let sum_upto: LinearExpr = upto_vars.into_iter().collect();
-                                        model.add_linear_constraint(sum_upto - or_var, [(0, i64::MAX)]);
+                                        model.add_linear_constraint(
+                                            sum_upto - or_var,
+                                            [(0, i64::MAX)],
+                                        );
                                         or_exprs.push(or_var);
                                     }
                                 }
                             }
                             And(_) | Or(_) => {
                                 // Recursively add for sub-reqs
-                                add_prereq_constraints(model, vars, idx_map, courses, course_idx, r, num_semesters);
+                                add_prereq_constraints(
+                                    model,
+                                    vars,
+                                    idx_map,
+                                    courses,
+                                    course_idx,
+                                    r,
+                                    num_semesters,
+                                );
                                 // For OR, we just add the or_var to the or_exprs
                             }
                             _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
@@ -270,7 +326,15 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
         }
     }
     for (i, c) in courses.iter().enumerate() {
-        add_prereq_constraints(&mut model, &vars, &idx_map, courses, i, &c.prereqs, num_semesters);
+        add_prereq_constraints(
+            &mut model,
+            &vars,
+            &idx_map,
+            courses,
+            i,
+            &c.prereqs,
+            num_semesters,
+        );
     }
     // Gen-ed requirements
     let gened_reqs = vec![("WRI", 1), ("HUM", 1), ("SCI", 1)];
@@ -302,7 +366,9 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
     }
     // Semester credit limits
     for s in 0..num_semesters {
-        let weighted_terms: Vec<(i64, _)> = courses.iter().enumerate()
+        let weighted_terms: Vec<(i64, _)> = courses
+            .iter()
+            .enumerate()
             .map(|(i, c)| (c.credits, vars[i][s]))
             .collect();
         let weighted_sum: LinearExpr = weighted_terms.into_iter().collect();
@@ -342,7 +408,8 @@ fn main() {
     // Stage 1: minimize total credits
     // Build the model and get the flat course list in model order
     let num_semesters = sched.courses.len();
-    let (mut model, vars, total_credits) = build_model_from_schedule(&sched, max_credits_per_semester, None);
+    let (mut model, vars, total_credits) =
+        build_model_from_schedule(&sched, max_credits_per_semester, None);
     model.minimize(total_credits.clone());
     let response = model.solve();
     // Build flat_courses in the same order as the model (all assigned + prereqs)
@@ -361,7 +428,12 @@ fn main() {
         while let Some(code) = queue.pop_front() {
             if let Some(req) = sched.catalog.prereqs.get(&code) {
                 // Helper: recursively collect all CourseCodes from a CourseReq
-                fn collect_prereq_codes(req: &prereqs::CourseReq, all_codes: &mut HashSet<CourseCode>, catalog: &schedule::Catalog, queue: &mut VecDeque<CourseCode>) {
+                fn collect_prereq_codes(
+                    req: &prereqs::CourseReq,
+                    all_codes: &mut HashSet<CourseCode>,
+                    catalog: &schedule::Catalog,
+                    queue: &mut VecDeque<CourseCode>,
+                ) {
                     use prereqs::CourseReq::*;
                     match req {
                         And(reqs) | Or(reqs) => {
@@ -413,13 +485,16 @@ fn main() {
     // Stage 2: minimize spread, subject to min total credits
     if SPREAD_SEMESTERS {
         if let Some(min_credits) = min_credits {
-            let (mut model2, vars2, total_credits2) = build_model_from_schedule(&sched, max_credits_per_semester, Some(min_credits));
+            let (mut model2, vars2, total_credits2) =
+                build_model_from_schedule(&sched, max_credits_per_semester, Some(min_credits));
             // Use the same flat_courses order as above (all assigned + prereqs, sorted)
             let total_credits_int: i64 = min_credits;
             let mean_load = total_credits_int / num_semesters as i64;
             let mut abs_deviation_vars = Vec::new();
             for s in 0..num_semesters {
-                let semester_credits: LinearExpr = flat_courses.iter().enumerate()
+                let semester_credits: LinearExpr = flat_courses
+                    .iter()
+                    .enumerate()
                     .map(|(i, (_code, credits))| (*credits, vars2[i][s]))
                     .collect();
                 let deviation = semester_credits.clone() - mean_load;
@@ -446,9 +521,17 @@ fn main() {
                         println!("  Credits: {}", sem_credits);
                     }
                     println!("Total credits: {}", min_credits);
+                    match crate::geneds::are_geneds_satisfied(&sched) {
+                        Ok(true) => println!("All GenEds satisfied!"),
+                        Ok(false) => println!("GenEd requirements NOT satisfied!"),
+                        Err(e) => println!("GenEd check error: {}", e),
+                    }
                 }
                 _ => {
-                    println!("No feasible solution found in stage 2. Status: {:?}", response2.status());
+                    println!(
+                        "No feasible solution found in stage 2. Status: {:?}",
+                        response2.status()
+                    );
                 }
             }
             return;
@@ -470,9 +553,18 @@ fn main() {
                 println!("  Credits: {}", sem_credits);
             }
             println!("Total credits: {}", response.objective_value as i64);
+            // Check geneds
+            match crate::geneds::are_geneds_satisfied(&sched) {
+                Ok(true) => println!("All GenEds satisfied!"),
+                Ok(false) => println!("GenEd requirements NOT satisfied!"),
+                Err(e) => println!("GenEd check error: {}", e),
+            }
         }
         _ => {
-            println!("No feasible solution found. Status: {:?}", response.status());
+            println!(
+                "No feasible solution found. Status: {:?}",
+                response.status()
+            );
         }
     }
 }

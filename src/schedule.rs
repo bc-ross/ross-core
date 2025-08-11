@@ -260,7 +260,11 @@ impl Schedule {
     pub fn validate_prereqs(&self) -> Result<bool> {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
-                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::NotRequired);
+                let req = self
+                    .catalog
+                    .prereqs
+                    .get(code)
+                    .unwrap_or(&CourseReq::NotRequired);
                 if !req.is_satisfied(self, sem_idx) {
                     return Ok(false);
                 }
