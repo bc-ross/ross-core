@@ -44,10 +44,11 @@ checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 [[package]]
 name = "cp_sat"
 version = "0.3.3"
-source = "git+https://github.com/bc-ross/cp_sat.git?rev=df64003e48e2a7371530eacc3215daaec61c5d50#df64003e48e2a7371530eacc3215daaec61c5d50"
+source = "git+https://github.com/bc-ross/cp_sat.git?rev=2ba15818232d73fb5169fc806f57b7c96aed8bcb#2ba15818232d73fb5169fc806f57b7c96aed8bcb"
 dependencies = [
  "bytes",
  "cc",
+ "glob",
  "libc",
  "prost",
  "prost-build",
@@ -93,6 +94,12 @@ dependencies = [
  "r-efi",
  "wasi",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
 
 [[package]]
 name = "hashbrown"
