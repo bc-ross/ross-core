@@ -340,29 +340,71 @@ fn main() {
     println!("{:?}", &sched.courses);
     let max_credits_per_semester = 18;
     // Stage 1: minimize total credits
-    let (mut model, vars, total_credits);
+    // Build the model and get the flat course list in model order
+    let num_semesters = sched.courses.len();
+    let (mut model, vars, total_credits) = build_model_from_schedule(&sched, max_credits_per_semester, None);
+    model.minimize(total_credits.clone());
+    let response = model.solve();
+    // Build flat_courses in the same order as the model (all assigned + prereqs)
     let mut flat_courses = Vec::new();
-    // Build flat_courses in the same order as build_model_from_schedule
-    for sem in &sched.courses {
-        for code in sem {
-            let (credits, prereqs) = match catalog.courses.get(code) {
-                Some((_name, credits_opt, _offering)) => {
-                    let credits = credits_opt.unwrap_or(0) as i64;
-                    let prereqs = catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
-                    (credits, prereqs)
+    if let Some(courses) = vars.get(0).map(|v| v.len()).map(|_| {
+        // Rebuild the course list in model order (matches build_model_from_schedule)
+        use std::collections::{HashSet, VecDeque};
+        let mut all_codes = HashSet::new();
+        let mut queue = VecDeque::new();
+        for sem in &sched.courses {
+            for code in sem {
+                all_codes.insert(code.clone());
+                queue.push_back(code.clone());
+            }
+        }
+        while let Some(code) = queue.pop_front() {
+            if let Some(req) = sched.catalog.prereqs.get(&code) {
+                // Helper: recursively collect all CourseCodes from a CourseReq
+                fn collect_prereq_codes(req: &prereqs::CourseReq, all_codes: &mut HashSet<CourseCode>, catalog: &schedule::Catalog, queue: &mut VecDeque<CourseCode>) {
+                    use prereqs::CourseReq::*;
+                    match req {
+                        And(reqs) | Or(reqs) => {
+                            for r in reqs {
+                                collect_prereq_codes(r, all_codes, catalog, queue);
+                            }
+                        }
+                        PreCourse(code) | CoCourse(code) => {
+                            if all_codes.insert(code.clone()) {
+                                queue.push_back(code.clone());
+                            }
+                        }
+                        _ => {}
+                    }
                 }
-                None => (0, prereqs::CourseReq::NotRequired),
+                collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
+            }
+        }
+        // Build flat_courses in a deterministic order (sorted)
+        let mut all_codes_vec: Vec<_> = all_codes.into_iter().collect();
+        all_codes_vec.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        all_codes_vec
+    }) {
+        for code in courses {
+            let credits = match catalog.courses.get(&code) {
+                Some((_name, credits_opt, _offering)) => credits_opt.unwrap_or(0) as i64,
+                None => 0,
             };
             flat_courses.push((code.clone(), credits));
         }
     }
-    let num_semesters = sched.courses.len();
-    (model, vars, total_credits) = build_model_from_schedule(&sched, max_credits_per_semester, None);
-    model.minimize(total_credits.clone());
-    let response = model.solve();
+    // Compute min_credits as the sum of all scheduled (assigned + prereq) course credits in the solution
     let mut min_credits = None;
     if let CpSolverStatus::Optimal | CpSolverStatus::Feasible = response.status() {
-        min_credits = Some(response.objective_value as i64);
+        let mut total = 0;
+        for (i, (_code, credits)) in flat_courses.iter().enumerate() {
+            for s in 0..num_semesters {
+                if vars[i][s].solution_value(&response) {
+                    total += credits;
+                }
+            }
+        }
+        min_credits = Some(total);
     }
 
     // Add a constant to toggle the secondary objective
@@ -372,8 +414,8 @@ fn main() {
     if SPREAD_SEMESTERS {
         if let Some(min_credits) = min_credits {
             let (mut model2, vars2, total_credits2) = build_model_from_schedule(&sched, max_credits_per_semester, Some(min_credits));
-            // Compute mean load (rounded down)
-            let total_credits_int: i64 = flat_courses.iter().map(|(_code, credits)| *credits).sum();
+            // Use the same flat_courses order as above (all assigned + prereqs, sorted)
+            let total_credits_int: i64 = min_credits;
             let mean_load = total_credits_int / num_semesters as i64;
             let mut abs_deviation_vars = Vec::new();
             for s in 0..num_semesters {
