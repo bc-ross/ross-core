@@ -15,7 +15,7 @@ pub enum CourseReq {
     // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
     Instructor,
     #[default]
-    None,
+    NotRequired,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -161,7 +161,7 @@ impl CourseReq {
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
             CourseReq::Instructor => todo!(),
-            CourseReq::None => true,
+            CourseReq::NotRequired => true,
         }
     }
 }

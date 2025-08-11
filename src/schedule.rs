@@ -177,29 +177,30 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     println!("Is schedule valid? {}", sched.is_valid()?);
 
     // Use the CP solver with gened support instead of just prerequisites
-    println!("Calling CP solver with gened support...");
-    let complete_schedules = crate::prereqs_cp::solve_prereqs_cp(&sched)?;
-    println!(
-        "CP solver returned {} schedule(s)",
-        complete_schedules.len()
-    );
+    unimplemented!();
+    // println!("Calling CP solver with gened support...");
+    // let complete_schedules = crate::prereqs_cp::solve_prereqs_cp(&sched)?;
+    // println!(
+    //     "CP solver returned {} schedule(s)",
+    //     complete_schedules.len()
+    // );
 
-    if let Some(best_schedule) = complete_schedules.first() {
-        sched.courses = best_schedule.clone();
+    // if let Some(best_schedule) = complete_schedules.first() {
+    //     sched.courses = best_schedule.clone();
 
-        // Debug: Print the final schedule
-        println!("Final schedule after CP solver:");
-        for (i, sem) in sched.courses.iter().enumerate() {
-            println!("  Semester {}: {:?}", i, sem);
-        }
-        println!("Final schedule validation: {}", sched.is_valid()?);
-    } else {
-        return Err(anyhow::anyhow!("No valid schedule found with CP solver"));
-    }
-    // let scheds = sched.ensure_prereqs()?;
-    // println!("{} different prereq filling options", scheds.len());
+    //     // Debug: Print the final schedule
+    //     println!("Final schedule after CP solver:");
+    //     for (i, sem) in sched.courses.iter().enumerate() {
+    //         println!("  Semester {}: {:?}", i, sem);
+    //     }
+    //     println!("Final schedule validation: {}", sched.is_valid()?);
+    // } else {
+    //     return Err(anyhow::anyhow!("No valid schedule found with CP solver"));
+    // }
+    // // let scheds = sched.ensure_prereqs()?;
+    // // println!("{} different prereq filling options", scheds.len());
 
-    Ok(sched)
+    // Ok(sched)
 }
 
 impl Schedule {
@@ -259,7 +260,7 @@ impl Schedule {
     pub fn validate_prereqs(&self) -> Result<bool> {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
-                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::None);
+                let req = self.catalog.prereqs.get(code).unwrap_or(&CourseReq::NotRequired);
                 if !req.is_satisfied(self, sem_idx) {
                     return Ok(false);
                 }

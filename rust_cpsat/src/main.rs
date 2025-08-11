@@ -2,13 +2,27 @@ use cp_sat::builder::{CpModelBuilder, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
 use std::collections::HashMap;
 
+
+#[path = "../../src/schedule.rs"]
+mod schedule;
+
+#[path = "../../src/prereqs.rs"]
+mod prereqs;
+
+#[path = "../../src/geneds.rs"]
+mod geneds;
+
+use prereqs::CourseReq;
+use schedule::CourseCode;
+
+#[derive(Clone)]
 struct Course<'a> {
-    id: &'a str,
+    code: CourseCode,
     credits: i64,
     required: bool,
     geneds: Vec<&'a str>,
     elective_group: Option<&'a str>,
-    prereqs: Vec<&'a str>,
+    prereqs: CourseReq,
 }
 
 /// Build the model and return (model, vars, total_credits LinearExpr)
@@ -36,23 +50,130 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
         }
     }
     // Prerequisite constraints
-    let idx_map: HashMap<_, _> = courses.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-    for (i, c) in courses.iter().enumerate() {
-        for &pre in &c.prereqs {
-            let pi = idx_map[pre];
-            for s in 0..num_semesters {
-                let cur = vars[i][s];
-                if s == 0 {
-                    model.add_eq(cur, 0);
-                } else {
-                    let earlier_vars: Vec<_> = vars[pi][..s].iter().copied().collect();
-                    if !earlier_vars.is_empty() {
-                        let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
-                        model.add_linear_constraint(sum_earlier - cur, [(0, i64::MAX)]);
+    let idx_map: HashMap<_, _> = courses.iter().enumerate().map(|(i, c)| (c.code.clone(), i)).collect();
+    // Recursively add prerequisite constraints for each course and semester
+    fn add_prereq_constraints(
+        model: &mut CpModelBuilder,
+        vars: &Vec<Vec<cp_sat::builder::BoolVar>>,
+        idx_map: &HashMap<CourseCode, usize>,
+        courses: &[Course],
+        course_idx: usize,
+        req: &CourseReq,
+        num_semesters: usize,
+    ) {
+        use prereqs::CourseReq::*;
+        match req {
+            And(reqs) => {
+                for r in reqs {
+                    add_prereq_constraints(model, vars, idx_map, courses, course_idx, r, num_semesters);
+                }
+            }
+            Or(reqs) => {
+                // For each semester, if this course is taken, at least one of the OR prereqs must be satisfied
+                for s in 0..num_semesters {
+                    let cur = vars[course_idx][s];
+                    let mut or_exprs = Vec::new();
+                    for r in reqs {
+                        // For each sub-req, create a bool var indicating if it is satisfied by semester s
+                        let or_var = model.new_bool_var();
+                        // Recursively add constraints for this sub-req, but only if or_var is true
+                        // We use indicator constraints: if or_var == 1, then sub-req must be satisfied
+                        // For PreCourse/CoCourse, this is just a linear constraint
+                        match r {
+                            PreCourse(code) => {
+                                if let Some(&pre_idx) = idx_map.get(code) {
+                                    if s == 0 {
+                                        model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                    } else {
+                                        let earlier_vars: Vec<_> = vars[pre_idx][..s].iter().copied().collect();
+                                        if !earlier_vars.is_empty() {
+                                            let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
+                                            // or_var => sum_earlier >= 1
+                                            model.add_bool_and([or_var, model.new_bool_var_with_name("")]);
+                                            model.add_linear_constraint(sum_earlier - or_var, [(0, i64::MAX)]);
+                                        } else {
+                                            model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                        }
+                                    }
+                                } else {
+                                    model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                }
+                            }
+                            CoCourse(code) => {
+                                if let Some(&co_idx) = idx_map.get(code) {
+                                    let upto_vars: Vec<_> = vars[co_idx][..=s].iter().copied().collect();
+                                    if !upto_vars.is_empty() {
+                                        let sum_upto: LinearExpr = upto_vars.into_iter().collect();
+                                        model.add_linear_constraint(sum_upto - or_var, [(0, i64::MAX)]);
+                                    } else {
+                                        model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                    }
+                                } else {
+                                    model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                }
+                            }
+                            And(_) | Or(_) => {
+                                // Recursively add for sub-reqs
+                                add_prereq_constraints(model, vars, idx_map, courses, course_idx, r, num_semesters);
+                                // For OR, we just add the or_var to the or_exprs
+                            }
+                            _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
+                        }
+                        or_exprs.push(or_var);
+                    }
+                    // If cur is taken, at least one or_var must be true
+                    if !or_exprs.is_empty() {
+                        let sum_or: LinearExpr = or_exprs.iter().copied().collect();
+                        model.add_linear_constraint(sum_or - cur, [(0, i64::MAX)]);
                     }
                 }
             }
+            PreCourse(code) => {
+                if let Some(&pre_idx) = idx_map.get(code) {
+                    for s in 0..num_semesters {
+                        let cur = vars[course_idx][s];
+                        if s == 0 {
+                            model.add_eq(cur, 0);
+                        } else {
+                            let earlier_vars: Vec<_> = vars[pre_idx][..s].iter().copied().collect();
+                            if !earlier_vars.is_empty() {
+                                let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
+                                model.add_linear_constraint(sum_earlier - cur, [(0, i64::MAX)]);
+                            } else {
+                                model.add_eq(cur, 0);
+                            }
+                        }
+                    }
+                } else {
+                    // If prereq course not found, can't take this course
+                    for s in 0..num_semesters {
+                        model.add_eq(vars[course_idx][s], 0);
+                    }
+                }
+            }
+            CoCourse(code) => {
+                if let Some(&co_idx) = idx_map.get(code) {
+                    for s in 0..num_semesters {
+                        let cur = vars[course_idx][s];
+                        let upto_vars: Vec<_> = vars[co_idx][..=s].iter().copied().collect();
+                        if !upto_vars.is_empty() {
+                            let sum_upto: LinearExpr = upto_vars.into_iter().collect();
+                            model.add_linear_constraint(sum_upto - cur, [(0, i64::MAX)]);
+                        } else {
+                            model.add_eq(cur, 0);
+                        }
+                    }
+                } else {
+                    for s in 0..num_semesters {
+                        model.add_eq(vars[course_idx][s], 0);
+                    }
+                }
+            }
+            _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
         }
+    }
+    for (i, c) in courses.iter().enumerate() {
+        add_prereq_constraints(&mut model, &vars, &idx_map, courses, i, &c.prereqs, num_semesters);
     }
     // Gen-ed requirements
     let gened_reqs = vec![("WRI", 1), ("HUM", 1), ("SCI", 1)];
@@ -105,18 +226,97 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
 }
 
 fn main() {
+    use prereqs::CourseReq::*;
+    use schedule::{CourseCode, CourseCodeSuffix};
     let courses = vec![
-        Course { id: "MATH101", credits: 4, required: true, geneds: vec![], elective_group: None, prereqs: vec![] },
-        Course { id: "MATH102", credits: 4, required: true, geneds: vec![], elective_group: None, prereqs: vec!["MATH101"] },
-        Course { id: "CS101", credits: 3, required: true, geneds: vec![], elective_group: None, prereqs: vec![] },
-        Course { id: "CS201", credits: 3, required: true, geneds: vec![], elective_group: None, prereqs: vec!["CS101"] },
-        Course { id: "ENG001", credits: 3, required: false, geneds: vec!["WRI"], elective_group: None, prereqs: vec![] },
-        Course { id: "PHIL01", credits: 3, required: false, geneds: vec!["HUM"], elective_group: None, prereqs: vec![] },
-        Course { id: "BIO01", credits: 4, required: false, geneds: vec!["SCI"], elective_group: None, prereqs: vec![] },
-        Course { id: "ART01", credits: 3, required: false, geneds: vec!["ART"], elective_group: None, prereqs: vec![] },
-        Course { id: "ELEC_A1", credits: 2, required: false, geneds: vec![], elective_group: Some("ELEC_A"), prereqs: vec![] },
-        Course { id: "ELEC_A2", credits: 3, required: false, geneds: vec![], elective_group: Some("ELEC_A"), prereqs: vec![] },
-        Course { id: "CS301", credits: 3, required: false, geneds: vec![], elective_group: None, prereqs: vec!["CS201"] },
+        Course {
+            code: CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(101) },
+            credits: 4,
+            required: true,
+            geneds: vec![],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(102) },
+            credits: 4,
+            required: true,
+            geneds: vec![],
+            elective_group: None,
+            prereqs: PreCourse(CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(101) }),
+        },
+        Course {
+            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(101) },
+            credits: 3,
+            required: true,
+            geneds: vec![],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(201) },
+            credits: 3,
+            required: true,
+            geneds: vec![],
+            elective_group: None,
+            prereqs: PreCourse(CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(101) }),
+        },
+        Course {
+            code: CourseCode { stem: "ENG".to_string(), code: CourseCodeSuffix::from(1) },
+            credits: 3,
+            required: false,
+            geneds: vec!["WRI"],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "PHIL".to_string(), code: CourseCodeSuffix::from(1) },
+            credits: 3,
+            required: false,
+            geneds: vec!["HUM"],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "BIO".to_string(), code: CourseCodeSuffix::from(1) },
+            credits: 4,
+            required: false,
+            geneds: vec!["SCI"],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "ART".to_string(), code: CourseCodeSuffix::from(1) },
+            credits: 3,
+            required: false,
+            geneds: vec!["ART"],
+            elective_group: None,
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "ELEC_A".to_string(), code: CourseCodeSuffix::from(1) },
+            credits: 2,
+            required: false,
+            geneds: vec![],
+            elective_group: Some("ELEC_A"),
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "ELEC_A".to_string(), code: CourseCodeSuffix::from(2) },
+            credits: 3,
+            required: false,
+            geneds: vec![],
+            elective_group: Some("ELEC_A"),
+            prereqs: NotRequired,
+        },
+        Course {
+            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(301) },
+            credits: 3,
+            required: false,
+            geneds: vec![],
+            elective_group: None,
+            prereqs: PreCourse(CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(201) }),
+        },
     ];
     let num_semesters = 8;
     let max_credits_per_semester = 18;
