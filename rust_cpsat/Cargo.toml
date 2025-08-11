@@ -1,0 +1,11 @@
+[package]
+name = "rust_cpsat"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+or-tools = { git = "https://github.com/bc-ross/or-tools-rs.git", rev = "ccd3af5f3918302712311265497fc13997ec47dc", features = [
+    "solver-scip",
+    "prebuilt",
+], default-features = false }
+anyhow = "^1.0.98"
