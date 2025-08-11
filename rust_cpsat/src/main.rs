@@ -297,8 +297,8 @@ fn main() {
     use crate::load_catalogs::CATALOGS;
     let catalog = &CATALOGS[0];
     let mut course_codes: Vec<CourseCode> = catalog.courses.keys().cloned().collect();
-    let assigned: Vec<CourseCode> = course_codes.drain(0..3).collect();
-    let mut semesters: Vec<Vec<CourseCode>> = vec![vec![]; 3];
+    let assigned: Vec<CourseCode> = course_codes.drain(0..8).collect();
+    let mut semesters: Vec<Vec<CourseCode>> = vec![vec![]; 8];
     for (i, code) in assigned.into_iter().enumerate() {
         semesters[i].push(code);
     }
