@@ -83,20 +83,19 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
                             PreCourse(code) => {
                                 if let Some(&pre_idx) = idx_map.get(code) {
                                     if s == 0 {
-                                        model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                        // If s == 0, can't satisfy PreCourse, so or_var must be false if cur is true
+                                        // Instead, just don't add or_var to or_exprs in this case
                                     } else {
                                         let earlier_vars: Vec<_> = vars[pre_idx][..s].iter().copied().collect();
                                         if !earlier_vars.is_empty() {
                                             let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
-                                            // or_var => sum_earlier >= 1
-                                            model.add_bool_and([or_var, model.new_bool_var_with_name("")]);
+                                            // If cur is taken, require sum_earlier >= 1
+                                            // or_var = 1 <=> sum_earlier >= 1
+                                            // We approximate: sum_earlier >= or_var
                                             model.add_linear_constraint(sum_earlier - or_var, [(0, i64::MAX)]);
-                                        } else {
-                                            model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                            or_exprs.push(or_var);
                                         }
                                     }
-                                } else {
-                                    model.add_implication(or_var, model.new_fixed_bool_var(false));
                                 }
                             }
                             CoCourse(code) => {
@@ -105,11 +104,8 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
                                     if !upto_vars.is_empty() {
                                         let sum_upto: LinearExpr = upto_vars.into_iter().collect();
                                         model.add_linear_constraint(sum_upto - or_var, [(0, i64::MAX)]);
-                                    } else {
-                                        model.add_implication(or_var, model.new_fixed_bool_var(false));
+                                        or_exprs.push(or_var);
                                     }
-                                } else {
-                                    model.add_implication(or_var, model.new_fixed_bool_var(false));
                                 }
                             }
                             And(_) | Or(_) => {
@@ -362,7 +358,7 @@ fn main() {
                         let mut sem_credits = 0;
                         for (i, c) in courses.iter().enumerate() {
                             if vars2[i][s].solution_value(&response2) {
-                                println!("  {} ({} credits)", c.id, c.credits);
+                                println!("  {} ({} credits)", c.code, c.credits);
                                 sem_credits += c.credits;
                             }
                         }
@@ -386,7 +382,7 @@ fn main() {
                 let mut sem_credits = 0;
                 for (i, c) in courses.iter().enumerate() {
                     if vars[i][s].solution_value(&response) {
-                        println!("  {} ({} credits)", c.id, c.credits);
+                        println!("  {} ({} credits)", c.code, c.credits);
                         sem_credits += c.credits;
                     }
                 }
