@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-or-tools = { git = "https://github.com/bc-ross/or-tools-rs.git", rev = "ccd3af5f3918302712311265497fc13997ec47dc", features = [
-    "solver-scip",
-    "prebuilt",
-], default-features = false }
+# or-tools = { git = "https://github.com/bc-ross/or-tools-rs.git", rev = "ccd3af5f3918302712311265497fc13997ec47dc", features = [
+#     "solver-scip",
+#     "prebuilt",
+# ], default-features = false }
+cp_sat = { git = "https://github.com/bc-ross/cp_sat.git", rev = "df64003e48e2a7371530eacc3215daaec61c5d50" }
 anyhow = "^1.0.98"
