@@ -1,6 +1,6 @@
+use or_tools::sat::cp_model::*;
 use or_tools::sat::*;
 use std::collections::HashMap;
-use or_tools::sat::cp_model::*;
 
 #[derive(Debug)]
 struct Course {
@@ -118,15 +118,15 @@ fn main() {
         course_idx.insert(course.id, i);
     }
 
-    // Create model
-    let mut model = CpModel::new();
+    // Create model builder
+    let mut model = cp_model_builder();
 
     // Create boolean vars for course in semester
     let mut c_vars: Vec<Vec<IntVar>> = Vec::with_capacity(courses.len());
-    for _ in 0..courses.len() {
+    for i in 0..courses.len() {
         let mut sem_vars = Vec::with_capacity(num_semesters);
         for s in 0..num_semesters {
-            sem_vars.push(model.new_bool_var(&format!("c_{}_sem_{}", c_vars.len(), s)));
+            sem_vars.push(model.new_bool_var().with_name(&format!("c_{}_sem_{}", i, s)));
         }
         c_vars.push(sem_vars);
     }
@@ -134,16 +134,14 @@ fn main() {
     // Each required course must be taken exactly once
     for (i, course) in courses.iter().enumerate() {
         if course.required {
-            let vars = &c_vars[i];
-            model.add_exactly_one(vars);
+            model.add_exactly_one(&c_vars[i]);
         }
     }
 
     // Optional courses: at most one semester
     for (i, course) in courses.iter().enumerate() {
         if !course.required {
-            let vars = &c_vars[i];
-            model.add_at_most_one(vars);
+            model.add_at_most_one(&c_vars[i]);
         }
     }
 
@@ -153,13 +151,18 @@ fn main() {
             let pre_i = *course_idx.get(pre).unwrap();
             for s in 0..num_semesters {
                 if s == 0 {
-                    model.add_equality(&c_vars[i][0], 0);
+                    // If course is taken in first semester, prerequisite cannot be satisfied
+                    model.add_equality(c_vars[i][0], 0);
                 } else {
                     // c_vars[i][s] => OR of c_vars[pre_i][0..s-1]
-                    let pre_before_s = &c_vars[pre_i][..s];
-                    let sum_pre: IntExpr =
-                        pre_before_s.iter().cloned().map(IntVar::into_expr).sum();
-                    model.add_implication_with_at_least(&c_vars[i][s], sum_pre.ge(1));
+                    let mut pre_vars = Vec::new();
+                    for t in 0..s {
+                        pre_vars.push(c_vars[pre_i][t]);
+                    }
+                    if !pre_vars.is_empty() {
+                        let pre_sum = linear_expr_sum(&pre_vars);
+                        model.add_implication(c_vars[i][s], pre_sum.ge(1));
+                    }
                 }
             }
         }
@@ -171,11 +174,14 @@ fn main() {
         for (i, course) in courses.iter().enumerate() {
             if course.geneds.contains(&gened) {
                 for s in 0..num_semesters {
-                    gened_vars.push(c_vars[i][s].clone());
+                    gened_vars.push(c_vars[i][s]);
                 }
             }
         }
-        model.add_at_least_k(gened_vars, count);
+        if !gened_vars.is_empty() {
+            let sum = linear_expr_sum(&gened_vars);
+            model.add_linear_constraint(sum, Domain::from(count..));
+        }
     }
 
     // Elective group requirements
@@ -184,52 +190,59 @@ fn main() {
         for (i, course) in courses.iter().enumerate() {
             if course.elective_group == Some(grp) {
                 for s in 0..num_semesters {
-                    elective_vars.push(c_vars[i][s].clone());
+                    elective_vars.push(c_vars[i][s]);
                 }
             }
         }
-        model.add_at_least_k(elective_vars, count);
+        if !elective_vars.is_empty() {
+            let sum = linear_expr_sum(&elective_vars);
+            model.add_linear_constraint(sum, Domain::from(count..));
+        }
     }
 
     // Per-semester credit limit
     for s in 0..num_semesters {
-        let mut weighted_vars = Vec::new();
+        let mut vars = Vec::new();
+        let mut coeffs = Vec::new();
         for (i, course) in courses.iter().enumerate() {
-            weighted_vars.push((c_vars[i][s].clone(), course.credits));
+            vars.push(c_vars[i][s]);
+            coeffs.push(course.credits);
         }
-        model.add_weighted_sum_less_or_equal(weighted_vars, max_credits_per_sem);
+        model.add_linear_constraint_with_coeffs(&vars, &coeffs, Domain::from(..=max_credits_per_sem));
     }
 
     // Objective: minimize total credits
-    let mut obj_terms = Vec::new();
-    for (i, course) in courses.iter().enumerate() {
-        for s in 0..num_semesters {
-            obj_terms.push((c_vars[i][s].clone(), course.credits));
-        }
-    }
-    model.minimize_weighted_sum(obj_terms);
+    let credit_terms: Vec<LinearExpr> = courses.iter().enumerate()
+        .flat_map(|(i, course)| {
+            (0..num_semesters).map(move |s| LinearExpr::from(c_vars[i][s]) * course.credits)
+        })
+        .collect();
+    let total_credits = LinearExpr::sum(credit_terms);
+    model.minimize(total_credits);
 
     // Solve
-    let solver = CpSolver::new();
-    let status = solver.solve(&model);
+    let model = model.build();
+    let response = solve_cp_model(&model);
 
-    if status == CpSolverStatus::Optimal || status == CpSolverStatus::Feasible {
-        println!("Schedule found:");
-        let solution = solver.solution().expect("Expected solution");
+    match response.status() {
+        CpSolverStatus::Optimal | CpSolverStatus::Feasible => {
+            println!("Schedule found:");
 
-        for s in 0..num_semesters {
-            println!("Semester {}", s + 1);
-            let mut sem_credits = 0;
-            for (i, course) in courses.iter().enumerate() {
-                if solution.value(&c_vars[i][s]) > 0 {
-                    println!("  {} ({} credits)", course.id, course.credits);
-                    sem_credits += course.credits;
+            for s in 0..num_semesters {
+                println!("Semester {}", s + 1);
+                let mut sem_credits = 0;
+                for (i, course) in courses.iter().enumerate() {
+                    if response.boolean_value(c_vars[i][s]) {
+                        println!("  {} ({} credits)", course.id, course.credits);
+                        sem_credits += course.credits;
+                    }
                 }
+                println!("  Credits: {}", sem_credits);
             }
-            println!("  Credits: {}", sem_credits);
+            println!("Total credits: {}", response.objective_value());
         }
-        println!("Total credits: {}", solution.objective_value());
-    } else {
-        println!("No solution found.");
+        _ => {
+            println!("No solution found. Status: {:?}", response.status());
+        }
     }
 }
