@@ -4,7 +4,8 @@ use crate::model_context::ModelBuilderContext;
 pub fn add_semester_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     // For each semester, sum the credits of all courses scheduled and add a constraint
     for s in 0..ctx.num_semesters {
-        let weighted_terms: Vec<(i64, _)> = ctx.courses
+        let weighted_terms: Vec<(i64, _)> = ctx
+            .courses
             .iter()
             .enumerate()
             .map(|(i, c)| (c.credits, ctx.vars[i][s]))

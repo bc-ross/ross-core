@@ -1,7 +1,7 @@
 //! Context struct for model building and shared state.
-use cp_sat::builder::{CpModelBuilder, BoolVar, LinearExpr};
-use crate::schedule::{Schedule, CourseCode, Catalog};
 use crate::prereqs::CourseReq;
+use crate::schedule::{Catalog, CourseCode, Schedule};
+use cp_sat::builder::{BoolVar, CpModelBuilder, LinearExpr};
 
 #[derive(Clone)]
 pub struct Course<'a> {
@@ -38,7 +38,12 @@ impl<'a> ModelBuilderContext<'a> {
         }
         while let Some(code) = queue.pop_front() {
             if let Some(req) = sched.catalog.prereqs.get(&code) {
-                fn collect_prereq_codes(req: &CourseReq, all_codes: &mut std::collections::HashSet<CourseCode>, catalog: &Catalog, queue: &mut std::collections::VecDeque<CourseCode>) {
+                fn collect_prereq_codes(
+                    req: &CourseReq,
+                    all_codes: &mut std::collections::HashSet<CourseCode>,
+                    catalog: &Catalog,
+                    queue: &mut std::collections::VecDeque<CourseCode>,
+                ) {
                     use crate::prereqs::CourseReq::*;
                     match req {
                         And(reqs) | Or(reqs) => {
@@ -63,7 +68,12 @@ impl<'a> ModelBuilderContext<'a> {
             let (credits, prereqs) = match sched.catalog.courses.get(code) {
                 Some((_name, credits_opt, _offering)) => {
                     let credits = credits_opt.unwrap_or(0) as i64;
-                    let prereqs = sched.catalog.prereqs.get(code).cloned().unwrap_or(CourseReq::NotRequired);
+                    let prereqs = sched
+                        .catalog
+                        .prereqs
+                        .get(code)
+                        .cloned()
+                        .unwrap_or(CourseReq::NotRequired);
                     (credits, prereqs)
                 }
                 None => (0, CourseReq::NotRequired),
@@ -95,7 +105,11 @@ impl<'a> ModelBuilderContext<'a> {
     }
 
     /// Compute the total credits LinearExpr for the current context
-    pub fn total_credits_expr(&self, vars: &Vec<Vec<BoolVar>>, flat_courses: &Vec<(Course, i64)>) -> LinearExpr {
+    pub fn total_credits_expr(
+        &self,
+        vars: &Vec<Vec<BoolVar>>,
+        flat_courses: &Vec<(Course, i64)>,
+    ) -> LinearExpr {
         let mut obj_terms = Vec::new();
         for (i, (_course, credits)) in flat_courses.iter().enumerate() {
             for s in 0..self.num_semesters {
@@ -107,12 +121,18 @@ impl<'a> ModelBuilderContext<'a> {
 }
 
 /// Build the model pipeline: add variables, constraints, and return (model, vars, flat_courses)
-pub fn build_model_pipeline<'a>(ctx: &mut ModelBuilderContext<'a>) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course<'a>, i64)>) {
+pub fn build_model_pipeline<'a>(
+    ctx: &mut ModelBuilderContext<'a>,
+) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course<'a>, i64)>) {
     crate::model_courses::add_courses(ctx);
     crate::model_prereqs::add_prereq_constraints(ctx);
     crate::model_geneds::add_gened_constraints(ctx);
     crate::model_semester::add_semester_constraints(ctx);
     // Build flat_courses as (Course, credits)
     let flat_courses = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
-    (std::mem::replace(&mut ctx.model, CpModelBuilder::default()), ctx.vars.clone(), flat_courses)
+    (
+        std::mem::replace(&mut ctx.model, CpModelBuilder::default()),
+        ctx.vars.clone(),
+        flat_courses,
+    )
 }
