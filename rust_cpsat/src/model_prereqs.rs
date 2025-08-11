@@ -3,11 +3,14 @@ use crate::model_context::{ModelBuilderContext, Course};
 use std::collections::HashMap;
 use crate::schedule::CourseCode;
 use crate::prereqs::CourseReq;
+use cp_sat::builder::LinearExpr;
 
 pub fn add_prereq_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     let idx_map: HashMap<_, _> = ctx.courses.iter().enumerate().map(|(i, c)| (c.code.clone(), i)).collect();
-    for (i, c) in ctx.courses.iter().enumerate() {
-        add_prereq_for_course(ctx, &idx_map, i, &c.prereqs);
+    // Avoid borrow checker issues: collect prereqs first
+    let prereqs: Vec<_> = ctx.courses.iter().map(|c| c.prereqs.clone()).collect();
+    for (i, req) in prereqs.iter().enumerate() {
+        add_prereq_for_course(ctx, &idx_map, i, req);
     }
 }
 
@@ -34,7 +37,7 @@ fn add_prereq_for_course<'a>(ctx: &mut ModelBuilderContext<'a>, idx_map: &HashMa
                                 } else {
                                     let earlier_vars: Vec<_> = ctx.vars[pre_idx][..s].iter().copied().collect();
                                     if !earlier_vars.is_empty() {
-                                        let sum_earlier = earlier_vars.into_iter().collect();
+                                        let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
                                         ctx.model.add_linear_constraint(sum_earlier - or_var, [(0, i64::MAX)]);
                                         or_exprs.push(or_var);
                                     }
@@ -45,7 +48,7 @@ fn add_prereq_for_course<'a>(ctx: &mut ModelBuilderContext<'a>, idx_map: &HashMa
                             if let Some(&co_idx) = idx_map.get(code) {
                                 let upto_vars: Vec<_> = ctx.vars[co_idx][..=s].iter().copied().collect();
                                 if !upto_vars.is_empty() {
-                                    let sum_upto = upto_vars.into_iter().collect();
+                                    let sum_upto: LinearExpr = upto_vars.into_iter().collect();
                                     ctx.model.add_linear_constraint(sum_upto - or_var, [(0, i64::MAX)]);
                                     or_exprs.push(or_var);
                                 }
@@ -59,7 +62,7 @@ fn add_prereq_for_course<'a>(ctx: &mut ModelBuilderContext<'a>, idx_map: &HashMa
                     or_exprs.push(or_var);
                 }
                 if !or_exprs.is_empty() {
-                    let sum_or = or_exprs.iter().copied().collect();
+                    let sum_or: LinearExpr = or_exprs.iter().copied().collect();
                     ctx.model.add_linear_constraint(sum_or - cur, [(0, i64::MAX)]);
                 }
             }
@@ -73,7 +76,7 @@ fn add_prereq_for_course<'a>(ctx: &mut ModelBuilderContext<'a>, idx_map: &HashMa
                     } else {
                         let earlier_vars: Vec<_> = ctx.vars[pre_idx][..s].iter().copied().collect();
                         if !earlier_vars.is_empty() {
-                            let sum_earlier = earlier_vars.into_iter().collect();
+                            let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
                             ctx.model.add_linear_constraint(sum_earlier - cur, [(0, i64::MAX)]);
                         } else {
                             ctx.model.add_eq(cur, 0);
@@ -92,7 +95,7 @@ fn add_prereq_for_course<'a>(ctx: &mut ModelBuilderContext<'a>, idx_map: &HashMa
                     let cur = ctx.vars[course_idx][s];
                     let upto_vars: Vec<_> = ctx.vars[co_idx][..=s].iter().copied().collect();
                     if !upto_vars.is_empty() {
-                        let sum_upto = upto_vars.into_iter().collect();
+                        let sum_upto: LinearExpr = upto_vars.into_iter().collect();
                         ctx.model.add_linear_constraint(sum_upto - cur, [(0, i64::MAX)]);
                     } else {
                         ctx.model.add_eq(cur, 0);
