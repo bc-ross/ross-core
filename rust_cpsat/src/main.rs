@@ -1,3 +1,68 @@
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::schedule::{Schedule, Semester, CourseCode};
+    use crate::load_catalogs::CATALOGS;
+
+    #[test]
+    fn test_fake_schedule_from_catalog() {
+        // Use the first catalog from CATALOGS
+        let catalog = &CATALOGS[0];
+        // Pick a few valid course codes from the catalog
+        let mut course_codes: Vec<CourseCode> = catalog.courses.keys().cloned().collect();
+        // Just pick the first 3 for this test
+        let assigned: Vec<CourseCode> = course_codes.drain(0..3).collect();
+        // Assign each to a different semester
+        let mut semesters: Vec<Semester> = vec![vec![]; 3];
+        for (i, code) in assigned.into_iter().enumerate() {
+            semesters[i].push(code);
+        }
+        let sched = Schedule {
+            courses: semesters,
+            programs: vec![],
+            catalog: catalog.clone(),
+        };
+        // Print for debug
+        for (i, sem) in sched.courses.iter().enumerate() {
+            println!("Semester {}: {:?}", i + 1, sem);
+        }
+        assert_eq!(sched.courses.len(), 3);
+    }
+}
+/// Build the model and return (model, vars, total_credits LinearExpr)
+/// If schedule is provided, use its courses as required, and look up credits/prereqs from catalog.
+fn build_model_from_schedule(
+    sched: &schedule::Schedule,
+    max_credits_per_semester: i64,
+    min_credits: Option<i64>,
+) -> (CpModelBuilder, Vec<Vec<cp_sat::builder::BoolVar>>, LinearExpr) {
+    let num_semesters = sched.courses.len();
+    // Build Course list from schedule and catalog
+    let mut courses = Vec::new();
+    for (sem_idx, sem) in sched.courses.iter().enumerate() {
+        for code in sem {
+            // Look up credits and prereqs from catalog
+            let (credits, prereqs) = match sched.catalog.courses.get(code) {
+                Some((_name, credits_opt, _offering)) => {
+                    let credits = credits_opt.unwrap_or(0) as i64;
+                    let prereqs = sched.catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
+                    (credits, prereqs)
+                }
+                None => (0, prereqs::CourseReq::NotRequired),
+            };
+            courses.push(Course {
+                code: code.clone(),
+                credits,
+                required: true,
+                geneds: vec![],
+                elective_group: None,
+                prereqs,
+            });
+        }
+    }
+    // Now build the model as before, but all courses are required
+    build_model(&courses, num_semesters, max_credits_per_semester, min_credits)
+}
 use cp_sat::builder::{CpModelBuilder, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
 use std::collections::HashMap;
@@ -11,6 +76,9 @@ mod prereqs;
 
 #[path = "../../src/geneds.rs"]
 mod geneds;
+
+#[path = "../../src/load_catalogs.rs"]
+mod load_catalogs;
 
 use prereqs::CourseReq;
 use schedule::CourseCode;
@@ -225,103 +293,41 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
 }
 
 fn main() {
-    use prereqs::CourseReq::*;
-    use schedule::{CourseCode, CourseCodeSuffix};
-    let courses = vec![
-        Course {
-            code: CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(101) },
-            credits: 4,
-            required: true,
-            geneds: vec![],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(102) },
-            credits: 4,
-            required: true,
-            geneds: vec![],
-            elective_group: None,
-            prereqs: PreCourse(CourseCode { stem: "MATH".to_string(), code: CourseCodeSuffix::from(101) }),
-        },
-        Course {
-            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(101) },
-            credits: 3,
-            required: true,
-            geneds: vec![],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(201) },
-            credits: 3,
-            required: true,
-            geneds: vec![],
-            elective_group: None,
-            prereqs: PreCourse(CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(101) }),
-        },
-        Course {
-            code: CourseCode { stem: "ENG".to_string(), code: CourseCodeSuffix::from(1) },
-            credits: 3,
-            required: false,
-            geneds: vec!["WRI"],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "PHIL".to_string(), code: CourseCodeSuffix::from(1) },
-            credits: 3,
-            required: false,
-            geneds: vec!["HUM"],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "BIO".to_string(), code: CourseCodeSuffix::from(1) },
-            credits: 4,
-            required: false,
-            geneds: vec!["SCI"],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "ART".to_string(), code: CourseCodeSuffix::from(1) },
-            credits: 3,
-            required: false,
-            geneds: vec!["ART"],
-            elective_group: None,
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "ELEC_A".to_string(), code: CourseCodeSuffix::from(1) },
-            credits: 2,
-            required: false,
-            geneds: vec![],
-            elective_group: Some("ELEC_A"),
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "ELEC_A".to_string(), code: CourseCodeSuffix::from(2) },
-            credits: 3,
-            required: false,
-            geneds: vec![],
-            elective_group: Some("ELEC_A"),
-            prereqs: NotRequired,
-        },
-        Course {
-            code: CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(301) },
-            credits: 3,
-            required: false,
-            geneds: vec![],
-            elective_group: None,
-            prereqs: PreCourse(CourseCode { stem: "CS".to_string(), code: CourseCodeSuffix::from(201) }),
-        },
-    ];
-    let num_semesters = 8;
+    // --- Use a real catalog and fake schedule ---
+    use crate::load_catalogs::CATALOGS;
+    let catalog = &CATALOGS[0];
+    let mut course_codes: Vec<CourseCode> = catalog.courses.keys().cloned().collect();
+    let assigned: Vec<CourseCode> = course_codes.drain(0..3).collect();
+    let mut semesters: Vec<Vec<CourseCode>> = vec![vec![]; 3];
+    for (i, code) in assigned.into_iter().enumerate() {
+        semesters[i].push(code);
+    }
+    let sched = schedule::Schedule {
+        courses: semesters,
+        programs: vec![],
+        catalog: catalog.clone(),
+    };
+    println!("{:?}", &sched.courses);
     let max_credits_per_semester = 18;
-
     // Stage 1: minimize total credits
-    let (mut model, vars, total_credits) = build_model(&courses, num_semesters, max_credits_per_semester, None);
+    let (mut model, vars, total_credits);
+    let mut flat_courses = Vec::new();
+    // Build flat_courses in the same order as build_model_from_schedule
+    for sem in &sched.courses {
+        for code in sem {
+            let (credits, prereqs) = match catalog.courses.get(code) {
+                Some((_name, credits_opt, _offering)) => {
+                    let credits = credits_opt.unwrap_or(0) as i64;
+                    let prereqs = catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
+                    (credits, prereqs)
+                }
+                None => (0, prereqs::CourseReq::NotRequired),
+            };
+            flat_courses.push((code.clone(), credits));
+        }
+    }
+    let num_semesters = sched.courses.len();
+    (model, vars, total_credits) = build_model_from_schedule(&sched, max_credits_per_semester, None);
     model.minimize(total_credits.clone());
     let response = model.solve();
     let mut min_credits = None;
@@ -335,14 +341,14 @@ fn main() {
     // Stage 2: minimize spread, subject to min total credits
     if SPREAD_SEMESTERS {
         if let Some(min_credits) = min_credits {
-            let (mut model2, vars2, total_credits2) = build_model(&courses, num_semesters, max_credits_per_semester, Some(min_credits));
+            let (mut model2, vars2, total_credits2) = build_model_from_schedule(&sched, max_credits_per_semester, Some(min_credits));
             // Compute mean load (rounded down)
-            let total_credits_int: i64 = courses.iter().map(|c| c.credits).sum();
+            let total_credits_int: i64 = flat_courses.iter().map(|(_code, credits)| *credits).sum();
             let mean_load = total_credits_int / num_semesters as i64;
             let mut abs_deviation_vars = Vec::new();
             for s in 0..num_semesters {
-                let semester_credits: LinearExpr = courses.iter().enumerate()
-                    .map(|(i, c)| (c.credits, vars2[i][s]))
+                let semester_credits: LinearExpr = flat_courses.iter().enumerate()
+                    .map(|(i, (_code, credits))| (*credits, vars2[i][s]))
                     .collect();
                 let deviation = semester_credits.clone() - mean_load;
                 let abs_dev = model2.new_int_var([(0, 1000)]);
@@ -359,10 +365,10 @@ fn main() {
                     for s in 0..num_semesters {
                         println!("Semester {}", s + 1);
                         let mut sem_credits = 0;
-                        for (i, c) in courses.iter().enumerate() {
+                        for (i, (code, credits)) in flat_courses.iter().enumerate() {
                             if vars2[i][s].solution_value(&response2) {
-                                println!("  {} ({} credits)", c.code, c.credits);
-                                sem_credits += c.credits;
+                                println!("  {} ({} credits)", code, credits);
+                                sem_credits += credits;
                             }
                         }
                         println!("  Credits: {}", sem_credits);
@@ -383,10 +389,10 @@ fn main() {
             for s in 0..num_semesters {
                 println!("Semester {}", s + 1);
                 let mut sem_credits = 0;
-                for (i, c) in courses.iter().enumerate() {
+                for (i, (code, credits)) in flat_courses.iter().enumerate() {
                     if vars[i][s].solution_value(&response) {
-                        println!("  {} ({} credits)", c.code, c.credits);
-                        sem_credits += c.credits;
+                        println!("  {} ({} credits)", code, credits);
+                        sem_credits += credits;
                     }
                 }
                 println!("  Credits: {}", sem_credits);
