@@ -29,22 +29,25 @@ mod tests {
         assert_eq!(sched.courses.len(), 3);
     }
 }
-/// Build the model and return (model, vars, total_credits LinearExpr)
-/// If schedule is provided, use its courses as required, and look up credits/prereqs from catalog.
+
+mod model;
+use crate::model::Course;
+
 fn build_model_from_schedule(
     sched: &schedule::Schedule,
     max_credits_per_semester: i64,
     min_credits: Option<i64>,
 ) -> (
-    CpModelBuilder,
+    cp_sat::builder::CpModelBuilder,
     Vec<Vec<cp_sat::builder::BoolVar>>,
-    LinearExpr,
+    cp_sat::builder::LinearExpr,
 ) {
+    // Use the legacy build_model for now, until ModelBuilderContext and build_model_pipeline are implemented in model.rs
+    // This allows the crate to build and run while modularization is finalized.
     let num_semesters = sched.courses.len();
-    use std::collections::{HashSet, VecDeque};
-    // Collect all assigned and transitive prereq courses
-    let mut all_codes = HashSet::new();
-    let mut queue = VecDeque::new();
+    use crate::model::Course;
+    let mut all_codes = std::collections::HashSet::new();
+    let mut queue = std::collections::VecDeque::new();
     for sem in &sched.courses {
         for code in sem {
             all_codes.insert(code.clone());
@@ -53,34 +56,55 @@ fn build_model_from_schedule(
     }
     while let Some(code) = queue.pop_front() {
         if let Some(req) = sched.catalog.prereqs.get(&code) {
+            fn collect_prereq_codes(
+                req: &prereqs::CourseReq,
+                all_codes: &mut std::collections::HashSet<CourseCode>,
+                catalog: &schedule::Catalog,
+                queue: &mut std::collections::VecDeque<CourseCode>,
+            ) {
+                use prereqs::CourseReq::*;
+                match req {
+                    And(reqs) | Or(reqs) => {
+                        for r in reqs {
+                            collect_prereq_codes(r, all_codes, catalog, queue);
+                        }
+                    }
+                    PreCourse(code) | CoCourse(code) => {
+                        if all_codes.insert(code.clone()) {
+                            queue.push_back(code.clone());
+                        }
+                    }
+                    _ => {}
+                }
+            }
             collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
         }
     }
-
-    // Helper: recursively collect all CourseCodes from a CourseReq
-    fn collect_prereq_codes(
-        req: &prereqs::CourseReq,
-        all_codes: &mut HashSet<CourseCode>,
-        catalog: &schedule::Catalog,
-        queue: &mut VecDeque<CourseCode>,
-    ) {
-        use prereqs::CourseReq::*;
+    let mut gened_codes = std::collections::HashSet::new();
+    for gened in &sched.catalog.geneds {
+        use crate::geneds::GenEdReq;
+        let req = match gened {
+            crate::geneds::GenEd::Core { req, .. } => req,
+            crate::geneds::GenEd::Foundation { req, .. } => req,
+            crate::geneds::GenEd::SkillAndPerspective { req, .. } => req,
+        };
         match req {
-            And(reqs) | Or(reqs) => {
-                for r in reqs {
-                    collect_prereq_codes(r, all_codes, catalog, queue);
+            GenEdReq::Set(codes) => {
+                gened_codes.extend(codes.iter().cloned());
+            }
+            GenEdReq::SetOpts(opts) => {
+                for set in opts {
+                    gened_codes.extend(set.iter().cloned());
                 }
             }
-            PreCourse(code) | CoCourse(code) => {
-                if all_codes.insert(code.clone()) {
-                    queue.push_back(code.clone());
-                }
+            GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+                gened_codes.extend(courses.iter().cloned());
             }
-            _ => {}
         }
     }
-
-    // Build Course list for all required codes
+    for code in &all_codes {
+        gened_codes.remove(code);
+    }
     let mut courses = Vec::new();
     for code in &all_codes {
         let (credits, prereqs) = match sched.catalog.courses.get(code) {
@@ -105,11 +129,36 @@ fn build_model_from_schedule(
             prereqs,
         });
     }
-    build_model(
+    for code in &gened_codes {
+        let (credits, prereqs) = match sched.catalog.courses.get(code) {
+            Some((_name, credits_opt, _offering)) => {
+                let credits = credits_opt.unwrap_or(0) as i64;
+                let prereqs = sched
+                    .catalog
+                    .prereqs
+                    .get(code)
+                    .cloned()
+                    .unwrap_or(prereqs::CourseReq::NotRequired);
+                (credits, prereqs)
+            }
+            None => (0, prereqs::CourseReq::NotRequired),
+        };
+        courses.push(Course {
+            code: code.clone(),
+            credits,
+            required: false,
+            geneds: vec![],
+            elective_group: None,
+            prereqs,
+        });
+    }
+    crate::model::build_model(
         &courses,
         num_semesters,
         max_credits_per_semester,
         min_credits,
+        Some(&sched.catalog.geneds),
+        Some(&sched.catalog),
     )
 }
 use cp_sat::builder::{CpModelBuilder, LinearExpr};
@@ -131,15 +180,7 @@ mod load_catalogs;
 use prereqs::CourseReq;
 use schedule::CourseCode;
 
-#[derive(Clone)]
-struct Course<'a> {
-    code: CourseCode,
-    credits: i64,
-    required: bool,
-    geneds: Vec<&'a str>,
-    elective_group: Option<&'a str>,
-    prereqs: CourseReq,
-}
+
 
 /// Build the model and return (model, vars, total_credits LinearExpr)
 fn build_model<'a>(
@@ -147,6 +188,8 @@ fn build_model<'a>(
     num_semesters: usize,
     max_credits_per_semester: i64,
     min_credits: Option<i64>,
+    geneds: Option<&'a [crate::geneds::GenEd]>,
+    catalog: Option<&'a schedule::Catalog>,
 ) -> (
     CpModelBuilder,
     Vec<Vec<cp_sat::builder::BoolVar>>,
@@ -336,32 +379,243 @@ fn build_model<'a>(
             num_semesters,
         );
     }
-    // Gen-ed requirements
-    let gened_reqs = vec![("WRI", 1), ("HUM", 1), ("SCI", 1)];
-    for &(g, req) in &gened_reqs {
-        let mut all_vars = Vec::new();
-        for (i, c) in courses.iter().enumerate() {
-            if c.geneds.contains(&g) {
-                all_vars.extend(vars[i].iter().copied());
+    // --- GenEd constraints ---
+    if let (Some(geneds), Some(catalog)) = (geneds, catalog) {
+        use crate::geneds::{GenEd, GenEdReq};
+        use std::collections::HashMap;
+        // Build a map from CourseCode to index in courses
+        let idx_map: HashMap<_, _> = courses.iter().enumerate().map(|(i, c)| (c.code.clone(), i)).collect();
+        // Core: overlap allowed
+        for gened in geneds.iter() {
+            if let GenEd::Core { req, .. } = gened {
+                match req {
+                    GenEdReq::Set(codes) => {
+                        for code in codes {
+                            if let Some(&i) = idx_map.get(code) {
+                                let sum: LinearExpr = vars[i].iter().copied().collect();
+                                model.add_ge(sum, 1);
+                            }
+                        }
+                    }
+                    GenEdReq::SetOpts(opts) => {
+                        let mut set_vars = Vec::new();
+                        for set in opts {
+                            let mut set_and = Vec::new();
+                            for code in set {
+                                if let Some(&i) = idx_map.get(code) {
+                                    let sum: LinearExpr = vars[i].iter().copied().collect();
+                                    let present = model.new_bool_var();
+                                    model.add_ge(sum.clone(), present);
+                                    set_and.push(present);
+                                }
+                            }
+                            if !set_and.is_empty() {
+                                let and_var = model.new_bool_var();
+                                model.add_min_eq(and_var, set_and.iter().copied());
+                                set_vars.push(and_var);
+                            }
+                        }
+                        if !set_vars.is_empty() {
+                            let sum: LinearExpr = set_vars.iter().copied().collect();
+                            model.add_ge(sum, 1);
+                        }
+                    }
+                    GenEdReq::Courses { num, courses } => {
+                        let mut all_vars = Vec::new();
+                        for code in courses {
+                            if let Some(&i) = idx_map.get(code) {
+                                all_vars.extend(vars[i].iter().copied());
+                            }
+                        }
+                        if !all_vars.is_empty() {
+                            let sum: LinearExpr = all_vars.into_iter().collect();
+                            model.add_ge(sum, *num as i64);
+                        }
+                    }
+                    GenEdReq::Credits { num, courses } => {
+                        let mut all_vars = Vec::new();
+                        for code in courses {
+                            if let Some(&i) = idx_map.get(code) {
+                                for s in 0..num_semesters {
+                                    all_vars.push((catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0) as i64, vars[i][s]));
+                                }
+                            }
+                        }
+                        if !all_vars.is_empty() {
+                            let sum: LinearExpr = all_vars.into_iter().collect();
+                            model.add_ge(sum, *num as i64);
+                        }
+                    }
+                }
             }
         }
-        if !all_vars.is_empty() {
-            let sum: LinearExpr = all_vars.into_iter().collect();
-            model.add_ge(sum, req);
-        }
-    }
-    // Elective group requirements
-    let elective_reqs = vec![("ELEC_A", 1)];
-    for &(eg, req) in &elective_reqs {
-        let mut all_vars = Vec::new();
-        for (i, c) in courses.iter().enumerate() {
-            if c.elective_group == Some(eg) {
-                all_vars.extend(vars[i].iter().copied());
+        // Foundation: no course can be used for more than one Foundation
+        let mut foundation_course_indicators: HashMap<schedule::CourseCode, Vec<cp_sat::builder::BoolVar>> = HashMap::new();
+        let mut foundation_reqs = Vec::new();
+        for gened in geneds.iter() {
+            if let GenEd::Foundation { req, .. } = gened {
+                foundation_reqs.push(req);
             }
         }
-        if !all_vars.is_empty() {
-            let sum: LinearExpr = all_vars.into_iter().collect();
-            model.add_ge(sum, req);
+        for req in foundation_reqs.iter() {
+            match req {
+                GenEdReq::Set(codes) => {
+                    for code in codes {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let sum: LinearExpr = vars[i].iter().copied().collect();
+                            model.add_ge(sum.clone(), present);
+                            foundation_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                }
+                GenEdReq::SetOpts(opts) => {
+                    for set in opts {
+                        let mut set_and = Vec::new();
+                        for code in set {
+                            if let Some(&i) = idx_map.get(code) {
+                                let present = model.new_bool_var();
+                                let sum: LinearExpr = vars[i].iter().copied().collect();
+                                model.add_ge(sum.clone(), present);
+                                set_and.push(present);
+                                foundation_course_indicators.entry(code.clone()).or_default().push(present);
+                            }
+                        }
+                        if !set_and.is_empty() {
+                            let and_var = model.new_bool_var();
+                            model.add_min_eq(and_var, set_and.iter().copied());
+                        }
+                    }
+                }
+                GenEdReq::Courses { num, courses } => {
+                    let mut all_vars = Vec::new();
+                    for code in courses {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let sum: LinearExpr = vars[i].iter().copied().collect();
+                            model.add_ge(sum.clone(), present);
+                            all_vars.push(present);
+                            foundation_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                    if !all_vars.is_empty() {
+                        let sum: LinearExpr = all_vars.into_iter().collect();
+                        model.add_ge(sum, *num as i64);
+                    }
+                }
+                GenEdReq::Credits { num, courses } => {
+                    let mut all_vars = Vec::new();
+                    for code in courses {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let mut weighted_vars = Vec::new();
+                            for s in 0..num_semesters {
+                                let cr = catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0) as i64;
+                                weighted_vars.push((cr, vars[i][s]));
+                            }
+                            if !weighted_vars.is_empty() {
+                                let sum: LinearExpr = weighted_vars.into_iter().collect();
+                                model.add_ge(sum, present.clone());
+                            }
+                            all_vars.push(present);
+                            foundation_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                    if !all_vars.is_empty() {
+                        let sum: LinearExpr = all_vars.into_iter().collect();
+                        model.add_ge(sum, *num as i64);
+                    }
+                }
+            }
+        }
+        // For each course, sum of foundation indicators <= 1
+        for (_code, inds) in foundation_course_indicators.iter() {
+            let sum: LinearExpr = inds.iter().copied().collect();
+            model.add_le(sum, 1);
+        }
+        // S&P: each must be satisfied, but no course can be used for more than 3 S&Ps
+        let mut sp_course_indicators: HashMap<schedule::CourseCode, Vec<cp_sat::builder::BoolVar>> = HashMap::new();
+        let mut sp_reqs = Vec::new();
+        for gened in geneds.iter() {
+            if let GenEd::SkillAndPerspective { req, .. } = gened {
+                sp_reqs.push(req);
+            }
+        }
+        for req in sp_reqs.iter() {
+            match req {
+                GenEdReq::Set(codes) => {
+                    for code in codes {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let sum: LinearExpr = vars[i].iter().copied().collect();
+                            model.add_ge(sum.clone(), present);
+                            sp_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                }
+                GenEdReq::SetOpts(opts) => {
+                    for set in opts {
+                        let mut set_and = Vec::new();
+                        for code in set {
+                            if let Some(&i) = idx_map.get(code) {
+                                let present = model.new_bool_var();
+                                let sum: LinearExpr = vars[i].iter().copied().collect();
+                                model.add_ge(sum.clone(), present);
+                                set_and.push(present);
+                                sp_course_indicators.entry(code.clone()).or_default().push(present);
+                            }
+                        }
+                        if !set_and.is_empty() {
+                            let and_var = model.new_bool_var();
+                            model.add_min_eq(and_var, set_and.iter().copied());
+                        }
+                    }
+                }
+                GenEdReq::Courses { num, courses } => {
+                    let mut all_vars = Vec::new();
+                    for code in courses {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let sum: LinearExpr = vars[i].iter().copied().collect();
+                            model.add_ge(sum.clone(), present);
+                            all_vars.push(present);
+                            sp_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                    if !all_vars.is_empty() {
+                        let sum: LinearExpr = all_vars.into_iter().collect();
+                        model.add_ge(sum, *num as i64);
+                    }
+                }
+                GenEdReq::Credits { num, courses } => {
+                    let mut all_vars = Vec::new();
+                    for code in courses {
+                        if let Some(&i) = idx_map.get(code) {
+                            let present = model.new_bool_var();
+                            let mut weighted_vars = Vec::new();
+                            for s in 0..num_semesters {
+                                let cr = catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0) as i64;
+                                weighted_vars.push((cr, vars[i][s]));
+                            }
+                            if !weighted_vars.is_empty() {
+                                let sum: LinearExpr = weighted_vars.into_iter().collect();
+                                model.add_ge(sum, present.clone());
+                            }
+                            all_vars.push(present);
+                            sp_course_indicators.entry(code.clone()).or_default().push(present);
+                        }
+                    }
+                    if !all_vars.is_empty() {
+                        let sum: LinearExpr = all_vars.into_iter().collect();
+                        model.add_ge(sum, *num as i64);
+                    }
+                }
+            }
+        }
+        // For each course, sum of S&P indicators <= 3
+        for (_code, inds) in sp_course_indicators.iter() {
+            let sum: LinearExpr = inds.iter().copied().collect();
+            model.add_le(sum, 3);
         }
     }
     // Semester credit limits
