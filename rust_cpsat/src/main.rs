@@ -63,6 +63,9 @@ fn build_model<'a>(courses: &'a [Course<'a>], num_semesters: usize, max_credits_
     ) {
         use prereqs::CourseReq::*;
         match req {
+            NotRequired => {
+                // No constraints needed for NotRequired
+            }
             And(reqs) => {
                 for r in reqs {
                     add_prereq_constraints(model, vars, idx_map, courses, course_idx, r, num_semesters);
