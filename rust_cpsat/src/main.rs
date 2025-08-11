@@ -125,7 +125,35 @@ fn main() {
         }
     }
     let total_credits: LinearExpr = obj_terms.into_iter().collect();
-    model.minimize(total_credits);
+    model.minimize(total_credits.clone());
+
+    // Add a constant to toggle the secondary objective
+    const SPREAD_SEMESTERS: bool = true;
+
+    // Secondary objective: spread courses evenly across semesters
+    if SPREAD_SEMESTERS {
+        // Compute mean load (rounded down)
+        let total_credits_int: i64 = courses.iter().map(|c| c.credits).sum();
+        let mean_load = total_credits_int / num_semesters as i64;
+
+        // For each semester, compute the load in credits and deviation from mean
+        let mut abs_deviation_vars = Vec::new();
+        for s in 0..num_semesters {
+            let semester_credits: LinearExpr = courses.iter().enumerate()
+                .map(|(i, c)| (c.credits, vars[i][s]))
+                .collect();
+            // deviation = semester_credits - mean_load
+            let deviation = semester_credits.clone() - mean_load;
+            // Introduce an auxiliary integer variable for |deviation|
+            let abs_dev = model.new_int_var([(0, 1000)]); // 1000 is arbitrary upper bound
+            model.add_ge(abs_dev, deviation.clone());
+            model.add_ge(abs_dev, -deviation);
+            abs_deviation_vars.push(abs_dev);
+        }
+        // Minimize total credits + sum of abs deviations (weighted)
+        let spread_penalty: LinearExpr = abs_deviation_vars.iter().copied().collect();
+        model.minimize(total_credits + spread_penalty);
+    }
 
     // Solve and report
     let response = model.solve();
