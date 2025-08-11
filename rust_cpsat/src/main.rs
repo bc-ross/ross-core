@@ -1,5 +1,6 @@
-use cp_sat::builder::CpModelBuilder;
+use cp_sat::builder::{CpModelBuilder, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
+use std::collections::HashMap;
 
 struct Course<'a> {
     id: &'a str,
@@ -29,13 +30,15 @@ fn main() {
     let elective_reqs = vec![("ELEC_A", 1)];
 
     let num_semesters = 8;
+    let max_credits_per_semester = 18;
     let mut model = CpModelBuilder::default();
     let mut vars = Vec::new();
 
-    for (i, _) in courses.iter().enumerate() {
+    // Create boolean vars for each course in each semester
+    for i in 0..courses.len() {
         let mut sem_vars = Vec::new();
         for s in 0..num_semesters {
-            let v = model.new_bool_var(format!("c_{}_{}", i, s));
+            let v = model.new_bool_var_with_name(format!("c_{}_{}", i, s));
             sem_vars.push(v);
         }
         vars.push(sem_vars);
@@ -44,86 +47,106 @@ fn main() {
     // Required courses exactly once
     for (i, c) in courses.iter().enumerate() {
         if c.required {
-            model.add_exactly_one(&vars[i]);
+            model.add_exactly_one(vars[i].iter().copied());
         }
     }
 
     // Optional courses at most once
     for (i, c) in courses.iter().enumerate() {
         if !c.required {
-            model.add_at_most_one(&vars[i]);
+            model.add_at_most_one(vars[i].iter().copied());
         }
     }
 
-    // Prereqs: each course variable in semester s implies some prereq var in an earlier semester
-    let idx_map: std::collections::HashMap<_, _> =
-        courses.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
+    // Prerequisite constraints
+    let idx_map: HashMap<_, _> = courses.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
     for (i, c) in courses.iter().enumerate() {
         for &pre in &c.prereqs {
             let pi = idx_map[pre];
             for s in 0..num_semesters {
                 let cur = vars[i][s];
                 if s == 0 {
-                    model.add_equality(cur, 0);
+                    // Cannot take a course with prerequisites in the first semester
+                    model.add_eq(cur, 0);
                 } else {
-                    let earlier: Vec<_> = vars[pi][..s].iter().cloned().collect();
-                    model.add_implication(cur, model.linear_expr_sum(earlier) >= 1);
+                    // If course is taken in semester s, prerequisite must be taken in an earlier semester
+                    let earlier_vars: Vec<_> = vars[pi][..s].iter().copied().collect();
+                    if !earlier_vars.is_empty() {
+                        let sum_earlier: LinearExpr = earlier_vars.into_iter().collect();
+                        model.add_linear_constraint(sum_earlier - cur, [(0, i64::MAX)]);
+                    }
                 }
             }
         }
     }
 
-    // Gen-ed and elective requirements
+    // Gen-ed requirements
     for &(g, req) in &gened_reqs {
-        let mut all = Vec::new();
+        let mut all_vars = Vec::new();
         for (i, c) in courses.iter().enumerate() {
             if c.geneds.contains(&g) {
-                all.extend(vars[i].clone());
+                all_vars.extend(vars[i].iter().copied());
             }
         }
-        model.add_at_least_k(&all, req);
-    }
-    for &(eg, req) in &elective_reqs {
-        let mut all = Vec::new();
-        for (i, c) in courses.iter().enumerate() {
-            if c.elective_group == Some(eg) {
-                all.extend(vars[i].clone());
-            }
+        if !all_vars.is_empty() {
+            let sum: LinearExpr = all_vars.into_iter().collect();
+            model.add_ge(sum, req);
         }
-        model.add_at_least_k(&all, req);
     }
 
-    // Semester credit caps
+    // Elective group requirements  
+    for &(eg, req) in &elective_reqs {
+        let mut all_vars = Vec::new();
+        for (i, c) in courses.iter().enumerate() {
+            if c.elective_group == Some(eg) {
+                all_vars.extend(vars[i].iter().copied());
+            }
+        }
+        if !all_vars.is_empty() {
+            let sum: LinearExpr = all_vars.into_iter().collect();
+            model.add_ge(sum, req);
+        }
+    }
+
+    // Semester credit limits
     for s in 0..num_semesters {
-        let terms: Vec<(cp_sat::builder::BoolVar, i64)> = courses.iter().enumerate()
-            .map(|(i, c)| (vars[i][s].clone(), c.credits))
+        let weighted_terms: Vec<(i64, _)> = courses.iter().enumerate()
+            .map(|(i, c)| (c.credits, vars[i][s]))
             .collect();
-        model.add_weighted_sum(&terms, 0, 18);
+        let weighted_sum: LinearExpr = weighted_terms.into_iter().collect();
+        model.add_le(weighted_sum, max_credits_per_semester);
     }
 
     // Objective: minimize total credits
-    let obj_terms: Vec<(cp_sat::builder::BoolVar, i64)> = courses.iter().enumerate()
-        .flat_map(|(i, c)| (0..num_semesters).map(move |s| (vars[i][s].clone(), c.credits)))
-        .collect();
-    model.minimize(obj_terms);
+    let mut obj_terms = Vec::new();
+    for (i, c) in courses.iter().enumerate() {
+        for s in 0..num_semesters {
+            obj_terms.push((c.credits, vars[i][s]));
+        }
+    }
+    let total_credits: LinearExpr = obj_terms.into_iter().collect();
+    model.minimize(total_credits);
 
     // Solve and report
-    let resp = model.solve();
-    if resp.status() == CpSolverStatus::Optimal || resp.status() == CpSolverStatus::Feasible {
-        let total: i64 = obj_terms.iter()
-            .filter(|(v, _)| v.value(&resp) == 1)
-            .map(|(_, w)| w)
-            .sum();
-        println!("Total credits: {}", total);
-        for s in 0..num_semesters {
-            println!("Semester {}", s + 1);
-            for (i, c) in courses.iter().enumerate() {
-                if vars[i][s].value(&resp) == 1 {
-                    println!("  {} ({} cr)", c.id, c.credits);
+    let response = model.solve();
+    match response.status() {
+        CpSolverStatus::Optimal | CpSolverStatus::Feasible => {
+            println!("Schedule found:");
+            for s in 0..num_semesters {
+                println!("Semester {}", s + 1);
+                let mut sem_credits = 0;
+                for (i, c) in courses.iter().enumerate() {
+                    if vars[i][s].solution_value(&response) {
+                        println!("  {} ({} credits)", c.id, c.credits);
+                        sem_credits += c.credits;
+                    }
                 }
+                println!("  Credits: {}", sem_credits);
             }
+            println!("Total credits: {}", response.objective_value as i64);
         }
-    } else {
-        println!("No feasible solution found.");
+        _ => {
+            println!("No feasible solution found. Status: {:?}", response.status());
+        }
     }
 }
