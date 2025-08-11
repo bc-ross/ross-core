@@ -37,30 +37,60 @@ fn build_model_from_schedule(
     min_credits: Option<i64>,
 ) -> (CpModelBuilder, Vec<Vec<cp_sat::builder::BoolVar>>, LinearExpr) {
     let num_semesters = sched.courses.len();
-    // Build Course list from schedule and catalog
-    let mut courses = Vec::new();
-    for (sem_idx, sem) in sched.courses.iter().enumerate() {
+    use std::collections::{HashSet, VecDeque};
+    // Collect all assigned and transitive prereq courses
+    let mut all_codes = HashSet::new();
+    let mut queue = VecDeque::new();
+    for sem in &sched.courses {
         for code in sem {
-            // Look up credits and prereqs from catalog
-            let (credits, prereqs) = match sched.catalog.courses.get(code) {
-                Some((_name, credits_opt, _offering)) => {
-                    let credits = credits_opt.unwrap_or(0) as i64;
-                    let prereqs = sched.catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
-                    (credits, prereqs)
-                }
-                None => (0, prereqs::CourseReq::NotRequired),
-            };
-            courses.push(Course {
-                code: code.clone(),
-                credits,
-                required: true,
-                geneds: vec![],
-                elective_group: None,
-                prereqs,
-            });
+            all_codes.insert(code.clone());
+            queue.push_back(code.clone());
         }
     }
-    // Now build the model as before, but all courses are required
+    while let Some(code) = queue.pop_front() {
+        if let Some(req) = sched.catalog.prereqs.get(&code) {
+            collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
+        }
+    }
+
+    // Helper: recursively collect all CourseCodes from a CourseReq
+    fn collect_prereq_codes(req: &prereqs::CourseReq, all_codes: &mut HashSet<CourseCode>, catalog: &schedule::Catalog, queue: &mut VecDeque<CourseCode>) {
+        use prereqs::CourseReq::*;
+        match req {
+            And(reqs) | Or(reqs) => {
+                for r in reqs {
+                    collect_prereq_codes(r, all_codes, catalog, queue);
+                }
+            }
+            PreCourse(code) | CoCourse(code) => {
+                if all_codes.insert(code.clone()) {
+                    queue.push_back(code.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Build Course list for all required codes
+    let mut courses = Vec::new();
+    for code in &all_codes {
+        let (credits, prereqs) = match sched.catalog.courses.get(code) {
+            Some((_name, credits_opt, _offering)) => {
+                let credits = credits_opt.unwrap_or(0) as i64;
+                let prereqs = sched.catalog.prereqs.get(code).cloned().unwrap_or(prereqs::CourseReq::NotRequired);
+                (credits, prereqs)
+            }
+            None => (0, prereqs::CourseReq::NotRequired),
+        };
+        courses.push(Course {
+            code: code.clone(),
+            credits,
+            required: true,
+            geneds: vec![],
+            elective_group: None,
+            prereqs,
+        });
+    }
     build_model(&courses, num_semesters, max_credits_per_semester, min_credits)
 }
 use cp_sat::builder::{CpModelBuilder, LinearExpr};
