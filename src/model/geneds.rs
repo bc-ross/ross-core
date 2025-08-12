@@ -199,37 +199,75 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     let num_foundations = foundation_sets.len();
     let num_courses = courses.len();
 
-    // For each Foundation, get the set of eligible indices and required number
-    let mut foundation_reqs = Vec::new();
+    // For each Foundation, get the set of eligible indices and required number/credits
+    let mut foundation_reqs: Vec<(Vec<usize>, i64, bool, Vec<i64>)> = Vec::new();
     for (f, set) in foundation_sets.iter().enumerate() {
-        let required = match &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f) {
-            Some(GenEd::Foundation { req, .. }) => match req {
-                GenEdReq::Set(codes) => codes.len() as i64,
-                GenEdReq::SetOpts(opts) => opts.iter().map(|o| o.len()).max().unwrap_or(1) as i64,
-                GenEdReq::Courses { num, .. } => *num as i64,
-                GenEdReq::Credits { num, .. } => *num as i64, // Approximate: assumes 1 credit per course
+        let gened = &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f).unwrap();
+        let (required, is_credits, course_credits) = match gened {
+            GenEd::Foundation { req, .. } => match req {
+                GenEdReq::Credits { num, courses } => {
+                    let credits: Vec<_> = set.iter().map(|&idx| ctx.courses[idx].credits as i64).collect();
+                    (*num as i64, true, credits)
+                },
+                GenEdReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
+                GenEdReq::SetOpts(_) | GenEdReq::Courses { .. } => {
+                    (set.len() as i64, false, vec![1; set.len()])
+                },
             },
-            _ => 1,
+            _ => (set.len() as i64, false, vec![1; set.len()]),
         };
-        foundation_reqs.push((set.clone(), required));
+        foundation_reqs.push((set.clone(), required, is_credits, course_credits));
     }
-
-    // For each Foundation, require that at least the required number of distinct eligible courses are scheduled
-    for (set, required) in &foundation_reqs {
-        let mut sum = LinearExpr::from(0);
+    // For each Foundation, require that at least the required number of distinct eligible courses/credits are scheduled
+    for (set, required, is_credits, course_credits) in &foundation_reqs {
+        // Split eligible indices into required and non-required
+        let mut required_idxs = Vec::new();
+        let mut optional_idxs = Vec::new();
         for &idx in set {
-            sum = sum + course_in_schedule(idx);
+            if ctx.courses[idx].required {
+                required_idxs.push(idx);
+            } else {
+                optional_idxs.push(idx);
+            }
         }
-        model.add_ge(sum, LinearExpr::from(*required));
+        // All required courses must count toward the Foundation
+        let mut required_sum = LinearExpr::from(0);
+        for &idx in &required_idxs {
+            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            for _ in 0..c {
+                required_sum = required_sum + course_in_schedule(idx);
+            }
+        }
+        // Optional courses can be used to reach the minimum, but not to over-satisfy
+        let mut optional_sum = LinearExpr::from(0);
+        for &idx in &optional_idxs {
+            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            for _ in 0..c {
+                optional_sum = optional_sum + course_in_schedule(idx);
+            }
+        }
+        // The total must be at least the required minimum
+        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(*required));
+        // The total (required + optional) cannot exceed the maximum of required_sum and required
+        // Set the domain to the true maximum possible sum (credits or count)
+        let max_possible = if *is_credits {
+            set.iter().map(|&idx| ctx.courses[idx].credits as i64).sum()
+        } else {
+            set.len() as i64
+        };
+        let max_expr = model.new_int_var([(0, max_possible)]);
+        model.add_ge(max_expr.clone(), required_sum.clone());
+        model.add_ge(max_expr.clone(), LinearExpr::from(*required));
+        model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
     }
 
     // Handle courses already present in the Schedule (forced courses)
-    for (set, _) in &foundation_reqs {
+    for (set, _, _, _) in &foundation_reqs {
         for &idx in set {
             if ctx.courses[idx].required {
                 // Add constraints to ensure forced courses are considered for all eligible Foundations
                 let mut foundation_vars = Vec::new();
-                for (other_set, _) in &foundation_reqs {
+                for (other_set, _, _, _) in &foundation_reqs {
                     if other_set.contains(&idx) {
                         let foundation_var = model.new_bool_var();
                         model.add_le(foundation_var.clone(), course_in_schedule(idx));
@@ -270,19 +308,141 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     for gened in geneds.iter() {
         if let GenEd::SkillAndPerspective { req, .. } = gened {
             match req {
-                GenEdReq::Set(codes) | GenEdReq::Courses { courses: codes, .. } | GenEdReq::Credits { courses: codes, .. } => {
+                GenEdReq::Set(codes) => {
                     if let Some(indices) = codes_to_indices(codes) {
-                        sp_sets.push(indices);
+                        sp_sets.push(indices.clone());
+                        // Split required/optional
+                        let mut required_idxs = Vec::new();
+                        let mut optional_idxs = Vec::new();
+                        for &idx in &indices {
+                            if ctx.courses[idx].required {
+                                required_idxs.push(idx);
+                            } else {
+                                optional_idxs.push(idx);
+                            }
+                        }
+                        let mut required_sum = LinearExpr::from(0);
+                        for &idx in &required_idxs {
+                            required_sum = required_sum + course_in_schedule(idx);
+                        }
+                        let mut optional_sum = LinearExpr::from(0);
+                        for &idx in &optional_idxs {
+                            optional_sum = optional_sum + course_in_schedule(idx);
+                        }
+                        let required = codes.len() as i64;
+                        // At least the minimum
+                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
+                        // At most max(required_sum, required)
+                        let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
+                        let max_expr = model.new_int_var([(0, max_possible)]);
+                        model.add_ge(max_expr.clone(), required_sum.clone());
+                        model.add_ge(max_expr.clone(), LinearExpr::from(required));
+                        model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
+                    }
+                }
+                GenEdReq::Courses { num, courses } => {
+                    if let Some(indices) = codes_to_indices(courses) {
+                        sp_sets.push(indices.clone());
+                        let mut required_idxs = Vec::new();
+                        let mut optional_idxs = Vec::new();
+                        for &idx in &indices {
+                            if ctx.courses[idx].required {
+                                required_idxs.push(idx);
+                            } else {
+                                optional_idxs.push(idx);
+                            }
+                        }
+                        let mut required_sum = LinearExpr::from(0);
+                        for &idx in &required_idxs {
+                            required_sum = required_sum + course_in_schedule(idx);
+                        }
+                        let mut optional_sum = LinearExpr::from(0);
+                        for &idx in &optional_idxs {
+                            optional_sum = optional_sum + course_in_schedule(idx);
+                        }
+                        let required = *num as i64;
+                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
+                        let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
+                        let max_expr = model.new_int_var([(0, max_possible)]);
+                        model.add_ge(max_expr.clone(), required_sum.clone());
+                        model.add_ge(max_expr.clone(), LinearExpr::from(required));
+                        model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
+                    }
+                }
+                GenEdReq::Credits { num, courses } => {
+                    if let Some(indices) = codes_to_indices(courses) {
+                        sp_sets.push(indices.clone());
+                        let mut required_sum = LinearExpr::from(0);
+                        let mut optional_sum = LinearExpr::from(0);
+                        for &idx in &indices {
+                            let credits = ctx.courses[idx].credits;
+                            if ctx.courses[idx].required {
+                                for _ in 0..credits {
+                                    required_sum = required_sum + course_in_schedule(idx);
+                                }
+                            } else {
+                                for _ in 0..credits {
+                                    optional_sum = optional_sum + course_in_schedule(idx);
+                                }
+                            }
+                        }
+                        let required = *num as i64;
+                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
+                        let max_possible = indices.iter().map(|&idx| ctx.courses[idx].credits as i64).sum();
+                        let max_expr = model.new_int_var([(0, max_possible)]);
+                        model.add_ge(max_expr.clone(), required_sum.clone());
+                        model.add_ge(max_expr.clone(), LinearExpr::from(required));
+                        model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
                     }
                 }
                 GenEdReq::SetOpts(opts) => {
-                    let mut indices = Vec::new();
+                    let mut all_indices = Vec::new();
+                    let mut option_exprs = Vec::new();
                     for opt in opts {
-                        if let Some(opt_indices) = codes_to_indices(opt) {
-                            indices.extend(opt_indices);
+                        if let Some(indices) = codes_to_indices(opt) {
+                            all_indices.extend(&indices);
+                            let mut required_idxs = Vec::new();
+                            let mut optional_idxs = Vec::new();
+                            for &idx in &indices {
+                                if ctx.courses[idx].required {
+                                    required_idxs.push(idx);
+                                } else {
+                                    optional_idxs.push(idx);
+                                }
+                            }
+                            let mut required_sum = LinearExpr::from(0);
+                            for &idx in &required_idxs {
+                                required_sum = required_sum + course_in_schedule(idx);
+                            }
+                            let mut optional_sum = LinearExpr::from(0);
+                            for &idx in &optional_idxs {
+                                optional_sum = optional_sum + course_in_schedule(idx);
+                            }
+                            let opt_len = opt.len() as i64;
+                            let opt_var = model.new_bool_var();
+                            // Option is satisfied if all required+optional courses are present
+                            // model.add_le(required_sum.clone() + optional_sum.clone(), LinearExpr::from(opt_len) + (LinearExpr::from(1) - opt_var.clone()) * opt_len);
+                            // model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(opt_len) - (LinearExpr::from(1) - opt_var.clone()) * opt_len);
+                            let le_expr = LinearExpr::from(1) - opt_var.clone();
+                            let mut le_scaled = LinearExpr::from(opt_len);
+                            for _ in 0..opt_len {
+                                le_scaled = le_scaled + le_expr.clone();
+                            }
+                            model.add_le(required_sum.clone() + optional_sum.clone(), le_scaled);
+                            let mut ge_scaled = LinearExpr::from(opt_len);
+                            for _ in 0..opt_len {
+                                ge_scaled = ge_scaled - le_expr.clone();
+                            }
+                            model.add_ge(required_sum.clone() + optional_sum.clone(), ge_scaled);
+                            option_exprs.push(opt_var);
                         }
                     }
-                    sp_sets.push(indices);
+                    if !option_exprs.is_empty() {
+                        let mut sum = LinearExpr::from(0);
+                        for v in option_exprs { sum = sum + LinearExpr::from(v); }
+                        model.add_ge(sum, LinearExpr::from(1));
+                    }
+                    sp_sets.push(all_indices);
                 }
             }
         }
