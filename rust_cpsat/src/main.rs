@@ -37,34 +37,29 @@ fn main() {
     println!("{:?}", &sched.courses);
     let max_credits_per_semester = 18;
 
-    // Call the new two-stage scheduling function
-    let schedule_result =
-        crate::two_stage_schedule::two_stage_lex_schedule(&sched, max_credits_per_semester);
+    // Call the new two-stage scheduling function, mutably updating sched.courses
+    let mut sched = sched;
+    crate::two_stage_schedule::two_stage_lex_schedule(&mut sched, max_credits_per_semester);
 
-    match schedule_result {
-        Some(final_schedule) => {
-            println!("Final schedule (two-stage, balanced):");
-            let mut sched_credits = 0;
-            for (s, semester) in final_schedule.iter().enumerate() {
-                println!("Semester {}", s + 1);
-                let mut sem_credits = 0;
-                for (code, credits) in semester {
-                    println!("  {} ({} credits)", code, credits);
-                    sem_credits += credits;
-                }
-                println!("  Credits: {}", sem_credits);
-                sched_credits += sem_credits;
-            }
-            println!("Total credits: {}", sched_credits);
-            // Check geneds
-            match crate::geneds::are_geneds_satisfied(&sched) {
-                Ok(true) => println!("All GenEds satisfied!"),
-                Ok(false) => println!("GenEd requirements NOT satisfied!"),
-                Err(e) => println!("GenEd check error: {}", e),
-            }
+    // Print the updated schedule from sched.courses
+    println!("Final schedule (two-stage, balanced):");
+    let mut sched_credits = 0;
+    for (s, semester) in sched.courses.iter().enumerate() {
+        println!("Semester {}", s + 1);
+        let mut sem_credits = 0;
+        for code in semester {
+            // Look up credits from catalog
+            let credits = sched.catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0);
+            println!("  {} ({} credits)", code, credits);
+            sem_credits += credits;
         }
-        None => {
-            println!("No feasible schedule found.");
-        }
+        println!("  Credits: {}", sem_credits);
+        sched_credits += sem_credits;
+    }
+    println!("Total credits: {}", sched_credits);
+    match crate::geneds::are_geneds_satisfied(&sched) {
+        Ok(true) => println!("All GenEds satisfied!"),
+        Ok(false) => println!("GenEd requirements NOT satisfied!"),
+        Err(e) => println!("GenEd check error: {}", e),
     }
 }

@@ -5,9 +5,9 @@ use cp_sat::proto::CpSolverStatus;
 
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(
-    sched: &Schedule,
+    sched: &mut Schedule,
     max_credits_per_semester: i64,
-) -> Option<Vec<Vec<(CourseCode, i64)>>> {
+) {
     // Stage 1: minimize total credits
     let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
@@ -29,7 +29,11 @@ pub fn two_stage_lex_schedule(
             }
             total
         }
-        _ => return None,
+        _ => {
+            // No feasible solution
+            sched.courses = vec![];
+            return;
+        }
     };
 
     // Stage 2: minimize spread, subject to min total credits
@@ -108,8 +112,14 @@ pub fn two_stage_lex_schedule(
                     }
                 }
             }
-            Some(result)
+            // Overwrite sched.courses with the new schedule (just the codes)
+            sched.courses = result
+                .iter()
+                .map(|sem| sem.iter().map(|(code, _)| code.clone()).collect())
+                .collect();
         }
-        _ => None,
+        _ => {
+            sched.courses = vec![];
+        }
     }
 }
