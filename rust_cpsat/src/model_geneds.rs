@@ -216,11 +216,35 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
 
     // For each Foundation, require that at least the required number of distinct eligible courses are scheduled
     for (set, required) in &foundation_reqs {
-        let mut sum = LinearExpr::from(0);
+        // Split eligible indices into required and non-required
+        let mut required_idxs = Vec::new();
+        let mut optional_idxs = Vec::new();
         for &idx in set {
-            sum = sum + course_in_schedule(idx);
+            if ctx.courses[idx].required {
+                required_idxs.push(idx);
+            } else {
+                optional_idxs.push(idx);
+            }
         }
-        model.add_ge(sum, LinearExpr::from(*required));
+        // All required courses must count toward the Foundation
+        let mut required_sum = LinearExpr::from(0);
+        for &idx in &required_idxs {
+            required_sum = required_sum + course_in_schedule(idx);
+        }
+        // Optional courses can be used to reach the minimum, but not to over-satisfy
+        let mut optional_sum = LinearExpr::from(0);
+        for &idx in &optional_idxs {
+            optional_sum = optional_sum + course_in_schedule(idx);
+        }
+        // The total must be at least the required minimum
+        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(*required));
+        // The total (required + optional) cannot exceed the maximum of required_sum and required
+        // This allows over-satisfaction only from required courses
+        let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
+        let max_expr = model.new_int_var([(0, max_possible)]);
+        model.add_ge(max_expr.clone(), required_sum.clone());
+        model.add_ge(max_expr.clone(), LinearExpr::from(*required));
+        model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
     }
 
     // Handle courses already present in the Schedule (forced courses)
