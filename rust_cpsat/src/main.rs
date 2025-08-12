@@ -32,9 +32,10 @@ fn main() {
     semesters[0].push(CC!("PSYC", 2731)); // Force-add a course which satisfies a Foundation
     semesters[0].push(CC!("HONR", 1030)); // Force-add a course which satisfies a Core
     semesters[0].push(CC!("THEO", 3820)); // Force-add a course which satisfies a Foundation & S&P
-    semesters[0].push(CC!("THEO", 2000)); // Force-add a course which also satisfies the same Foundation
-    // semesters[0].push(CC!("THEO", 2100)); // Force-add a course which over-satisfies the same Foundation
+    // semesters[0].push(CC!("THEO", 2000)); // Force-add a course which also satisfies the same Foundation
+    semesters[0].push(CC!("THEO", 2100)); // Force-add a course which over-satisfies the same Foundation
     semesters[0].push(CC!("THEO", 3100)); // Force-add a course which over-satisfies the same Foundation
+    semesters[0].push(CC!("THEO", 3110)); // Force-add a course which over-satisfies the same Foundation
 
     let sched = schedule::Schedule {
         courses: semesters,
