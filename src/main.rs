@@ -4,8 +4,7 @@ use std::path::Path;
 mod geneds;
 mod load_catalogs;
 mod prereqs;
-mod prereqs_cp;
-mod prereqs_sat;
+mod model;
 mod read_excel_file;
 mod schedule;
 mod version;
@@ -17,6 +16,7 @@ pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
 
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
+pub const MAX_CREDITS_PER_SEMESTER: i64 = 18;
 
 fn main() -> Result<()> {
     // Test the full real schedule generation with strategic Foundation selection
@@ -37,7 +37,29 @@ fn main() -> Result<()> {
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
     )?;
-    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
+
+        println!("Final schedule (two-stage, balanced):");
+    let mut sched_credits = 0;
+    for (s, semester) in sched.courses.iter().enumerate() {
+        println!("Semester {}", s + 1);
+        let mut sem_credits = 0;
+        for code in semester {
+            // Look up credits from catalog
+            let credits = sched.catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0);
+            println!("  {} ({} credits)", code, credits);
+            sem_credits += credits;
+        }
+        println!("  Credits: {}", sem_credits);
+        sched_credits += sem_credits;
+    }
+    println!("Total credits: {}", sched_credits);
+    match crate::geneds::are_geneds_satisfied(&sched) {
+        Ok(true) => println!("All GenEds satisfied!"),
+        Ok(false) => println!("GenEd requirements NOT satisfied!"),
+        Err(e) => println!("GenEd check error: {}", e),
+    }
+
+    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;  
 
     println!(
         "Excel file created: {FNAME} with {} schedule",
