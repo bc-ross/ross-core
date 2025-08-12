@@ -156,25 +156,43 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         }
         if let Some(candidates) = satisfy_req(reqs[idx], sched_courses, catalog) {
             let available: Vec<_> = candidates.difference(used).copied().collect();
+            println!("[FOUNDATION DIAG] {}: candidates = {:?}, used = {:?}, available = {:?}", names[idx], candidates, used, available);
             if available.len() < candidates.len() {
+                println!("[FOUNDATION DIAG] Not enough available for {}: need {}, have {}", names[idx], candidates.len(), available.len());
                 *fail_foundation = Some(names[idx].clone());
                 return false;
             }
-            for comb in available
-                .iter()
-                .copied()
-                .collect::<Vec<_>>()
-                .windows(candidates.len())
-            {
+            // Try all combinations of candidates from available (order doesn't matter)
+            fn combinations<'b, T: Clone>(data: &'b [T], k: usize, out: &mut Vec<T>, res: &mut Vec<Vec<T>>) {
+                if out.len() == k {
+                    res.push(out.clone());
+                    return;
+                }
+                for i in 0..data.len() {
+                    out.push(data[i].clone());
+                    let rest = &data[i+1..];
+                    combinations(rest, k, out, res);
+                    out.pop();
+                }
+            }
+            let mut combs = Vec::new();
+            let mut out = Vec::new();
+            combinations(&available, candidates.len(), &mut out, &mut combs);
+            if combs.is_empty() {
+                println!("[FOUNDATION DIAG] No valid combinations for {}", names[idx]);
+            }
+            for comb in &combs {
                 let mut new_used = used.clone();
                 new_used.extend(comb.iter().copied());
                 if assign_foundations(reqs, names, idx + 1, &mut new_used, sched_courses, catalog, fail_foundation) {
                     return true;
                 }
             }
+            println!("[FOUNDATION DIAG] All combinations failed for {}", names[idx]);
             *fail_foundation = Some(names[idx].clone());
             false
         } else {
+            println!("[FOUNDATION DIAG] satisfy_req returned None for {}", names[idx]);
             *fail_foundation = Some(names[idx].clone());
             false
         }
