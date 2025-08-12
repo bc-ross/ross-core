@@ -201,24 +201,49 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
             *course_foundation_counts.entry(idx).or_insert(0) += 1;
         }
     }
-    // For each course, add constraint: sum of Foundation assignments <= 1
-    for (&idx, &count) in &course_foundation_counts {
-        if count > 1 {
-            // For each Foundation, create a bool var if this course is used for that Foundation
-            let mut used_vars = Vec::new();
-            for set in &foundation_sets {
-                if set.contains(&idx) {
-                    let used = model.new_bool_var();
-                    // If course is scheduled, used can be 1, else 0
-                    model.add_le(used.clone(), course_in_schedule(idx));
-                    used_vars.push(used);
-                }
-            }
-            // At most one Foundation can use this course
-            let mut sum = LinearExpr::from(0);
-            for v in used_vars { sum = sum + LinearExpr::from(v); }
-            model.add_le(sum, LinearExpr::from(1));
+    // For each course, add constraint: sum of Foundation assignments <= 1, and enforce global assignment
+    // Build a matrix: foundation_sets[f] is Vec<course_idx> eligible for Foundation f
+    // Let x[f][i] = 1 if course i is assigned to Foundation f
+    let num_foundations = foundation_sets.len();
+    let num_courses = courses.len();
+    let mut x = vec![vec![None; num_courses]; num_foundations];
+    for (f, set) in foundation_sets.iter().enumerate() {
+        for &idx in set {
+            let var = model.new_bool_var();
+            // If course is scheduled, can be assigned; else must be 0
+            model.add_le(var.clone(), course_in_schedule(idx));
+            x[f][idx] = Some(var);
         }
+    }
+    // Each Foundation must have the required number of assigned courses
+    for (f, set) in foundation_sets.iter().enumerate() {
+        let mut sum = LinearExpr::from(0);
+        for &idx in set {
+            if let Some(ref var) = x[f][idx] {
+                sum = sum + LinearExpr::from(var.clone());
+            }
+        }
+        // For Set, SetOpts, Courses, Credits, get the required number
+        let required = match &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f) {
+            Some(GenEd::Foundation { req, .. }) => match req {
+                GenEdReq::Set(codes) => codes.len() as i64,
+                GenEdReq::SetOpts(opts) => opts.iter().map(|o| o.len()).max().unwrap_or(1) as i64,
+                GenEdReq::Courses { num, .. } => *num as i64,
+                GenEdReq::Credits { num, .. } => *num as i64, // Approximate: assumes 1 credit per course
+            },
+            _ => 1,
+        };
+        model.add_ge(sum, LinearExpr::from(required));
+    }
+    // No course can be assigned to more than one Foundation
+    for idx in 0..num_courses {
+        let mut sum = LinearExpr::from(0);
+        for f in 0..num_foundations {
+            if let Some(ref var) = x[f][idx] {
+                sum = sum + LinearExpr::from(var.clone());
+            }
+        }
+        model.add_le(sum, LinearExpr::from(1));
     }
 
     // --- Skills & Perspectives: no course may satisfy more than 3 S&Ps ---
