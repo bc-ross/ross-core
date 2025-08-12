@@ -105,14 +105,21 @@ fn satisfy_req<'a>(
 pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     let sched_courses: HashSet<&CourseCode> = sched.courses.iter().flatten().collect();
     // 1. Core: each must be satisfied, overlap allowed
+    let mut all_core_ok = true;
     for gened in sched.catalog.geneds.iter() {
         if let GenEd::Core { req, name } = gened {
             if satisfy_req(req, &sched_courses, &sched.catalog).is_none() {
                 println!("FAILED Core gened: {}", name);
-                return Ok(false);
+                all_core_ok = false;
+            } else {
+                println!("Core gened satisfied: {}", name);
             }
         }
     }
+    if !all_core_ok {
+        return Ok(false);
+    }
+
     // 2. Foundation: each must be satisfied, but no course can be used for more than one Foundation
     let mut foundation_reqs = vec![];
     let mut foundation_names = vec![];
@@ -125,22 +132,22 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     // Try all possible assignments of courses to foundation geneds (backtracking)
     fn assign_foundations<'a>(
         reqs: &[&'a GenEdReq],
+        names: &[&'a String],
         idx: usize,
         used: &mut HashSet<&'a CourseCode>,
         sched_courses: &HashSet<&'a CourseCode>,
         catalog: &Catalog,
+        fail_foundation: &mut Option<String>,
     ) -> bool {
         if idx == reqs.len() {
             return true;
         }
         if let Some(candidates) = satisfy_req(reqs[idx], sched_courses, catalog) {
-            // Try all possible ways to assign courses to this foundation, not using any in 'used'
-            let mut available: Vec<_> = candidates.difference(used).copied().collect();
-            // If not enough, fail
+            let available: Vec<_> = candidates.difference(used).copied().collect();
             if available.len() < candidates.len() {
+                *fail_foundation = Some(names[idx].clone());
                 return false;
             }
-            // Try all combinations (greedy: just pick one set)
             for comb in available
                 .iter()
                 .copied()
@@ -149,28 +156,44 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
             {
                 let mut new_used = used.clone();
                 new_used.extend(comb.iter().copied());
-                if assign_foundations(reqs, idx + 1, &mut new_used, sched_courses, catalog) {
+                if assign_foundations(reqs, names, idx + 1, &mut new_used, sched_courses, catalog, fail_foundation) {
                     return true;
                 }
             }
+            *fail_foundation = Some(names[idx].clone());
             false
         } else {
+            *fail_foundation = Some(names[idx].clone());
             false
         }
     }
     if !foundation_reqs.is_empty() {
         let mut used = HashSet::new();
+        let mut fail_foundation = None;
+        let req_refs: Vec<&GenEdReq> = foundation_reqs.iter().map(|r| *r).collect();
+        let name_refs: Vec<&String> = foundation_names.iter().map(|r| *r).collect();
         if !assign_foundations(
-            &foundation_reqs,
+            &req_refs,
+            &name_refs,
             0,
             &mut used,
             &sched_courses,
             &sched.catalog,
+            &mut fail_foundation,
         ) {
-            println!("FAILED Foundation geneds");
+            if let Some(fail) = fail_foundation {
+                println!("FAILED Foundation gened: {}", fail);
+            } else {
+                println!("FAILED Foundation geneds (unknown)");
+            }
             return Ok(false);
+        } else {
+            for name in &foundation_names {
+                println!("Foundation gened satisfied: {}", name);
+            }
         }
     }
+
     // 3. Skills & Perspectives: each must be satisfied, but no course can be used for more than 3 S&Ps
     let mut sp_reqs = vec![];
     let mut sp_names = vec![];
@@ -180,21 +203,31 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
             sp_names.push(name);
         }
     }
-    // For each S&P, get the set of courses that could satisfy it
+    let mut all_sp_ok = true;
     let mut sp_course_counts: HashMap<&CourseCode, usize> = HashMap::new();
-    for req in &sp_reqs {
+    for (i, req) in sp_reqs.iter().enumerate() {
         if let Some(courses) = satisfy_req(req, &sched_courses, &sched.catalog) {
             for c in courses {
                 *sp_course_counts.entry(c).or_insert(0) += 1;
             }
+            println!("S&P gened satisfied: {}", sp_names[i]);
         } else {
-            println!("FAILED S&P gened");
-            return Ok(false);
+            println!("FAILED S&P gened: {}", sp_names[i]);
+            all_sp_ok = false;
         }
     }
+    if !all_sp_ok {
+        return Ok(false);
+    }
     // No course can be used for more than 3 S&Ps
-    if sp_course_counts.values().any(|&v| v > 3) {
-        println!("FAILED S&P overlap");
+    let mut sp_overlap_fail = false;
+    for (c, count) in &sp_course_counts {
+        if *count > 3 {
+            println!("FAILED S&P overlap: course {} used for {} S&Ps", c, count);
+            sp_overlap_fail = true;
+        }
+    }
+    if sp_overlap_fail {
         return Ok(false);
     }
     println!("=== All geneds satisfied ===");
