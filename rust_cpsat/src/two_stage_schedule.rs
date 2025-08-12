@@ -2,12 +2,13 @@ use crate::model::{ModelBuilderContext, build_model_pipeline};
 use crate::schedule::{CourseCode, Schedule};
 use cp_sat::builder::{CpModelBuilder, IntVar, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
+use anyhow::{anyhow, Result};
 
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(
     sched: &mut Schedule,
     max_credits_per_semester: i64,
-) {
+) -> Result<()> {
     // Stage 1: minimize total credits
     let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
@@ -31,8 +32,7 @@ pub fn two_stage_lex_schedule(
         }
         _ => {
             // No feasible solution
-            sched.courses = vec![];
-            return;
+            return Err(anyhow!("No feasible solution found in single-stage scheduling"));
         }
     };
 
@@ -117,9 +117,10 @@ pub fn two_stage_lex_schedule(
                 .iter()
                 .map(|sem| sem.iter().map(|(code, _)| code.clone()).collect())
                 .collect();
+            Ok(())
         }
         _ => {
-            sched.courses = vec![];
+            Err(anyhow!("No feasible solution found in two-stage scheduling"))
         }
     }
 }

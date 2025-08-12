@@ -39,7 +39,7 @@ fn main() {
 
     // Call the new two-stage scheduling function, mutably updating sched.courses
     let mut sched = sched;
-    crate::two_stage_schedule::two_stage_lex_schedule(&mut sched, max_credits_per_semester);
+    crate::two_stage_schedule::two_stage_lex_schedule(&mut sched, max_credits_per_semester).unwrap();
 
     // Print the updated schedule from sched.courses
     println!("Final schedule (two-stage, balanced):");
