@@ -198,6 +198,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     use std::collections::HashSet;
     let num_foundations = foundation_sets.len();
     let num_courses = courses.len();
+
     // For each Foundation, get the set of eligible indices and required number
     let mut foundation_reqs = Vec::new();
     for (f, set) in foundation_sets.iter().enumerate() {
@@ -220,6 +221,28 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
             sum = sum + course_in_schedule(idx);
         }
         model.add_ge(sum, LinearExpr::from(*required));
+    }
+
+    // Handle courses already present in the Schedule (forced courses)
+    for (set, _) in &foundation_reqs {
+        for &idx in set {
+            if ctx.courses[idx].required {
+                // Add constraints to ensure forced courses are considered for all eligible Foundations
+                let mut foundation_vars = Vec::new();
+                for (other_set, _) in &foundation_reqs {
+                    if other_set.contains(&idx) {
+                        let foundation_var = model.new_bool_var();
+                        model.add_le(foundation_var.clone(), course_in_schedule(idx));
+                        foundation_vars.push(foundation_var);
+                    }
+                }
+                let mut sum = LinearExpr::from(0);
+                for v in foundation_vars {
+                    sum = sum + LinearExpr::from(v);
+                }
+                model.add_eq(sum, LinearExpr::from(1)); // Ensure the forced course satisfies exactly one Foundation
+            }
+        }
     }
 
     // For every pair of Foundations, require that the number of scheduled courses in the intersection is at most the overlap allowed (usually zero)

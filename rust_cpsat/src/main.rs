@@ -29,6 +29,7 @@ fn main() {
     for (i, code) in assigned.into_iter().enumerate() {
         semesters[i].push(code);
     }
+    // semesters[0].push(CC!("PSYC", 2731)); // Force-add a course which satisfies a Foundation
     let sched = schedule::Schedule {
         courses: semesters,
         programs: vec![],
