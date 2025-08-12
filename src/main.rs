@@ -31,6 +31,7 @@ fn main() -> Result<()> {
             .programs
             .iter()
             .map(|x| x.name.as_str())
+            .take(1)
             .collect(),
         CATALOGS
             .first()
