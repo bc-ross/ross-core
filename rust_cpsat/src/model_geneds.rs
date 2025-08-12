@@ -114,26 +114,82 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         }
     }
 
-    // --- Foundation GenEds: no course may satisfy more than one Foundation ---
-    // For each Foundation, build a set of eligible courses
+    // --- Foundation GenEds: enforce required number/credits, no course may satisfy more than one Foundation ---
+    // For each Foundation, build a set of eligible courses and add a hard constraint for the requirement
     let mut foundation_sets = Vec::new();
     for gened in geneds.iter() {
         if let GenEd::Foundation { req, .. } = gened {
             match req {
-                GenEdReq::Set(codes) | GenEdReq::Courses { courses: codes, .. } | GenEdReq::Credits { courses: codes, .. } => {
+                GenEdReq::Set(codes) => {
                     if let Some(indices) = codes_to_indices(codes) {
+                        // All courses in the set must be scheduled
+                        for idx in &indices {
+                            model.add_ge(course_in_schedule(*idx), LinearExpr::from(1));
+                        }
                         foundation_sets.push(indices);
                     }
                 }
                 GenEdReq::SetOpts(opts) => {
-                    // Flatten all options into one set for overlap constraint
-                    let mut indices = Vec::new();
+                    // At least one option set must be fully present
+                    let mut option_exprs = Vec::new();
+                    let mut all_indices = Vec::new();
                     for opt in opts {
-                        if let Some(opt_indices) = codes_to_indices(opt) {
-                            indices.extend(opt_indices);
+                        if let Some(indices) = codes_to_indices(opt) {
+                            // All courses in this option must be present
+                            let mut all_present = LinearExpr::from(0);
+                            for idx in &indices {
+                                all_present = all_present + course_in_schedule(*idx);
+                            }
+                            // Use a bool var to represent this option
+                            let opt_var = model.new_bool_var();
+                            let mut le_expr = LinearExpr::from(1) - opt_var.clone();
+                            let mut le_scaled = LinearExpr::from(0);
+                            for _ in 0..opt.len() {
+                                le_scaled = le_scaled + le_expr.clone();
+                            }
+                            model.add_le(all_present.clone(), LinearExpr::from(opt.len() as i64) + le_scaled);
+                            let mut ge_scaled = LinearExpr::from(0);
+                            for _ in 0..opt.len() {
+                                ge_scaled = ge_scaled + le_expr.clone();
+                            }
+                            model.add_ge(all_present, LinearExpr::from(opt.len() as i64) - ge_scaled);
+                            option_exprs.push(opt_var);
+                            all_indices.extend(indices);
                         }
                     }
-                    foundation_sets.push(indices);
+                    if !option_exprs.is_empty() {
+                        let mut sum = LinearExpr::from(0);
+                        for v in option_exprs { sum = sum + LinearExpr::from(v); }
+                        model.add_ge(sum, LinearExpr::from(1));
+                    }
+                    foundation_sets.push(all_indices);
+                }
+                GenEdReq::Courses { num, courses } => {
+                    if let Some(indices) = codes_to_indices(courses) {
+                        let mut sum = LinearExpr::from(0);
+                        for idx in &indices { sum = sum + course_in_schedule(*idx); }
+                        model.add_ge(sum, LinearExpr::from(*num as i64));
+                        foundation_sets.push(indices);
+                    }
+                }
+                GenEdReq::Credits { num, courses } => {
+                    if let Some(indices) = codes_to_indices(courses) {
+                        let mut sum = LinearExpr::from(0);
+                        for idx in &indices {
+                            let credits = ctx.courses[*idx].credits;
+                            if credits > 0 {
+                                for _ in 0..credits {
+                                    sum = sum + course_in_schedule(*idx);
+                                }
+                            } else if credits < 0 {
+                                for _ in 0..(-credits) {
+                                    sum = sum - course_in_schedule(*idx);
+                                }
+                            }
+                        }
+                        model.add_ge(sum, LinearExpr::from(*num as i64));
+                        foundation_sets.push(indices);
+                    }
                 }
             }
         }

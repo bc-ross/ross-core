@@ -127,6 +127,18 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         if let GenEd::Foundation { req, name } = gened {
             foundation_reqs.push(req);
             foundation_names.push(name);
+            // Print eligible courses for this Foundation
+            let eligible: Vec<_> = match req {
+                GenEdReq::Set(codes) => codes.clone(),
+                GenEdReq::SetOpts(opts) => opts.iter().flatten().cloned().collect(),
+                GenEdReq::Courses { courses, .. } => courses.clone(),
+                GenEdReq::Credits { courses, .. } => courses.clone(),
+            };
+            println!("Foundation '{}': eligible courses: {:?}", name, eligible);
+            // Print which eligible courses are present in the schedule
+            let sched_courses: HashSet<&CourseCode> = sched.courses.iter().flatten().collect();
+            let present: Vec<_> = eligible.iter().filter(|c| sched_courses.contains(c)).collect();
+            println!("Foundation '{}': scheduled courses: {:?}", name, present);
         }
     }
     // Try all possible assignments of courses to foundation geneds (backtracking)
