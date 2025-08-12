@@ -199,23 +199,27 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     let num_foundations = foundation_sets.len();
     let num_courses = courses.len();
 
-    // For each Foundation, get the set of eligible indices and required number
-    let mut foundation_reqs = Vec::new();
+    // For each Foundation, get the set of eligible indices and required number/credits
+    let mut foundation_reqs: Vec<(Vec<usize>, i64, bool, Vec<i64>)> = Vec::new();
     for (f, set) in foundation_sets.iter().enumerate() {
-        let required = match &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f) {
-            Some(GenEd::Foundation { req, .. }) => match req {
-                GenEdReq::Set(codes) => codes.len() as i64,
-                GenEdReq::SetOpts(opts) => opts.iter().map(|o| o.len()).max().unwrap_or(1) as i64,
-                GenEdReq::Courses { num, .. } => *num as i64,
-                GenEdReq::Credits { num, .. } => *num as i64, // Approximate: assumes 1 credit per course
+        let gened = &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f).unwrap();
+        let (required, is_credits, course_credits) = match gened {
+            GenEd::Foundation { req, .. } => match req {
+                GenEdReq::Credits { num, courses } => {
+                    let credits: Vec<_> = set.iter().map(|&idx| ctx.courses[idx].credits as i64).collect();
+                    (*num as i64, true, credits)
+                },
+                GenEdReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
+                GenEdReq::SetOpts(_) | GenEdReq::Courses { .. } => {
+                    (set.len() as i64, false, vec![1; set.len()])
+                },
             },
-            _ => 1,
+            _ => (set.len() as i64, false, vec![1; set.len()]),
         };
-        foundation_reqs.push((set.clone(), required));
+        foundation_reqs.push((set.clone(), required, is_credits, course_credits));
     }
-
-    // For each Foundation, require that at least the required number of distinct eligible courses are scheduled
-    for (set, required) in &foundation_reqs {
+    // For each Foundation, require that at least the required number of distinct eligible courses/credits are scheduled
+    for (set, required, is_credits, course_credits) in &foundation_reqs {
         // Split eligible indices into required and non-required
         let mut required_idxs = Vec::new();
         let mut optional_idxs = Vec::new();
@@ -229,18 +233,28 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         // All required courses must count toward the Foundation
         let mut required_sum = LinearExpr::from(0);
         for &idx in &required_idxs {
-            required_sum = required_sum + course_in_schedule(idx);
+            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            for _ in 0..c {
+                required_sum = required_sum + course_in_schedule(idx);
+            }
         }
         // Optional courses can be used to reach the minimum, but not to over-satisfy
         let mut optional_sum = LinearExpr::from(0);
         for &idx in &optional_idxs {
-            optional_sum = optional_sum + course_in_schedule(idx);
+            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            for _ in 0..c {
+                optional_sum = optional_sum + course_in_schedule(idx);
+            }
         }
         // The total must be at least the required minimum
         model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(*required));
         // The total (required + optional) cannot exceed the maximum of required_sum and required
-        // This allows over-satisfaction only from required courses
-        let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
+        // Set the domain to the true maximum possible sum (credits or count)
+        let max_possible = if *is_credits {
+            set.iter().map(|&idx| ctx.courses[idx].credits as i64).sum()
+        } else {
+            set.len() as i64
+        };
         let max_expr = model.new_int_var([(0, max_possible)]);
         model.add_ge(max_expr.clone(), required_sum.clone());
         model.add_ge(max_expr.clone(), LinearExpr::from(*required));
@@ -248,12 +262,12 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     }
 
     // Handle courses already present in the Schedule (forced courses)
-    for (set, _) in &foundation_reqs {
+    for (set, _, _, _) in &foundation_reqs {
         for &idx in set {
             if ctx.courses[idx].required {
                 // Add constraints to ensure forced courses are considered for all eligible Foundations
                 let mut foundation_vars = Vec::new();
-                for (other_set, _) in &foundation_reqs {
+                for (other_set, _, _, _) in &foundation_reqs {
                     if other_set.contains(&idx) {
                         let foundation_var = model.new_bool_var();
                         model.add_le(foundation_var.clone(), course_in_schedule(idx));
