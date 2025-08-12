@@ -175,32 +175,9 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
+    crate::model::two_stage_lex_schedule(&mut sched, crate::MAX_CREDITS_PER_SEMESTER)?;
 
-    // Use the CP solver with gened support instead of just prerequisites
-    unimplemented!();
-    // println!("Calling CP solver with gened support...");
-    // let complete_schedules = crate::prereqs_cp::solve_prereqs_cp(&sched)?;
-    // println!(
-    //     "CP solver returned {} schedule(s)",
-    //     complete_schedules.len()
-    // );
-
-    // if let Some(best_schedule) = complete_schedules.first() {
-    //     sched.courses = best_schedule.clone();
-
-    //     // Debug: Print the final schedule
-    //     println!("Final schedule after CP solver:");
-    //     for (i, sem) in sched.courses.iter().enumerate() {
-    //         println!("  Semester {}: {:?}", i, sem);
-    //     }
-    //     println!("Final schedule validation: {}", sched.is_valid()?);
-    // } else {
-    //     return Err(anyhow::anyhow!("No valid schedule found with CP solver"));
-    // }
-    // // let scheds = sched.ensure_prereqs()?;
-    // // println!("{} different prereq filling options", scheds.len());
-
-    // Ok(sched)
+    Ok(sched)
 }
 
 impl Schedule {

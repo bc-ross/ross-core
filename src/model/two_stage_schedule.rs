@@ -1,4 +1,4 @@
-use crate::model::{ModelBuilderContext, build_model_pipeline};
+use super::{ModelBuilderContext, build_model_pipeline};
 use crate::schedule::{CourseCode, Schedule};
 use cp_sat::builder::{CpModelBuilder, IntVar, LinearExpr};
 use cp_sat::proto::CpSolverStatus;

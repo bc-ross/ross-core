@@ -1,6 +1,6 @@
 //! Functions for adding GenEd constraints.
-use crate::model_context::Course;
-use crate::model_context::ModelBuilderContext;
+use super::context::Course;
+use super::context::ModelBuilderContext;
 use crate::geneds::{GenEd, GenEdReq};
 use cp_sat::builder::LinearExpr;
 
