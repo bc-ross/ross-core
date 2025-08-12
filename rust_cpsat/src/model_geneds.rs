@@ -241,6 +241,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                     sum = sum + LinearExpr::from(v);
                 }
                 model.add_eq(sum, LinearExpr::from(1)); // Ensure the forced course satisfies exactly one Foundation
+                // No restriction here for S&Ps: forced courses can also be used for S&Ps as long as S&P constraints are met
             }
         }
     }
@@ -310,4 +311,5 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
             model.add_le(sum, LinearExpr::from(3));
         }
     }
+    // No additional restriction: forced courses can be used for both a Foundation and S&Ps, as long as they are not double-counted for multiple Foundations or more than 3 S&Ps.
 }
