@@ -112,7 +112,13 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
             let val = match &code.code {
                 crate::schedule::CourseCodeSuffix::Number(n)
                 | crate::schedule::CourseCodeSuffix::Unique(n) => *n as i64,
-                crate::schedule::CourseCodeSuffix::Special(_) => 0,
+                crate::schedule::CourseCodeSuffix::Special(x) => {
+                    if x.as_str() == "COMP" {
+                        1000000 // Assign a high value for COMP courses
+                    } else {
+                        0 // Other special codes treated as 0
+                    }
+                }
             };
             sum = sum + (val, vars2[i][s].clone());
             count = count + LinearExpr::from(vars2[i][s].clone());
