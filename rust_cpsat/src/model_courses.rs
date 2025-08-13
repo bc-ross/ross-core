@@ -28,6 +28,33 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
     if let Some(min_credits) = ctx.min_credits {
         let flat_courses: Vec<_> = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
         let total_credits_expr = ctx.total_credits_expr(&ctx.vars, &flat_courses);
-        ctx.model.add_le(total_credits_expr, cp_sat::builder::LinearExpr::from(min_credits));
+        ctx.model.add_le(
+            total_credits_expr,
+            cp_sat::builder::LinearExpr::from(min_credits),
+        );
+    }
+    // Enforce term offering constraints for each course
+    for (i, c) in ctx.courses.iter().enumerate() {
+        // Look up term offering from catalog
+        let offering = ctx
+            .catalog
+            .and_then(|cat| cat.courses.get(&c.code))
+            .map(|(_, _, off)| off);
+        for s in 0..ctx.num_semesters {
+            let allowed = match offering {
+                Some(crate::schedule::CourseTermOffering::Fall) => s % 2 == 0, // even semesters
+                Some(crate::schedule::CourseTermOffering::Spring) => s % 2 == 1, // odd semesters
+                Some(crate::schedule::CourseTermOffering::Both) => true,
+                Some(crate::schedule::CourseTermOffering::Discretion) => true, // allowed, but may change in future
+                Some(crate::schedule::CourseTermOffering::Infrequently) => true, // allowed, but may change in future
+                Some(crate::schedule::CourseTermOffering::Summer) => false,      // never schedule
+                None => true,                                                    // default: allow
+            };
+            if !allowed {
+                // Forbid scheduling this course in this semester
+                ctx.model
+                    .add_eq(ctx.vars[i][s], cp_sat::builder::LinearExpr::from(0));
+            }
+        }
     }
 }
