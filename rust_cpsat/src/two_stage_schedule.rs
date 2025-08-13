@@ -102,50 +102,30 @@ pub fn two_stage_lex_schedule(
         spread_penalty = spread_penalty + LinearExpr::from(v.clone());
     }
 
-    // // --- Mini-objective: penalize out-of-order course pairs in each semester ---
-    // // Helper to get a numeric value for ordering
-    // fn course_order_value(code: &crate::schedule::CourseCode) -> i64 {
-    //     use crate::schedule::CourseCodeSuffix::*;
-    //     match &code.code {
-    //         Number(n) | Unique(n) => *n as i64,
-    //         Special(s) if s == "COMP" => i64::MAX, // treat as infinity
-    //         Special(_) => -1, // ignore in ordering
-    //     }
-    // }
-    // let mut order_penalty = LinearExpr::from(0);
-    // for s in 0..num_semesters {
-    //     // For all pairs (i, j) with i < j in flat_courses2
-    //     for i in 0..flat_courses2.len() {
-    //         for j in (i+1)..flat_courses2.len() {
-    //             let code_i = &flat_courses2[i].0.code;
-    //             let code_j = &flat_courses2[j].0.code;
-    //             let val_i = course_order_value(code_i);
-    //             let val_j = course_order_value(code_j);
-    //             // Only penalize if both are orderable (not -1)
-    //             if val_i >= 0 && val_j >= 0 && val_i > val_j {
-    //                 // If both scheduled in semester s, add penalty
-    //                 let var_i = vars2[i][s].clone();
-    //                 let var_j = vars2[j][s].clone();
-    //                 // penalty_var = 1 if both scheduled
-    //                 let penalty_var = model2.new_bool_var();
-    //                 model2.add_le(penalty_var.clone(), var_i.clone());
-    //                 model2.add_le(penalty_var.clone(), var_j.clone());
-    //                 model2.add_ge(
-    //                     penalty_var.clone(),
-    //                     LinearExpr::from(var_i.clone()) + LinearExpr::from(var_j.clone()) - LinearExpr::from(1),
-    //                 );
-    //                 order_penalty = order_penalty + penalty_var;
-    //             }
-    //         }
-    //     }
-    // }
-    // // Add mini-objective to main objective (small weight)
-    // let mut weighted_spread = LinearExpr::from(0);
-    // for _ in 0..1000 {
-    //     weighted_spread = weighted_spread + spread_penalty.clone();
-    // }
-    // let total_objective = weighted_spread + order_penalty;
-    model2.minimize(spread_penalty);
+    // --- Simple ordering objective: mean course code number per semester ---
+    let mut order_penalty = LinearExpr::from(0);
+    for s in 0..num_semesters {
+        let mut sum_codes = LinearExpr::from(0);
+        let mut count_courses = LinearExpr::from(0);
+        for i in 0..flat_courses2.len() {
+            let code = &flat_courses2[i].0.code;
+            let val = match &code.code {
+                crate::schedule::CourseCodeSuffix::Number(n) | crate::schedule::CourseCodeSuffix::Unique(n) => *n as i64,
+                crate::schedule::CourseCodeSuffix::Special(_) => 0, // ignore specials
+            };
+            sum_codes = sum_codes + (val, vars2[i][s].clone());
+            count_courses = count_courses + LinearExpr::from(vars2[i][s].clone());
+        }
+        // To avoid division, penalize sum_codes - target * count_courses (target=0 for lowest possible)
+        order_penalty = order_penalty + sum_codes;
+    }
+    // Add mini-objective to main objective (small weight)
+    let mut weighted_spread = LinearExpr::from(0);
+    for _ in 0..10 {
+        weighted_spread = weighted_spread + spread_penalty.clone();
+    }
+    let total_objective = weighted_spread + order_penalty;
+    model2.minimize(total_objective);
 
     let response2 = model2.solve_with_parameters(&params);
     match response2.status() {
