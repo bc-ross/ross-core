@@ -131,7 +131,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     }
     // Add mini-objective to main objective (small weight)
     let mut weighted_spread = LinearExpr::from(0);
-    for _ in 0..10 {
+    for _ in 0..50 {
         weighted_spread = weighted_spread + spread_penalty.clone();
     }
     let total_objective = weighted_spread + order_penalty;
