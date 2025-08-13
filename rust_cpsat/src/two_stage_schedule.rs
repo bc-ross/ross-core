@@ -11,14 +11,14 @@ pub fn two_stage_lex_schedule(
 ) -> Result<()> {
     let mut params = cp_sat::proto::SatParameters::default();
     params.log_search_progress = Some(true);
-    dbg!(params.num_search_workers);
+    params.num_search_workers = Some(8);
     // Stage 1: minimize total credits
     let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
     let num_semesters = sched.courses.len();
     let total_credits = ctx.total_credits_expr(&vars, &flat_courses);
     model.minimize(total_credits.clone());
-    let response = model.solve();
+    let response = model.solve_with_parameters(&params);
 
     // Compute min_credits as the sum of all scheduled (assigned + prereq) course credits in the solution
     let min_credits = match response.status() {
@@ -147,7 +147,7 @@ pub fn two_stage_lex_schedule(
     // let total_objective = weighted_spread + order_penalty;
     model2.minimize(spread_penalty);
 
-    let response2 = model2.solve();
+    let response2 = model2.solve_with_parameters(&params);
     match response2.status() {
         CpSolverStatus::Optimal | CpSolverStatus::Feasible => {
             // Build the schedule output: Vec<Vec<(CourseCode, i64)>>
