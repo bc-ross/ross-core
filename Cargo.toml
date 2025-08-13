@@ -18,4 +18,4 @@ savefile-derive = "0.18.7"
 umya-spreadsheet = "2.3.1"
 rust_xlsxwriter = "0.89.1"
 lazy_static = "1.5.0"
-cp_sat = { git = "https://github.com/bc-ross/cp_sat.git", rev = "e5202a217dd84e4a689208398558819cf002981e" }
+cp_sat = { git = "https://github.com/bc-ross/cp_sat.git", rev = "700ee56b475261f18e7ca2aa456f95188919bd02" }
