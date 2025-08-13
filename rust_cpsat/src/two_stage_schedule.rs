@@ -1,14 +1,11 @@
 use crate::model::{ModelBuilderContext, build_model_pipeline};
 use crate::schedule::{CourseCode, Schedule};
+use anyhow::{Result, anyhow};
 use cp_sat::builder::{CpModelBuilder, IntVar, LinearExpr};
 use cp_sat::proto::CpSolverStatus;
-use anyhow::{anyhow, Result};
 
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
-pub fn two_stage_lex_schedule(
-    sched: &mut Schedule,
-    max_credits_per_semester: i64,
-) -> Result<()> {
+pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<()> {
     let mut params = cp_sat::proto::SatParameters::default();
     params.log_search_progress = Some(true);
     params.num_search_workers = Some(8);
@@ -35,7 +32,9 @@ pub fn two_stage_lex_schedule(
         }
         _ => {
             // No feasible solution
-            return Err(anyhow!("No feasible solution found in single-stage scheduling"));
+            return Err(anyhow!(
+                "No feasible solution found in single-stage scheduling"
+            ));
         }
     };
 
@@ -102,22 +101,33 @@ pub fn two_stage_lex_schedule(
         spread_penalty = spread_penalty + LinearExpr::from(v.clone());
     }
 
-    // --- Simple ordering objective: mean course code number per semester ---
-    let mut order_penalty = LinearExpr::from(0);
+    // --- Ordering objective: penalize semesters where mean course code does not increase ---
+    let mut sum_codes = Vec::new();
+    let mut count_courses = Vec::new();
     for s in 0..num_semesters {
-        let mut sum_codes = LinearExpr::from(0);
-        let mut count_courses = LinearExpr::from(0);
+        let mut sum = LinearExpr::from(0);
+        let mut count = LinearExpr::from(0);
         for i in 0..flat_courses2.len() {
             let code = &flat_courses2[i].0.code;
             let val = match &code.code {
-                crate::schedule::CourseCodeSuffix::Number(n) | crate::schedule::CourseCodeSuffix::Unique(n) => *n as i64,
-                crate::schedule::CourseCodeSuffix::Special(_) => 0, // ignore specials
+                crate::schedule::CourseCodeSuffix::Number(n)
+                | crate::schedule::CourseCodeSuffix::Unique(n) => *n as i64,
+                crate::schedule::CourseCodeSuffix::Special(_) => 0,
             };
-            sum_codes = sum_codes + (val, vars2[i][s].clone());
-            count_courses = count_courses + LinearExpr::from(vars2[i][s].clone());
+            sum = sum + (val, vars2[i][s].clone());
+            count = count + LinearExpr::from(vars2[i][s].clone());
         }
-        // To avoid division, penalize sum_codes - target * count_courses (target=0 for lowest possible)
-        order_penalty = order_penalty + sum_codes;
+        sum_codes.push(sum);
+        count_courses.push(count);
+    }
+    let mut order_penalty = LinearExpr::from(0);
+    for s in 0..(num_semesters - 1) {
+        // Penalize if sum in s > sum in s+1 (approximate ascending order)
+        let diff = sum_codes[s].clone() - sum_codes[s + 1].clone();
+        // Only penalize positive differences
+        let diff_var = model2.new_int_var(vec![(0, 1000000)]);
+        model2.add_ge(diff_var.clone(), diff);
+        order_penalty = order_penalty + diff_var;
     }
     // Add mini-objective to main objective (small weight)
     let mut weighted_spread = LinearExpr::from(0);
@@ -146,8 +156,8 @@ pub fn two_stage_lex_schedule(
                 .collect();
             Ok(())
         }
-        _ => {
-            Err(anyhow!("No feasible solution found in two-stage scheduling"))
-        }
+        _ => Err(anyhow!(
+            "No feasible solution found in two-stage scheduling"
+        )),
     }
 }
