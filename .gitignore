@@ -11,6 +11,9 @@ __pycache__
 *.xlsx
 *.sqlite
 
+# From pysat branch
+rust_cpsat
+
 # Added by cargo
 
 /target
