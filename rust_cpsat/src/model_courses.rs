@@ -25,9 +25,9 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
         }
     }
     // // Enforce maximum total credits if specified
-    // if let Some(min_credits) = ctx.min_credits {
-    //     let flat_courses: Vec<_> = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
-    //     let total_credits_expr = ctx.total_credits_expr(&ctx.vars, &flat_courses);
-    //     ctx.model.add_le(total_credits_expr, cp_sat::builder::LinearExpr::from(min_credits));
-    // }
+    if let Some(min_credits) = ctx.min_credits {
+        let flat_courses: Vec<_> = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
+        let total_credits_expr = ctx.total_credits_expr(&ctx.vars, &flat_courses);
+        ctx.model.add_le(total_credits_expr, cp_sat::builder::LinearExpr::from(min_credits));
+    }
 }
