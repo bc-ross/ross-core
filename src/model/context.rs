@@ -93,7 +93,6 @@ impl<'a> ModelBuilderContext<'a> {
         // Build Course structs for all codes, and print diagnostics
         let mut courses = Vec::new();
         let mut total_credits = 0;
-        println!("[DIAG] Courses included in model:");
         for code in &all_codes {
             let (credits, prereqs) = match sched.catalog.courses.get(code) {
                 Some((_name, credits_opt, _offering)) => {
@@ -109,7 +108,6 @@ impl<'a> ModelBuilderContext<'a> {
                 None => (0, CourseReq::NotRequired),
             };
             total_credits += credits;
-            println!("  {} ({} credits)", code, credits);
             // Mark as required only if in student's plan
             let required = sched.courses.iter().flatten().any(|c| c == code);
             courses.push(Course {
@@ -121,21 +119,7 @@ impl<'a> ModelBuilderContext<'a> {
                 prereqs,
             });
         }
-        println!("[DIAG] Total courses: {}", courses.len());
-        println!("[DIAG] Total credits (all modeled courses): {}", total_credits);
-        println!("[DIAG] Semesters: {}", sched.courses.len());
-        println!("[DIAG] Max credits/semester: {}", max_credits_per_semester);
-        if !sched.catalog.geneds.is_empty() {
-            println!("[DIAG] GenEd requirements:");
-            for gened in &sched.catalog.geneds {
-                use crate::geneds::GenEd;
-                match gened {
-                    GenEd::Core { name, req } => println!("  Core: {}: {:?}", name, req),
-                    GenEd::Foundation { name, req } => println!("  Foundation: {}: {:?}", name, req),
-                    GenEd::SkillAndPerspective { name, req } => println!("  S&P: {}: {:?}", name, req),
-                }
-            }
-        }
+
         ModelBuilderContext {
             model: CpModelBuilder::default(),
             vars: Vec::new(),

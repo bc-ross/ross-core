@@ -7,7 +7,7 @@ use cp_sat::proto::CpSolverStatus;
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<()> {
     let mut params = cp_sat::proto::SatParameters::default();
-    params.log_search_progress = Some(true);
+    params.log_search_progress = Some(false);
     params.num_search_workers = Some(8);
     // Stage 1: minimize total credits
     let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
