@@ -293,7 +293,7 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 [[package]]
 name = "cp_sat"
 version = "0.3.3"
-source = "git+https://github.com/bc-ross/cp_sat.git?rev=700ee56b475261f18e7ca2aa456f95188919bd02#700ee56b475261f18e7ca2aa456f95188919bd02"
+source = "git+https://github.com/bc-ross/cp_sat.git?rev=a7ed2e23176939dc61e5697693a6e326640667b2#a7ed2e23176939dc61e5697693a6e326640667b2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -303,6 +303,7 @@ dependencies = [
  "glob",
  "libc",
  "os_info",
+ "pathdiff",
  "prost",
  "prost-build",
  "smallvec",
@@ -991,6 +992,12 @@ dependencies = [
  "smallvec",
  "windows-targets 0.52.6",
 ]
+
+[[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "pbkdf2"
