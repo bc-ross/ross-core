@@ -1,7 +1,7 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{Catalog, CourseCode, Schedule, Semester};
+use crate::schedule::{CourseCode, Schedule};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -15,7 +15,7 @@ pub enum CourseReq {
     // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
     Instructor,
     #[default]
-    None,
+    NotRequired,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -160,8 +160,8 @@ impl CourseReq {
                     .iter()
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
-            CourseReq::Instructor => unimplemented!(),
-            CourseReq::None => true,
+            CourseReq::Instructor => todo!(),
+            CourseReq::NotRequired => true,
         }
     }
 }

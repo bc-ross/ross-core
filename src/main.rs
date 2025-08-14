@@ -1,7 +1,9 @@
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
+mod geneds;
 mod load_catalogs;
+mod model;
 mod prereqs;
 mod read_excel_file;
 mod schedule;
@@ -9,12 +11,12 @@ mod version;
 mod write_excel_file;
 
 use load_catalogs::CATALOGS;
-use read_excel_file::read_file;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
 
 pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
+pub const MAX_CREDITS_PER_SEMESTER: i64 = 18;
 
 fn main() -> Result<()> {
     const FNAME: &str = "ross_test.xlsx";
@@ -26,26 +28,45 @@ fn main() -> Result<()> {
             .programs
             .iter()
             .map(|x| x.name.as_str())
+            .take(1)
             .collect(),
         CATALOGS
             .first()
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
     )?;
+
+    println!("Final schedule (two-stage, balanced):");
+    let mut sched_credits = 0;
+    for (s, semester) in sched.courses.iter().enumerate() {
+        println!("Semester {}", s + 1);
+        let mut sem_credits = 0;
+        for code in semester {
+            // Look up credits from catalog
+            let credits = sched
+                .catalog
+                .courses
+                .get(code)
+                .and_then(|(_, cr, _)| *cr)
+                .unwrap_or(0);
+            println!("  {} ({} credits)", code, credits);
+            sem_credits += credits;
+        }
+        println!("  Credits: {}", sem_credits);
+        sched_credits += sem_credits;
+    }
+    println!("Total credits: {}", sched_credits);
+
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
-    println!("Excel file created: {FNAME}");
-    // println!("{}", catalogs.first().ok_or(anyhow!("no catalogs found"))?);
+    println!(
+        "Excel file created: {FNAME} with {} schedule",
+        if sched.is_valid()? {
+            "valid"
+        } else {
+            "invalid"
+        }
+    );
 
-    let _new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
-    // dbg!(new_sched);
-    println!("Read file: {FNAME}");
-
-    // save_schedule(
-    //     &Path::new("output.xlsx").to_path_buf(),
-    //     new_sched.borrow_schedule(),
-    // )?;
-
-    // println!("Excel file created: output.xlsx");
     Ok(())
 }
