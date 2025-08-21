@@ -20,9 +20,6 @@ pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
 pub const MAX_CREDITS_PER_SEMESTER: i64 = 18;
 
 fn main() -> Result<()> {
-    // Test the full real schedule generation with strategic Foundation selection
-    println!("=== Testing Real Schedule Generation with Strategic Foundation Selection ===");
-
     const FNAME: &str = "ross_test.xlsx";
 
     let sched = generate_schedule(
@@ -70,11 +67,6 @@ fn main() -> Result<()> {
         }
     }
     println!("Total credits (excluding incoming): {}", sched_credits);
-    match crate::geneds::are_geneds_satisfied(&sched) {
-        Ok(true) => println!("All GenEds satisfied!"),
-        Ok(false) => println!("GenEd requirements NOT satisfied!"),
-        Err(e) => println!("GenEd check error: {}", e),
-    }
 
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 

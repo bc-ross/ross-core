@@ -65,15 +65,12 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
         for s in 0..ctx.num_semesters {
             if is_incoming {
                 if s == incoming_semester {
-                    println!("[DIAG] ALLOW incoming course {} in semester {}", c.code, s);
                     ctx.model.add_eq(ctx.vars[i][s], 1); // Must be scheduled in semester 0
                 } else {
-                    println!("[DIAG] FORBID incoming course {} in semester {}", c.code, s);
                     ctx.model.add_eq(ctx.vars[i][s], 0); // Cannot be scheduled elsewhere
                 }
             } else {
                 if s == incoming_semester {
-                    println!("[DIAG] FORBID non-incoming course {} in semester 0", c.code);
                     ctx.model.add_eq(ctx.vars[i][s], 0); // Only incoming courses allowed in semester 0
                 }
             }

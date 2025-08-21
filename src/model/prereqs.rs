@@ -30,10 +30,6 @@ fn add_prereq_for_course<'a>(
     // If the target course is an incoming course, skip prereq constraints entirely.
     // Incoming courses are allowed in semester 0 and should not be blocked by prereqs.
     if ctx.incoming_codes.contains(&ctx.courses[course_idx].code) {
-        println!(
-            "[DIAG] Skipping prereq constraints for incoming course {:?}",
-            ctx.courses[course_idx].code
-        );
         return;
     }
     match req {

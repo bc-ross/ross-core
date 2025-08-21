@@ -7,10 +7,10 @@ use cp_sat::proto::CpSolverStatus;
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<()> {
     let mut params = cp_sat::proto::SatParameters::default();
-    params.log_search_progress = Some(true);
+    params.log_search_progress = Some(false);
     params.num_search_workers = Some(8);
     // Fix solver seed for reproducibility and easier debugging
-    params.random_seed = Some(123456);
+    params.random_seed = None;
     // --- Transform schedule: add incoming as semester 0 (always present, even if empty) ---
     // Always set incoming courses before building model context for both stages
     let mut sched_for_model = sched.clone();
@@ -23,13 +23,6 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
     // Determine number of semesters (includes incoming semester 0)
     let num_semesters = sched_for_model.courses.len();
-    // Diagnostic: print context info before solving stage 1
-    println!("[DIAG] Stage 1 incoming_codes: {:?}", ctx.incoming_codes);
-    println!(
-        "[DIAG] Stage 1 num_semesters: {} flat_courses: {}",
-        num_semesters,
-        flat_courses.len()
-    );
     let first_sched_semester = 1; // semester 0 is incoming only
     // Only sum credits for semesters 1..N (ignore semester 0)
     let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
@@ -41,7 +34,6 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     }
     model.minimize(total_credits_sched.clone());
     let response = model.solve_with_parameters(&params);
-    println!("[DIAG] Stage 1 solver status: {:?}", response.status());
 
     // Compute min_credits as the sum of all scheduled (assigned + prereq) course credits in the solution
     let min_credits = match response.status() {
