@@ -103,7 +103,10 @@ fn satisfy_req<'a>(
 }
 
 pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
-    let sched_courses: HashSet<&CourseCode> = sched.courses.iter().flatten().collect();
+    let sched_courses: HashSet<&CourseCode> = std::iter::once(&sched.incoming)
+        .chain(sched.courses.iter())
+        .flatten()
+        .collect();
     // 1. Core: each must be satisfied, overlap allowed
     let mut all_core_ok = true;
     for gened in sched.catalog.geneds.iter() {

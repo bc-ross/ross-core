@@ -11,6 +11,7 @@ mod version;
 mod write_excel_file;
 
 use load_catalogs::CATALOGS;
+use schedule::CourseCode;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
@@ -34,15 +35,30 @@ fn main() -> Result<()> {
             .first()
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
+        Some(vec![CC!("THEO", 1100)]), // None,
     )?;
 
     println!("Final schedule (two-stage, balanced):");
+    println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
-    for (s, semester) in sched.courses.iter().enumerate() {
-        println!("Semester {}", s + 1);
+    for (s, semester) in std::iter::once(&sched.incoming)
+        .chain(sched.courses.iter())
+        .enumerate()
+    {
+        if s == 0 {
+            println!("Semester 0 (incoming only):");
+        } else {
+            println!("Semester {}", s);
+        }
         let mut sem_credits = 0;
         for code in semester {
             // Look up credits from catalog
+            let credits = sched
+                .catalog
+                .courses
+                .get(code)
+                .and_then(|(_, cr, _)| *cr)
+                .unwrap_or(0);
             let credits = sched
                 .catalog
                 .courses
@@ -53,10 +69,13 @@ fn main() -> Result<()> {
             sem_credits += credits;
         }
         println!("  Credits: {}", sem_credits);
-        sched_credits += sem_credits;
+        if s > 0 {
+            sched_credits += sem_credits;
+        }
     }
-    println!("Total credits: {}", sched_credits);
+    println!("Total credits (excluding incoming): {}", sched_credits);
 
+    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
     println!(
