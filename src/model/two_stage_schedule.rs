@@ -181,13 +181,6 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
             }
 
             // Strictly separate incoming (semester 0) from planned semesters (1..N)
-            // Only incoming courses should be present in semester 0
-            let filtered_incoming_codes: Vec<CourseCode> = result[0]
-                .iter()
-                .filter(|(code, _)| sched.incoming.contains(code))
-                .map(|(code, _)| code.clone())
-                .collect();
-            sched.incoming = filtered_incoming_codes;
             // Only planned semesters (1..N) go into sched.courses
             sched.courses = result
                 .iter()

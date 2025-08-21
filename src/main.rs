@@ -11,6 +11,7 @@ mod version;
 mod write_excel_file;
 
 use load_catalogs::CATALOGS;
+use schedule::CourseCode;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
 use write_excel_file::save_schedule;
@@ -37,6 +38,7 @@ fn main() -> Result<()> {
             .first()
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
+        Some(vec![CC!("THEO", 1100)]), // None,
     )?;
 
     println!("Final schedule (two-stage, balanced):");

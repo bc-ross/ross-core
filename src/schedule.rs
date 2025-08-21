@@ -150,7 +150,11 @@ pub struct Schedule {
     pub catalog: Catalog,
 }
 
-pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedule> {
+pub fn generate_schedule(
+    programs: Vec<&str>,
+    catalog: Catalog,
+    incoming: Option<Semester>,
+) -> Result<Schedule> {
     // (catalog: )
     let programs: Vec<&Program> = catalog
         .programs
@@ -172,7 +176,7 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     let mut sched = Schedule {
         courses: combined_semesters,
         programs: programs.iter().map(|x| x.name.to_owned()).collect(),
-        incoming: vec![], // Assuming no incoming courses for now
+        incoming: incoming.unwrap_or_default(),
         catalog,
     };
     sched.reduce()?;
