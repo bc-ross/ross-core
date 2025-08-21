@@ -99,6 +99,7 @@ impl<'a> ModelBuilderContext<'a> {
         let mut courses = Vec::new();
         let mut total_credits = 0;
         println!("[DIAG] Courses included in model:");
+        println!("[DIAG] incoming_codes: {:?}", sched.incoming);
         for code in &all_codes {
             let (credits, prereqs) = match sched.catalog.courses.get(code) {
                 Some((_name, credits_opt, _offering)) => {
@@ -114,10 +115,20 @@ impl<'a> ModelBuilderContext<'a> {
                 None => (0, CourseReq::NotRequired),
             };
             total_credits += credits;
-            println!("  {} ({} credits)", code, credits);
-            // Mark as required if in incoming or in student's plan
-            let required =
-                sched.incoming.contains(code) || sched.courses.iter().flatten().any(|c| c == code);
+            let required = if sched.incoming.contains(code) {
+                true
+            } else if sched.courses.iter().flatten().any(|c| c == code) {
+                true
+            } else {
+                false
+            };
+            println!(
+                "  {} ({} credits) required: {} incoming: {}",
+                code,
+                credits,
+                required,
+                sched.incoming.contains(code)
+            );
             courses.push(Course {
                 code: code.clone(),
                 credits,
@@ -156,7 +167,7 @@ impl<'a> ModelBuilderContext<'a> {
             model: CpModelBuilder::default(),
             vars: Vec::new(),
             courses,
-            num_semesters: sched.courses.len() + 1, // +1 for incoming semester 0
+            num_semesters: sched.courses.len(), // already includes semester 0 after transformation
             max_credits_per_semester,
             min_credits: None,
             geneds: Some(&sched.catalog.geneds),

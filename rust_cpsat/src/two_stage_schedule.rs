@@ -9,7 +9,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut params = cp_sat::proto::SatParameters::default();
     params.log_search_progress = Some(true);
     params.num_search_workers = Some(8);
-    // --- Transform schedule: add incoming as semester 0 ---
+    // --- Transform schedule: add incoming as semester 0 (always present, even if empty) ---
     let mut all_semesters = vec![sched.incoming.clone()];
     all_semesters.extend(sched.courses.clone());
     let mut sched_for_model = sched.clone();

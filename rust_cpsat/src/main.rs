@@ -40,7 +40,7 @@ fn main() {
     semesters[0].push(CC!("THEO", 3100)); // Foundation
     semesters[0].push(CC!("THEO", 3110)); // Foundation
     // Incoming courses are tracked separately, not in the main semester list
-    let incoming_courses = vec![CC!("ENGL", 3910)]; // Example incoming course
+    let incoming_courses = vec![CC!("THEO", 1100)]; // Example incoming course
     // Only semesters 1-8 in courses, incoming courses in incoming
     let sched = schedule::Schedule {
         courses: semesters.clone(),
@@ -57,7 +57,10 @@ fn main() {
     // Print the updated schedule from sched.courses
     println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
-    for (s, semester) in sched.courses.iter().enumerate() {
+    for (s, semester) in std::iter::once(&sched.incoming)
+        .chain(sched.courses.iter())
+        .enumerate()
+    {
         if s == 0 {
             println!("Semester 0 (incoming only):");
         } else {
