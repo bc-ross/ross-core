@@ -27,6 +27,15 @@ fn add_prereq_for_course<'a>(
 ) {
     use crate::prereqs::CourseReq::*;
     let num_semesters = ctx.num_semesters;
+    // If the target course is an incoming course, skip prereq constraints entirely.
+    // Incoming courses are allowed in semester 0 and should not be blocked by prereqs.
+    if ctx.incoming_codes.contains(&ctx.courses[course_idx].code) {
+        println!(
+            "[DIAG] Skipping prereq constraints for incoming course {:?}",
+            ctx.courses[course_idx].code
+        );
+        return;
+    }
     match req {
         NotRequired => {}
         And(reqs) => {
