@@ -13,8 +13,16 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
     let num_semesters = sched.courses.len();
-    let total_credits = ctx.total_credits_expr(&vars, &flat_courses);
-    model.minimize(total_credits.clone());
+    let first_sched_semester = 1; // semester 0 is incoming only
+    // Only sum credits for semesters 1..N (ignore semester 0)
+    let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
+    for s in first_sched_semester..num_semesters {
+        for i in 0..flat_courses.len() {
+            let credits = flat_courses[i].1;
+            total_credits_sched = total_credits_sched + (credits, vars[i][s].clone());
+        }
+    }
+    model.minimize(total_credits_sched.clone());
     let response = model.solve_with_parameters(&params);
 
     // Compute min_credits as the sum of all scheduled (assigned + prereq) course credits in the solution
@@ -22,7 +30,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         CpSolverStatus::Optimal | CpSolverStatus::Feasible => {
             let mut total = 0;
             for (i, (_course, credits)) in flat_courses.iter().enumerate() {
-                for s in 0..num_semesters {
+                for s in first_sched_semester..num_semesters {
                     if vars[i][s].solution_value(&response) {
                         total += credits;
                     }
@@ -43,11 +51,15 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     ctx2.set_min_credits(min_credits);
     let (mut model2, vars2, flat_courses2) = build_model_pipeline(&mut ctx2);
     // Compute mean load (rounded down)
-    let mean_load = min_credits / num_semesters as i64;
+    let mean_load = if num_semesters > 1 {
+        min_credits / (num_semesters as i64 - 1)
+    } else {
+        0
+    };
 
     // For each semester, create an IntVar for the semester's total credits
     let mut semester_credit_vars = Vec::new();
-    for s in 0..num_semesters {
+    for s in first_sched_semester..num_semesters {
         let mut expr = LinearExpr::from(0);
         for i in 0..flat_courses2.len() {
             let var = vars2[i][s].clone();
@@ -71,7 +83,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
 
     // For each semester, create an IntVar for the absolute deviation from mean
     let mut abs_deviation_vars = Vec::new();
-    for (_s, credit_var) in semester_credit_vars.iter().enumerate() {
+    for credit_var in semester_credit_vars.iter() {
         let diff_domain = vec![(
             -max_credits_per_semester * flat_courses2.len() as i64,
             max_credits_per_semester * flat_courses2.len() as i64,
@@ -104,7 +116,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     // --- Ordering objective: penalize semesters where mean course code does not increase ---
     let mut sum_codes = Vec::new();
     let mut count_courses = Vec::new();
-    for s in 0..num_semesters {
+    for s in first_sched_semester..num_semesters {
         let mut sum = LinearExpr::from(0);
         let mut count = LinearExpr::from(0);
         for i in 0..flat_courses2.len() {
@@ -127,7 +139,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         count_courses.push(count);
     }
     let mut order_penalty = LinearExpr::from(0);
-    for s in 0..(num_semesters - 1) {
+    for s in 0..(sum_codes.len() - 1) {
         // Penalize if sum in s > sum in s+1 (approximate ascending order)
         let diff = sum_codes[s].clone() - sum_codes[s + 1].clone();
         // Only penalize positive differences
@@ -155,9 +167,10 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
                     }
                 }
             }
-            // Overwrite sched.courses with the new schedule (just the codes)
+            // Overwrite sched.courses with the new schedule (just the codes), skipping semester 0 for output
             sched.courses = result
                 .iter()
+                .skip(first_sched_semester)
                 .map(|sem| sem.iter().map(|(code, _)| code.clone()).collect())
                 .collect();
             Ok(())

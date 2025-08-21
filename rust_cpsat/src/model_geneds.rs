@@ -1,7 +1,7 @@
 //! Functions for adding GenEd constraints.
+use crate::geneds::{GenEd, GenEdReq};
 use crate::model_context::Course;
 use crate::model_context::ModelBuilderContext;
-use crate::geneds::{GenEd, GenEdReq};
 use cp_sat::builder::LinearExpr;
 
 /// Add GenEd constraints to the model.
@@ -23,6 +23,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         .collect();
 
     // Helper: for a course code, return a variable that is 1 if the course is scheduled in any semester
+    // Helper: for a course code, return a variable that is 1 if the course is scheduled in any semester (including semester 0)
     let course_in_schedule = |idx: usize| {
         let mut expr = LinearExpr::from(0);
         for s in 0..num_semesters {
@@ -69,25 +70,35 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             for _ in 0..opt.len() {
                                 le_scaled = le_scaled + le_expr.clone();
                             }
-                            model.add_le(all_present.clone(), LinearExpr::from(opt.len() as i64) + le_scaled);
+                            model.add_le(
+                                all_present.clone(),
+                                LinearExpr::from(opt.len() as i64) + le_scaled,
+                            );
                             let mut ge_scaled = LinearExpr::from(0);
                             for _ in 0..opt.len() {
                                 ge_scaled = ge_scaled + le_expr.clone();
                             }
-                            model.add_ge(all_present, LinearExpr::from(opt.len() as i64) - ge_scaled);
+                            model.add_ge(
+                                all_present,
+                                LinearExpr::from(opt.len() as i64) - ge_scaled,
+                            );
                             option_exprs.push(opt_var);
                         }
                     }
                     if !option_exprs.is_empty() {
                         let mut sum = LinearExpr::from(0);
-                        for v in option_exprs { sum = sum + LinearExpr::from(v); }
+                        for v in option_exprs {
+                            sum = sum + LinearExpr::from(v);
+                        }
                         model.add_ge(sum, LinearExpr::from(1));
                     }
                 }
                 GenEdReq::Courses { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
-                        for idx in indices { sum = sum + course_in_schedule(idx); }
+                        for idx in indices {
+                            sum = sum + course_in_schedule(idx);
+                        }
                         model.add_ge(sum, LinearExpr::from(*num as i64));
                     }
                 }
@@ -147,19 +158,27 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             for _ in 0..opt.len() {
                                 le_scaled = le_scaled + le_expr.clone();
                             }
-                            model.add_le(all_present.clone(), LinearExpr::from(opt.len() as i64) + le_scaled);
+                            model.add_le(
+                                all_present.clone(),
+                                LinearExpr::from(opt.len() as i64) + le_scaled,
+                            );
                             let mut ge_scaled = LinearExpr::from(0);
                             for _ in 0..opt.len() {
                                 ge_scaled = ge_scaled + le_expr.clone();
                             }
-                            model.add_ge(all_present, LinearExpr::from(opt.len() as i64) - ge_scaled);
+                            model.add_ge(
+                                all_present,
+                                LinearExpr::from(opt.len() as i64) - ge_scaled,
+                            );
                             option_exprs.push(opt_var);
                             all_indices.extend(indices);
                         }
                     }
                     if !option_exprs.is_empty() {
                         let mut sum = LinearExpr::from(0);
-                        for v in option_exprs { sum = sum + LinearExpr::from(v); }
+                        for v in option_exprs {
+                            sum = sum + LinearExpr::from(v);
+                        }
                         model.add_ge(sum, LinearExpr::from(1));
                     }
                     foundation_sets.push(all_indices);
@@ -167,7 +186,9 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                 GenEdReq::Courses { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
-                        for idx in &indices { sum = sum + course_in_schedule(*idx); }
+                        for idx in &indices {
+                            sum = sum + course_in_schedule(*idx);
+                        }
                         model.add_ge(sum, LinearExpr::from(*num as i64));
                         foundation_sets.push(indices);
                     }
@@ -202,17 +223,24 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     // For each Foundation, get the set of eligible indices and required number/credits
     let mut foundation_reqs: Vec<(Vec<usize>, i64, bool, Vec<i64>)> = Vec::new();
     for (f, set) in foundation_sets.iter().enumerate() {
-        let gened = &geneds.iter().filter(|g| matches!(g, GenEd::Foundation { .. })).nth(f).unwrap();
+        let gened = &geneds
+            .iter()
+            .filter(|g| matches!(g, GenEd::Foundation { .. }))
+            .nth(f)
+            .unwrap();
         let (required, is_credits, course_credits) = match gened {
             GenEd::Foundation { req, .. } => match req {
                 GenEdReq::Credits { num, courses } => {
-                    let credits: Vec<_> = set.iter().map(|&idx| ctx.courses[idx].credits as i64).collect();
+                    let credits: Vec<_> = set
+                        .iter()
+                        .map(|&idx| ctx.courses[idx].credits as i64)
+                        .collect();
                     (*num as i64, true, credits)
-                },
+                }
                 GenEdReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
                 GenEdReq::SetOpts(_) | GenEdReq::Courses { .. } => {
                     (set.len() as i64, false, vec![1; set.len()])
-                },
+                }
             },
             _ => (set.len() as i64, false, vec![1; set.len()]),
         };
@@ -233,7 +261,11 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         // All required courses must count toward the Foundation
         let mut required_sum = LinearExpr::from(0);
         for &idx in &required_idxs {
-            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            let c = if *is_credits {
+                ctx.courses[idx].credits as i64
+            } else {
+                1
+            };
             for _ in 0..c {
                 required_sum = required_sum + course_in_schedule(idx);
             }
@@ -241,13 +273,20 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         // Optional courses can be used to reach the minimum, but not to over-satisfy
         let mut optional_sum = LinearExpr::from(0);
         for &idx in &optional_idxs {
-            let c = if *is_credits { ctx.courses[idx].credits as i64 } else { 1 };
+            let c = if *is_credits {
+                ctx.courses[idx].credits as i64
+            } else {
+                1
+            };
             for _ in 0..c {
                 optional_sum = optional_sum + course_in_schedule(idx);
             }
         }
         // The total must be at least the required minimum
-        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(*required));
+        model.add_ge(
+            required_sum.clone() + optional_sum.clone(),
+            LinearExpr::from(*required),
+        );
         // The total (required + optional) cannot exceed the maximum of required_sum and required
         // Set the domain to the true maximum possible sum (credits or count)
         let max_possible = if *is_credits {
@@ -286,7 +325,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
 
     // For every pair of Foundations, require that the number of scheduled courses in the intersection is at most the overlap allowed (usually zero)
     for i in 0..num_foundations {
-        for j in (i+1)..num_foundations {
+        for j in (i + 1)..num_foundations {
             let set_i: HashSet<_> = foundation_reqs[i].0.iter().copied().collect();
             let set_j: HashSet<_> = foundation_reqs[j].0.iter().copied().collect();
             let intersection: Vec<_> = set_i.intersection(&set_j).copied().collect();
@@ -331,7 +370,10 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         }
                         let required = codes.len() as i64;
                         // At least the minimum
-                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
+                        model.add_ge(
+                            required_sum.clone() + optional_sum.clone(),
+                            LinearExpr::from(required),
+                        );
                         // At most max(required_sum, required)
                         let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
                         let max_expr = model.new_int_var([(0, max_possible)]);
@@ -361,7 +403,10 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             optional_sum = optional_sum + course_in_schedule(idx);
                         }
                         let required = *num as i64;
-                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
+                        model.add_ge(
+                            required_sum.clone() + optional_sum.clone(),
+                            LinearExpr::from(required),
+                        );
                         let max_possible = required_idxs.len() as i64 + optional_idxs.len() as i64;
                         let max_expr = model.new_int_var([(0, max_possible)]);
                         model.add_ge(max_expr.clone(), required_sum.clone());
@@ -387,8 +432,14 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             }
                         }
                         let required = *num as i64;
-                        model.add_ge(required_sum.clone() + optional_sum.clone(), LinearExpr::from(required));
-                        let max_possible = indices.iter().map(|&idx| ctx.courses[idx].credits as i64).sum();
+                        model.add_ge(
+                            required_sum.clone() + optional_sum.clone(),
+                            LinearExpr::from(required),
+                        );
+                        let max_possible = indices
+                            .iter()
+                            .map(|&idx| ctx.courses[idx].credits as i64)
+                            .sum();
                         let max_expr = model.new_int_var([(0, max_possible)]);
                         model.add_ge(max_expr.clone(), required_sum.clone());
                         model.add_ge(max_expr.clone(), LinearExpr::from(required));
@@ -439,7 +490,9 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                     }
                     if !option_exprs.is_empty() {
                         let mut sum = LinearExpr::from(0);
-                        for v in option_exprs { sum = sum + LinearExpr::from(v); }
+                        for v in option_exprs {
+                            sum = sum + LinearExpr::from(v);
+                        }
                         model.add_ge(sum, LinearExpr::from(1));
                     }
                     sp_sets.push(all_indices);
@@ -448,7 +501,8 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         }
     }
     // For each course, count how many S&Ps it could satisfy
-    let mut course_sp_counts: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
+    let mut course_sp_counts: std::collections::HashMap<usize, usize> =
+        std::collections::HashMap::new();
     for set in sp_sets.iter() {
         for &idx in set {
             *course_sp_counts.entry(idx).or_insert(0) += 1;
@@ -467,7 +521,9 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                 }
             }
             let mut sum = LinearExpr::from(0);
-            for v in used_vars { sum = sum + LinearExpr::from(v); }
+            for v in used_vars {
+                sum = sum + LinearExpr::from(v);
+            }
             model.add_le(sum, LinearExpr::from(3));
         }
     }
