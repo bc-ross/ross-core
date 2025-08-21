@@ -70,11 +70,6 @@ fn main() -> Result<()> {
         }
     }
     println!("Total credits (excluding incoming): {}", sched_credits);
-    match crate::geneds::are_geneds_satisfied(&sched) {
-        Ok(true) => println!("All GenEds satisfied!"),
-        Ok(false) => println!("GenEd requirements NOT satisfied!"),
-        Err(e) => println!("GenEd check error: {}", e),
-    }
 
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 

@@ -112,10 +112,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     for gened in sched.catalog.geneds.iter() {
         if let GenEd::Core { req, name } = gened {
             if satisfy_req(req, &sched_courses, &sched.catalog).is_none() {
-                println!("FAILED Core gened: {}", name);
                 all_core_ok = false;
-            } else {
-                println!("Core gened satisfied: {}", name);
             }
         }
     }
@@ -137,14 +134,12 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
                 GenEdReq::Courses { courses, .. } => courses.clone(),
                 GenEdReq::Credits { courses, .. } => courses.clone(),
             };
-            println!("Foundation '{}': eligible courses: {:?}", name, eligible);
             // Print which eligible courses are present in the schedule
             let sched_courses: HashSet<&CourseCode> = sched.courses.iter().flatten().collect();
             let present: Vec<_> = eligible
                 .iter()
                 .filter(|c| sched_courses.contains(c))
                 .collect();
-            println!("Foundation '{}': scheduled courses: {:?}", name, present);
         }
     }
     // Try all possible assignments of courses to foundation geneds (backtracking)
@@ -162,17 +157,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         }
         if let Some(candidates) = satisfy_req(reqs[idx], sched_courses, catalog) {
             let available: Vec<_> = candidates.difference(used).copied().collect();
-            println!(
-                "[FOUNDATION DIAG] {}: candidates = {:?}, used = {:?}, available = {:?}",
-                names[idx], candidates, used, available
-            );
             if available.len() < candidates.len() {
-                println!(
-                    "[FOUNDATION DIAG] Not enough available for {}: need {}, have {}",
-                    names[idx],
-                    candidates.len(),
-                    available.len()
-                );
                 *fail_foundation = Some(names[idx].clone());
                 return false;
             }
@@ -197,9 +182,6 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
             let mut combs = Vec::new();
             let mut out = Vec::new();
             combinations(&available, candidates.len(), &mut out, &mut combs);
-            if combs.is_empty() {
-                println!("[FOUNDATION DIAG] No valid combinations for {}", names[idx]);
-            }
             for comb in &combs {
                 let mut new_used = used.clone();
                 new_used.extend(comb.iter().copied());
@@ -215,17 +197,9 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
                     return true;
                 }
             }
-            println!(
-                "[FOUNDATION DIAG] All combinations failed for {}",
-                names[idx]
-            );
             *fail_foundation = Some(names[idx].clone());
             false
         } else {
-            println!(
-                "[FOUNDATION DIAG] satisfy_req returned None for {}",
-                names[idx]
-            );
             *fail_foundation = Some(names[idx].clone());
             false
         }
@@ -244,16 +218,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
             &sched.catalog,
             &mut fail_foundation,
         ) {
-            if let Some(fail) = fail_foundation {
-                println!("FAILED Foundation gened: {}", fail);
-            } else {
-                println!("FAILED Foundation geneds (unknown)");
-            }
             return Ok(false);
-        } else {
-            for name in &foundation_names {
-                println!("Foundation gened satisfied: {}", name);
-            }
         }
     }
 
@@ -273,9 +238,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
             for c in courses {
                 *sp_course_counts.entry(c).or_insert(0) += 1;
             }
-            println!("S&P gened satisfied: {}", sp_names[i]);
         } else {
-            println!("FAILED S&P gened: {}", sp_names[i]);
             all_sp_ok = false;
         }
     }
@@ -286,13 +249,11 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     let mut sp_overlap_fail = false;
     for (c, count) in &sp_course_counts {
         if *count > 3 {
-            println!("FAILED S&P overlap: course {} used for {} S&Ps", c, count);
             sp_overlap_fail = true;
         }
     }
     if sp_overlap_fail {
         return Ok(false);
     }
-    println!("=== All geneds satisfied ===");
     Ok(true)
 }
