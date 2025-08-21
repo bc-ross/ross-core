@@ -27,6 +27,15 @@ fn add_prereq_for_course<'a>(
 ) {
     use crate::prereqs::CourseReq::*;
     let num_semesters = ctx.num_semesters;
+    // If the target course is an incoming course, skip prereq constraints entirely.
+    // Incoming courses are allowed in semester 0 and should not be blocked by prereqs.
+    if ctx.incoming_codes.contains(&ctx.courses[course_idx].code) {
+        println!(
+            "[DIAG] Skipping prereq constraints for incoming course {:?}",
+            ctx.courses[course_idx].code
+        );
+        return;
+    }
     match req {
         NotRequired => {}
         And(reqs) => {
@@ -43,19 +52,17 @@ fn add_prereq_for_course<'a>(
                     match r {
                         PreCourse(code) => {
                             if let Some(&pre_idx) = idx_map.get(code) {
-                                if s == 0 {
-                                } else {
-                                    let earlier_vars: Vec<_> =
-                                        ctx.vars[pre_idx][..s].iter().copied().collect();
-                                    if !earlier_vars.is_empty() {
-                                        let sum_earlier: LinearExpr =
-                                            earlier_vars.into_iter().collect();
-                                        ctx.model.add_linear_constraint(
-                                            sum_earlier - or_var,
-                                            [(0, i64::MAX)],
-                                        );
-                                        or_exprs.push(or_var);
-                                    }
+                                // Allow prereqs to be satisfied in semester 0 (incoming)
+                                let earlier_vars: Vec<_> =
+                                    ctx.vars[pre_idx][..s].iter().copied().collect();
+                                if !earlier_vars.is_empty() {
+                                    let sum_earlier: LinearExpr =
+                                        earlier_vars.into_iter().collect();
+                                    ctx.model.add_linear_constraint(
+                                        sum_earlier - or_var,
+                                        [(0, i64::MAX)],
+                                    );
+                                    or_exprs.push(or_var);
                                 }
                             }
                         }

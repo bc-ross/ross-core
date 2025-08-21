@@ -22,15 +22,20 @@ pub struct ModelBuilderContext<'a> {
     pub min_credits: Option<i64>,
     pub geneds: Option<&'a [crate::geneds::GenEd]>,
     pub catalog: Option<&'a Catalog>,
+    pub incoming_codes: Vec<CourseCode>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
     /// Create a new ModelBuilderContext from a schedule and max credits per semester.
     pub fn new(sched: &'a Schedule, max_credits_per_semester: i64) -> Self {
-        // Add all courses in the student's plan, their prerequisites, and all GenEd-eligible courses (as options)
+        // Add incoming courses as semester 0
         let mut all_codes = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
-        // 1. Add planned courses and their prereqs
+        // Add incoming courses first
+        for code in &sched.incoming {
+            all_codes.insert(code.clone());
+        }
+        // Add planned courses and their prereqs
         for sem in &sched.courses {
             for code in sem {
                 all_codes.insert(code.clone());
@@ -63,7 +68,7 @@ impl<'a> ModelBuilderContext<'a> {
                 collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
             }
         }
-        // 2. Add all GenEd-eligible courses (so the solver can choose among them)
+        // Add GenEd-eligible courses
         for gened in &sched.catalog.geneds {
             use crate::geneds::{GenEd, GenEdReq};
             let reqs: Vec<&GenEdReq> = match gened {
@@ -94,6 +99,7 @@ impl<'a> ModelBuilderContext<'a> {
         let mut courses = Vec::new();
         let mut total_credits = 0;
         println!("[DIAG] Courses included in model:");
+        println!("[DIAG] incoming_codes: {:?}", sched.incoming);
         for code in &all_codes {
             let (credits, prereqs) = match sched.catalog.courses.get(code) {
                 Some((_name, credits_opt, _offering)) => {
@@ -109,9 +115,20 @@ impl<'a> ModelBuilderContext<'a> {
                 None => (0, CourseReq::NotRequired),
             };
             total_credits += credits;
-            println!("  {} ({} credits)", code, credits);
-            // Mark as required only if in student's plan
-            let required = sched.courses.iter().flatten().any(|c| c == code);
+            let required = if sched.incoming.contains(code) {
+                true
+            } else if sched.courses.iter().flatten().any(|c| c == code) {
+                true
+            } else {
+                false
+            };
+            println!(
+                "  {} ({} credits) required: {} incoming: {}",
+                code,
+                credits,
+                required,
+                sched.incoming.contains(code)
+            );
             courses.push(Course {
                 code: code.clone(),
                 credits,
@@ -122,8 +139,14 @@ impl<'a> ModelBuilderContext<'a> {
             });
         }
         println!("[DIAG] Total courses: {}", courses.len());
-        println!("[DIAG] Total credits (all modeled courses): {}", total_credits);
-        println!("[DIAG] Semesters: {}", sched.courses.len());
+        println!(
+            "[DIAG] Total credits (all modeled courses): {}",
+            total_credits
+        );
+        println!(
+            "[DIAG] Semesters: {} (+1 for incoming)",
+            sched.courses.len()
+        );
         println!("[DIAG] Max credits/semester: {}", max_credits_per_semester);
         if !sched.catalog.geneds.is_empty() {
             println!("[DIAG] GenEd requirements:");
@@ -131,8 +154,12 @@ impl<'a> ModelBuilderContext<'a> {
                 use crate::geneds::GenEd;
                 match gened {
                     GenEd::Core { name, req } => println!("  Core: {}: {:?}", name, req),
-                    GenEd::Foundation { name, req } => println!("  Foundation: {}: {:?}", name, req),
-                    GenEd::SkillAndPerspective { name, req } => println!("  S&P: {}: {:?}", name, req),
+                    GenEd::Foundation { name, req } => {
+                        println!("  Foundation: {}: {:?}", name, req)
+                    }
+                    GenEd::SkillAndPerspective { name, req } => {
+                        println!("  S&P: {}: {:?}", name, req)
+                    }
                 }
             }
         }
@@ -140,11 +167,12 @@ impl<'a> ModelBuilderContext<'a> {
             model: CpModelBuilder::default(),
             vars: Vec::new(),
             courses,
-            num_semesters: sched.courses.len(),
+            num_semesters: sched.courses.len(), // already includes semester 0 after transformation
             max_credits_per_semester,
             min_credits: None,
             geneds: Some(&sched.catalog.geneds),
             catalog: Some(&sched.catalog),
+            incoming_codes: sched.incoming.clone(),
         }
     }
 
@@ -161,7 +189,8 @@ impl<'a> ModelBuilderContext<'a> {
     ) -> LinearExpr {
         let mut obj_terms = Vec::new();
         for (i, (_course, credits)) in flat_courses.iter().enumerate() {
-            for s in 0..self.num_semesters {
+            // Skip semester 0 (incoming) when computing total scheduled credits
+            for s in 1..self.num_semesters {
                 obj_terms.push((*credits, vars[i][s]));
             }
         }
