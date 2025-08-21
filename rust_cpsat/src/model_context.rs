@@ -189,7 +189,8 @@ impl<'a> ModelBuilderContext<'a> {
     ) -> LinearExpr {
         let mut obj_terms = Vec::new();
         for (i, (_course, credits)) in flat_courses.iter().enumerate() {
-            for s in 0..self.num_semesters {
+            // Skip semester 0 (incoming) when computing total scheduled credits
+            for s in 1..self.num_semesters {
                 obj_terms.push((*credits, vars[i][s]));
             }
         }

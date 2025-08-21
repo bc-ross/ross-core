@@ -9,15 +9,23 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut params = cp_sat::proto::SatParameters::default();
     params.log_search_progress = Some(true);
     params.num_search_workers = Some(8);
+    // Fix solver seed for reproducibility and easier debugging
+    params.random_seed = Some(123456);
     // --- Transform schedule: add incoming as semester 0 (always present, even if empty) ---
-    let mut all_semesters = vec![sched.incoming.clone()];
-    all_semesters.extend(sched.courses.clone());
+    // Always set incoming courses before building model context for both stages
     let mut sched_for_model = sched.clone();
+    sched_for_model.incoming = sched.incoming.clone();
+    let mut all_semesters = vec![sched_for_model.incoming.clone()];
+    all_semesters.extend(sched.courses.clone());
     sched_for_model.courses = all_semesters;
     // Stage 1: minimize total credits
     let mut ctx = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
+    // Determine number of semesters (includes incoming semester 0)
     let num_semesters = sched_for_model.courses.len();
+    // Diagnostic: print context info before solving stage 1
+    println!("[DIAG] Stage 1 incoming_codes: {:?}", ctx.incoming_codes);
+    println!("[DIAG] Stage 1 num_semesters: {} flat_courses: {}", num_semesters, flat_courses.len());
     let first_sched_semester = 1; // semester 0 is incoming only
     // Only sum credits for semesters 1..N (ignore semester 0)
     let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
@@ -29,6 +37,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     }
     model.minimize(total_credits_sched.clone());
     let response = model.solve_with_parameters(&params);
+    println!("[DIAG] Stage 1 solver status: {:?}", response.status());
 
     // Compute min_credits as the sum of all scheduled (assigned + prereq) course credits in the solution
     let min_credits = match response.status() {
@@ -55,9 +64,12 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut ctx2 = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     ctx2.set_min_credits(min_credits);
     let (mut model2, vars2, flat_courses2) = build_model_pipeline(&mut ctx2);
-    // Compute mean load (rounded down)
-    let mean_load = if num_semesters > 1 {
-        min_credits / (num_semesters as i64 - 1)
+    // Diagnostic: print incoming codes in stage two
+    println!("[DIAG] Stage 2 incoming_codes: {:?}", ctx2.incoming_codes);
+    // Compute mean load (rounded down), EXCLUDING semester 0 (incoming)
+    let num_sched_semesters = num_semesters as i64 - 1;
+    let mean_load = if num_sched_semesters > 0 {
+        min_credits / num_sched_semesters
     } else {
         0
     };
@@ -69,15 +81,8 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         for i in 0..flat_courses2.len() {
             let var = vars2[i][s].clone();
             let coeff = flat_courses2[i].1;
-            if coeff > 0 {
-                for _ in 0..coeff {
-                    expr = expr + LinearExpr::from(var.clone());
-                }
-            } else if coeff < 0 {
-                for _ in 0..(-coeff) {
-                    expr = expr - LinearExpr::from(var.clone());
-                }
-            }
+            // Use a single scaled addition (supports negative coeffs) instead of repeated adds/subtracts
+            expr = expr + (coeff, var.clone());
         }
         // Domain: [0, max_credits_per_semester * flat_courses2.len() as i64]
         let domain = vec![(0, max_credits_per_semester * flat_courses2.len() as i64)];
@@ -172,7 +177,26 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
                     }
                 }
             }
-            // Overwrite sched.courses with the new schedule (just the codes), skipping semester 0 for output
+            // Diagnostic: print all courses scheduled in semester 0 (incoming)
+            println!("[DIAG] Scheduled in semester 0 (incoming):");
+            for (code, credits) in &result[0] {
+                println!("[DIAG]   {} ({} credits)", code, credits);
+                if !sched.incoming.contains(code) {
+                    println!(
+                        "[WARNING] Non-incoming course scheduled in semester 0: {} ({} credits)",
+                        code, credits
+                    );
+                }
+            }
+            // Strictly separate incoming (semester 0) from planned semesters (1..N)
+            // Only incoming courses should be present in semester 0
+            let filtered_incoming_codes: Vec<CourseCode> = result[0]
+                .iter()
+                .filter(|(code, _)| sched.incoming.contains(code))
+                .map(|(code, _)| code.clone())
+                .collect();
+            sched.incoming = filtered_incoming_codes;
+            // Only planned semesters (1..N) go into sched.courses
             sched.courses = result
                 .iter()
                 .skip(first_sched_semester)
