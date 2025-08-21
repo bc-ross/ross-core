@@ -57,4 +57,23 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
             }
         }
     }
+    // --- Incoming courses logic ---
+    // Get incoming codes from context (they are always required and only scheduled in semester 0)
+    let incoming_semester = 0;
+    for (i, c) in ctx.courses.iter().enumerate() {
+        let is_incoming = ctx.incoming_codes.contains(&c.code);
+        for s in 0..ctx.num_semesters {
+            if is_incoming {
+                if s == incoming_semester {
+                    ctx.model.add_eq(ctx.vars[i][s], 1); // Must be scheduled in semester 0
+                } else {
+                    ctx.model.add_eq(ctx.vars[i][s], 0); // Cannot be scheduled elsewhere
+                }
+            } else {
+                if s == incoming_semester {
+                    ctx.model.add_eq(ctx.vars[i][s], 0); // Only incoming courses allowed in semester 0
+                }
+            }
+        }
+    }
 }
