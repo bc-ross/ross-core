@@ -39,6 +39,7 @@ fn main() -> Result<()> {
     )?;
 
     println!("Final schedule (two-stage, balanced):");
+    println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
     for (s, semester) in std::iter::once(&sched.incoming)
         .chain(sched.courses.iter())
@@ -58,6 +59,12 @@ fn main() -> Result<()> {
                 .get(code)
                 .and_then(|(_, cr, _)| *cr)
                 .unwrap_or(0);
+            let credits = sched
+                .catalog
+                .courses
+                .get(code)
+                .and_then(|(_, cr, _)| *cr)
+                .unwrap_or(0);
             println!("  {} ({} credits)", code, credits);
             sem_credits += credits;
         }
@@ -68,6 +75,7 @@ fn main() -> Result<()> {
     }
     println!("Total credits (excluding incoming): {}", sched_credits);
 
+    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
     println!(
