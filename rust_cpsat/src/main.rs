@@ -40,7 +40,7 @@ fn main() {
     semesters[0].push(CC!("THEO", 3100)); // Foundation
     semesters[0].push(CC!("THEO", 3110)); // Foundation
     // Incoming courses are tracked separately, not in the main semester list
-    let incoming_courses = vec![CC!("THEO", 1100)]; // Example incoming course
+    let incoming_courses = vec![CC!("CHEM", 2200)]; // Example incoming course
     // Only semesters 1-8 in courses, incoming courses in incoming
     let sched = schedule::Schedule {
         courses: semesters.clone(),

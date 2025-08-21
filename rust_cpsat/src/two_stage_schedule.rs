@@ -25,7 +25,11 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let num_semesters = sched_for_model.courses.len();
     // Diagnostic: print context info before solving stage 1
     println!("[DIAG] Stage 1 incoming_codes: {:?}", ctx.incoming_codes);
-    println!("[DIAG] Stage 1 num_semesters: {} flat_courses: {}", num_semesters, flat_courses.len());
+    println!(
+        "[DIAG] Stage 1 num_semesters: {} flat_courses: {}",
+        num_semesters,
+        flat_courses.len()
+    );
     let first_sched_semester = 1; // semester 0 is incoming only
     // Only sum credits for semesters 1..N (ignore semester 0)
     let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
