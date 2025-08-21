@@ -146,6 +146,7 @@ impl fmt::Display for Catalog {
 pub struct Schedule {
     pub courses: Vec<Semester>,
     pub programs: Vec<String>,
+    pub incoming: Semester,
     pub catalog: Catalog,
 }
 
@@ -171,6 +172,7 @@ pub fn generate_schedule(programs: Vec<&str>, catalog: Catalog) -> Result<Schedu
     let mut sched = Schedule {
         courses: combined_semesters,
         programs: programs.iter().map(|x| x.name.to_owned()).collect(),
+        incoming: vec![], // Assuming no incoming courses for now
         catalog,
     };
     sched.reduce()?;

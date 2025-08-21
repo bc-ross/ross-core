@@ -40,6 +40,7 @@ fn main() {
     let sched = schedule::Schedule {
         courses: semesters,
         programs: vec![],
+        incoming: vec![CC!("CS", 1010)], // Example incoming course
         catalog: catalog.clone(),
     };
     println!("{:?}", &sched.courses);
@@ -47,7 +48,8 @@ fn main() {
 
     // Call the new two-stage scheduling function, mutably updating sched.courses
     let mut sched = sched;
-    crate::two_stage_schedule::two_stage_lex_schedule(&mut sched, max_credits_per_semester).unwrap();
+    crate::two_stage_schedule::two_stage_lex_schedule(&mut sched, max_credits_per_semester)
+        .unwrap();
 
     // Print the updated schedule from sched.courses
     println!("Final schedule (two-stage, balanced):");
@@ -57,7 +59,12 @@ fn main() {
         let mut sem_credits = 0;
         for code in semester {
             // Look up credits from catalog
-            let credits = sched.catalog.courses.get(code).and_then(|(_, cr, _)| *cr).unwrap_or(0);
+            let credits = sched
+                .catalog
+                .courses
+                .get(code)
+                .and_then(|(_, cr, _)| *cr)
+                .unwrap_or(0);
             println!("  {} ({} credits)", code, credits);
             sem_credits += credits;
         }
