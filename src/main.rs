@@ -41,8 +41,15 @@ fn main() -> Result<()> {
 
     println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
-    for (s, semester) in sched.courses.iter().enumerate() {
-        println!("Semester {}", s + 1);
+    for (s, semester) in std::iter::once(&sched.incoming)
+        .chain(sched.courses.iter())
+        .enumerate()
+    {
+        if s == 0 {
+            println!("Semester 0 (incoming only):");
+        } else {
+            println!("Semester {}", s);
+        }
         let mut sem_credits = 0;
         for code in semester {
             // Look up credits from catalog
@@ -56,9 +63,11 @@ fn main() -> Result<()> {
             sem_credits += credits;
         }
         println!("  Credits: {}", sem_credits);
-        sched_credits += sem_credits;
+        if s > 0 {
+            sched_credits += sem_credits;
+        }
     }
-    println!("Total credits: {}", sched_credits);
+    println!("Total credits (excluding incoming): {}", sched_credits);
     match crate::geneds::are_geneds_satisfied(&sched) {
         Ok(true) => println!("All GenEds satisfied!"),
         Ok(false) => println!("GenEd requirements NOT satisfied!"),

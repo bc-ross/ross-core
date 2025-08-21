@@ -68,8 +68,6 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut ctx2 = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     ctx2.set_min_credits(min_credits);
     let (mut model2, vars2, flat_courses2) = build_model_pipeline(&mut ctx2);
-    // Diagnostic: print incoming codes in stage two
-    println!("[DIAG] Stage 2 incoming_codes: {:?}", ctx2.incoming_codes);
     // Compute mean load (rounded down), EXCLUDING semester 0 (incoming)
     let num_sched_semesters = num_semesters as i64 - 1;
     let mean_load = if num_sched_semesters > 0 {
@@ -181,17 +179,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
                     }
                 }
             }
-            // Diagnostic: print all courses scheduled in semester 0 (incoming)
-            println!("[DIAG] Scheduled in semester 0 (incoming):");
-            for (code, credits) in &result[0] {
-                println!("[DIAG]   {} ({} credits)", code, credits);
-                if !sched.incoming.contains(code) {
-                    println!(
-                        "[WARNING] Non-incoming course scheduled in semester 0: {} ({} credits)",
-                        code, credits
-                    );
-                }
-            }
+
             // Strictly separate incoming (semester 0) from planned semesters (1..N)
             // Only incoming courses should be present in semester 0
             let filtered_incoming_codes: Vec<CourseCode> = result[0]
