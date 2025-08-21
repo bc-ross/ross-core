@@ -42,8 +42,8 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
             .map(|(_, _, off)| off);
         for s in 0..ctx.num_semesters {
             let allowed = match offering {
-                Some(crate::schedule::CourseTermOffering::Fall) => s % 2 == 0, // even semesters
-                Some(crate::schedule::CourseTermOffering::Spring) => s % 2 == 1, // odd semesters
+                Some(crate::schedule::CourseTermOffering::Fall) => s % 2 == 1, // odd semesters
+                Some(crate::schedule::CourseTermOffering::Spring) => s % 2 == 0, // even semesters
                 Some(crate::schedule::CourseTermOffering::Both) => true,
                 Some(crate::schedule::CourseTermOffering::Discretion) => true, // allowed, but may change in future
                 Some(crate::schedule::CourseTermOffering::Infrequently) => true, // allowed, but may change in future
