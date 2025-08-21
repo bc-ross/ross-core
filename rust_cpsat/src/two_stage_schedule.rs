@@ -9,10 +9,15 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut params = cp_sat::proto::SatParameters::default();
     params.log_search_progress = Some(true);
     params.num_search_workers = Some(8);
+    // --- Transform schedule: add incoming as semester 0 ---
+    let mut all_semesters = vec![sched.incoming.clone()];
+    all_semesters.extend(sched.courses.clone());
+    let mut sched_for_model = sched.clone();
+    sched_for_model.courses = all_semesters;
     // Stage 1: minimize total credits
-    let mut ctx = ModelBuilderContext::new(sched, max_credits_per_semester);
+    let mut ctx = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
-    let num_semesters = sched.courses.len();
+    let num_semesters = sched_for_model.courses.len();
     let first_sched_semester = 1; // semester 0 is incoming only
     // Only sum credits for semesters 1..N (ignore semester 0)
     let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
@@ -47,7 +52,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     };
 
     // Stage 2: minimize spread, subject to min total credits
-    let mut ctx2 = ModelBuilderContext::new(sched, max_credits_per_semester);
+    let mut ctx2 = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     ctx2.set_min_credits(min_credits);
     let (mut model2, vars2, flat_courses2) = build_model_pipeline(&mut ctx2);
     // Compute mean load (rounded down)
