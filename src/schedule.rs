@@ -6,7 +6,7 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::geneds::{GenEd, are_geneds_satisfied};
+use crate::geneds::{ElectiveReq, GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
@@ -99,12 +99,9 @@ impl std::fmt::Debug for CourseCode {
 pub type Semester = Vec<CourseCode>;
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
-pub enum Elective {
-    And(Vec<Elective>),
-    Or(Vec<Elective>),
-    Courses { num: usize, opts: Vec<CourseCode> },
-    Credits { num: usize, opts: Vec<CourseCode> },
-    Sequence(Vec<Vec<CourseCode>>),
+pub struct Elective {
+    pub name: String,
+    pub req: ElectiveReq,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
