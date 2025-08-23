@@ -81,7 +81,7 @@ fn add_prereq_for_course<'a>(
                         And(_) | Or(_) => {
                             add_prereq_for_course(ctx, idx_map, course_idx, r);
                         }
-                        _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
+                        _ => eprintln!("Only PreCourse, CoCourse, And, Or supported, not {:?}", r),
                     }
                     or_exprs.push(or_var);
                 }
