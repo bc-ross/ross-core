@@ -44,7 +44,7 @@ fn main() {
     // Only semesters 1-8 in courses, incoming courses in incoming
     let sched = schedule::Schedule {
         courses: semesters.clone(),
-        programs: vec![],
+        programs: vec!["BA Chemistry".to_string()],
         incoming: incoming_courses.clone(),
         catalog: catalog.clone(),
     };
