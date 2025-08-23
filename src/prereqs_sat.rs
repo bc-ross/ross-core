@@ -708,12 +708,12 @@ impl PrereqSatSolver {
     /// Add constraint for a single gened requirement
     fn add_gened_requirement_constraint(
         &mut self,
-        req: &crate::geneds::GenEdReq,
+        req: &crate::geneds::ElectiveReq,
         catalog: &crate::schedule::Catalog,
         _gened_name: &str,
     ) {
         match req {
-            crate::geneds::GenEdReq::Courses { num, courses } => {
+            crate::geneds::ElectiveReq::Courses { num, courses } => {
                 print!(" (needs {} from {} courses)", num, courses.len());
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
@@ -746,7 +746,7 @@ impl PrereqSatSolver {
                     self.add_at_most_k_constraint(&course_vars, *num + 2); // Allow small buffer
                 }
             }
-            crate::geneds::GenEdReq::Credits { num, courses } => {
+            crate::geneds::ElectiveReq::Credits { num, courses } => {
                 print!(" (needs {} credits from {} courses)", num, courses.len());
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
@@ -779,7 +779,7 @@ impl PrereqSatSolver {
                     self.add_at_most_k_constraint(&simple_vars, max_courses_needed as usize);
                 }
             }
-            crate::geneds::GenEdReq::Set(courses) => {
+            crate::geneds::ElectiveReq::Set(courses) => {
                 print!(" (requires exactly {} courses)", courses.len());
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 
@@ -799,7 +799,7 @@ impl PrereqSatSolver {
                     self.formula.add_clause(&clause);
                 }
             }
-            crate::geneds::GenEdReq::SetOpts(sets) => {
+            crate::geneds::ElectiveReq::SetOpts(sets) => {
                 print!(" (one of {} set options)", sets.len());
                 std::io::Write::flush(&mut std::io::stdout()).unwrap();
 

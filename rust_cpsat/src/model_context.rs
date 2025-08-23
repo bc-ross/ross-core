@@ -70,22 +70,22 @@ impl<'a> ModelBuilderContext<'a> {
         }
         // Add GenEd-eligible courses
         for gened in &sched.catalog.geneds {
-            use crate::geneds::{GenEd, GenEdReq};
-            let reqs: Vec<&GenEdReq> = match gened {
+            use crate::geneds::{ElectiveReq, GenEd};
+            let reqs: Vec<&ElectiveReq> = match gened {
                 GenEd::Core { req, .. } => vec![req],
                 GenEd::Foundation { req, .. } => vec![req],
                 GenEd::SkillAndPerspective { req, .. } => vec![req],
             };
             for req in reqs {
                 match req {
-                    GenEdReq::Set(codes)
-                    | GenEdReq::Courses { courses: codes, .. }
-                    | GenEdReq::Credits { courses: codes, .. } => {
+                    ElectiveReq::Set(codes)
+                    | ElectiveReq::Courses { courses: codes, .. }
+                    | ElectiveReq::Credits { courses: codes, .. } => {
                         for code in codes {
                             all_codes.insert(code.clone());
                         }
                     }
-                    GenEdReq::SetOpts(opts) => {
+                    ElectiveReq::SetOpts(opts) => {
                         for opt in opts {
                             for code in opt {
                                 all_codes.insert(code.clone());

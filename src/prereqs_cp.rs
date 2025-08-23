@@ -1,4 +1,4 @@
-use crate::geneds::{GenEd, GenEdReq, are_geneds_satisfied};
+use crate::geneds::{ElectiveReq, GenEd, are_geneds_satisfied};
 use crate::schedule::{Catalog, CourseCode, Schedule};
 use anyhow::Result;
 use std::collections::{HashMap, HashSet};
@@ -124,18 +124,18 @@ fn is_gened_satisfied(
         | GenEd::SkillAndPerspective { req, .. } => {
             // We need to implement our own satisfaction check since fulfilled_courses is private
             match req {
-                GenEdReq::Set(courses) => courses.iter().all(|c| current_courses.contains(c)),
-                GenEdReq::SetOpts(opts) => opts
+                ElectiveReq::Set(courses) => courses.iter().all(|c| current_courses.contains(c)),
+                ElectiveReq::SetOpts(opts) => opts
                     .iter()
                     .any(|opt| opt.iter().all(|c| current_courses.contains(c))),
-                GenEdReq::Courses { num, courses } => {
+                ElectiveReq::Courses { num, courses } => {
                     let satisfied_count = courses
                         .iter()
                         .filter(|c| current_courses.contains(c))
                         .count();
                     satisfied_count >= *num
                 }
-                GenEdReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, courses } => {
                     let satisfied_credits: u32 = courses
                         .iter()
                         .filter(|c| current_courses.contains(c))
@@ -157,12 +157,12 @@ fn get_all_satisfying_courses(gened: &GenEd) -> Vec<CourseCode> {
         | GenEd::Foundation { req, .. }
         | GenEd::SkillAndPerspective { req, .. } => {
             match req {
-                GenEdReq::Set(courses) => courses.clone(),
-                GenEdReq::SetOpts(opts) => {
+                ElectiveReq::Set(courses) => courses.clone(),
+                ElectiveReq::SetOpts(opts) => {
                     // Return all courses from all options
                     opts.iter().flatten().cloned().collect()
                 }
-                GenEdReq::Courses { courses, .. } | GenEdReq::Credits { courses, .. } => {
+                ElectiveReq::Courses { courses, .. } | ElectiveReq::Credits { courses, .. } => {
                     courses.clone()
                 }
             }

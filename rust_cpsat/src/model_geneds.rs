@@ -1,5 +1,5 @@
 //! Functions for adding GenEd constraints.
-use crate::geneds::{GenEd, GenEdReq};
+use crate::geneds::{ElectiveReq, GenEd};
 use crate::model_context::Course;
 use crate::model_context::ModelBuilderContext;
 use cp_sat::builder::LinearExpr;
@@ -41,7 +41,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     for gened in geneds.iter() {
         if let GenEd::Core { req, .. } = gened {
             match req {
-                GenEdReq::Set(codes) => {
+                ElectiveReq::Set(codes) => {
                     if let Some(indices) = codes_to_indices(codes) {
                         for idx in indices {
                             // Each course must be scheduled somewhere
@@ -49,7 +49,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         }
                     }
                 }
-                GenEdReq::SetOpts(opts) => {
+                ElectiveReq::SetOpts(opts) => {
                     // At least one option set must be fully present
                     let mut option_exprs = Vec::new();
                     for opt in opts {
@@ -93,7 +93,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         model.add_ge(sum, LinearExpr::from(1));
                     }
                 }
-                GenEdReq::Courses { num, courses } => {
+                ElectiveReq::Courses { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
                         for idx in indices {
@@ -102,7 +102,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         model.add_ge(sum, LinearExpr::from(*num as i64));
                     }
                 }
-                GenEdReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
                         for idx in indices.iter() {
@@ -131,7 +131,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     for gened in geneds.iter() {
         if let GenEd::Foundation { req, .. } = gened {
             match req {
-                GenEdReq::Set(codes) => {
+                ElectiveReq::Set(codes) => {
                     if let Some(indices) = codes_to_indices(codes) {
                         // All courses in the set must be scheduled
                         for idx in &indices {
@@ -140,7 +140,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         foundation_sets.push(indices);
                     }
                 }
-                GenEdReq::SetOpts(opts) => {
+                ElectiveReq::SetOpts(opts) => {
                     // At least one option set must be fully present
                     let mut option_exprs = Vec::new();
                     let mut all_indices = Vec::new();
@@ -183,7 +183,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                     }
                     foundation_sets.push(all_indices);
                 }
-                GenEdReq::Courses { num, courses } => {
+                ElectiveReq::Courses { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
                         for idx in &indices {
@@ -193,7 +193,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         foundation_sets.push(indices);
                     }
                 }
-                GenEdReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         let mut sum = LinearExpr::from(0);
                         for idx in &indices {
@@ -230,15 +230,15 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
             .unwrap();
         let (required, is_credits, course_credits) = match gened {
             GenEd::Foundation { req, .. } => match req {
-                GenEdReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, courses } => {
                     let credits: Vec<_> = set
                         .iter()
                         .map(|&idx| ctx.courses[idx].credits as i64)
                         .collect();
                     (*num as i64, true, credits)
                 }
-                GenEdReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
-                GenEdReq::SetOpts(_) | GenEdReq::Courses { .. } => {
+                ElectiveReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
+                ElectiveReq::SetOpts(_) | ElectiveReq::Courses { .. } => {
                     (set.len() as i64, false, vec![1; set.len()])
                 }
             },
@@ -347,7 +347,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     for gened in geneds.iter() {
         if let GenEd::SkillAndPerspective { req, .. } = gened {
             match req {
-                GenEdReq::Set(codes) => {
+                ElectiveReq::Set(codes) => {
                     if let Some(indices) = codes_to_indices(codes) {
                         sp_sets.push(indices.clone());
                         // Split required/optional
@@ -382,7 +382,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
                     }
                 }
-                GenEdReq::Courses { num, courses } => {
+                ElectiveReq::Courses { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         sp_sets.push(indices.clone());
                         let mut required_idxs = Vec::new();
@@ -414,7 +414,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
                     }
                 }
-                GenEdReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, courses } => {
                     if let Some(indices) = codes_to_indices(courses) {
                         sp_sets.push(indices.clone());
                         let mut required_sum = LinearExpr::from(0);
@@ -446,7 +446,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                         model.add_le(required_sum.clone() + optional_sum.clone(), max_expr);
                     }
                 }
-                GenEdReq::SetOpts(opts) => {
+                ElectiveReq::SetOpts(opts) => {
                     let mut all_indices = Vec::new();
                     let mut option_exprs = Vec::new();
                     for opt in opts {
