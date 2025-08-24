@@ -296,3 +296,38 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     println!("=== All geneds satisfied ===");
     Ok(true)
 }
+
+// Used for script_assistant crate
+#[allow(dead_code)]
+impl GenEd {
+    pub fn all_course_codes(&self) -> Vec<CourseCode> {
+        match self {
+            GenEd::Core { req, .. } => req.all_course_codes(),
+            GenEd::Foundation { req, .. } => req.all_course_codes(),
+            GenEd::SkillAndPerspective { req, .. } => req.all_course_codes(),
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl ElectiveReq {
+    fn all_course_codes(&self) -> Vec<CourseCode> {
+        let mut codes = Vec::new();
+        self.collect_course_codes(&mut codes);
+        codes.into_iter().map(|x| x.clone()).collect()
+    }
+
+    fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {
+        match self {
+            ElectiveReq::Set(courses) => {
+                codes.extend(courses.iter());
+            }
+            ElectiveReq::SetOpts(course_seqs) => {
+                codes.extend(course_seqs.iter().flatten());
+            }
+            ElectiveReq::Courses { courses, .. } | ElectiveReq::Credits { courses, .. } => {
+                codes.extend(courses.iter());
+            }
+        }
+    }
+}
