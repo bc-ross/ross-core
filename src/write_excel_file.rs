@@ -8,6 +8,11 @@ use std::path::PathBuf;
 fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Result<()> {
     let semesters = sched.courses.len() + 1;
     let format = Format::new().set_align(FormatAlign::Center);
+    let mut last_row = 0;
+    let mut sem_sums = vec![0; semesters];
+
+    let total_format = Format::new().set_italic();
+    let cr_format = Format::new().set_align(FormatAlign::Center);
 
     sheet.merge_range(0, 0, 0, 1, "Incoming", &format)?;
     for col_idx in 1..semesters {
@@ -23,16 +28,25 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
 
     for (row_idx, val) in sched.incoming.iter().enumerate() {
         sheet.write_string((row_idx + 1) as u32, 0, val.to_string())?;
-        sheet.write_string(
+        sheet.write_number_with_format(
             (row_idx + 1) as u32,
             1,
             sched
                 .catalog
                 .courses
                 .get(val)
-                .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("0".into()))
+                .map(|(_, x, _)| x.unwrap_or(0))
                 .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
+            &cr_format,
         )?;
+
+        sem_sums[0] += sched
+            .catalog
+            .courses
+            .get(val)
+            .and_then(|(_, x, _)| *x)
+            .unwrap_or(0);
+        last_row = last_row.max(row_idx);
     }
 
     for (col_idx, field) in sched.courses.iter().enumerate() {
@@ -42,21 +56,61 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                 ((col_idx + 1) * 2) as u16,
                 val.to_string(),
             )?;
-            sheet.write_string(
+            sheet.write_number_with_format(
                 (row_idx + 1) as u32,
                 ((col_idx + 1) * 2 + 1) as u16,
                 sched
                     .catalog
                     .courses
                     .get(&val)
-                    .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("0".into()))
+                    .map(|(_, x, _)| x.unwrap_or(0))
                     .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
+                &cr_format,
             )?;
 
-            // TODO: How to add credit??
+            sem_sums[col_idx] += sched
+                .catalog
+                .courses
+                .get(val)
+                .and_then(|(_, x, _)| *x)
+                .unwrap_or(0);
+            last_row = last_row.max(row_idx);
         }
     }
+
+    for (col_idx, sum) in sem_sums.iter().enumerate() {
+        sheet.write_string_with_format(
+            (last_row + 2) as u32,
+            (col_idx * 2) as u16,
+            "Total",
+            &total_format,
+        )?;
+        sheet
+            .write_formula_with_format(
+                (last_row + 2) as u32,
+                (col_idx * 2 + 1) as u16,
+                format!(
+                    "=SUM({}:{})",
+                    rust_xlsxwriter::utility::row_col_to_cell(1, (col_idx * 2 + 1) as u16),
+                    rust_xlsxwriter::utility::row_col_to_cell(
+                        (last_row + 1) as u32,
+                        (col_idx * 2 + 1) as u16
+                    )
+                )
+                .as_str(),
+                &cr_format,
+            )?
+            .set_formula_result(
+                (last_row + 2) as u32,
+                (col_idx * 2 + 1) as u16,
+                format!("{}", sum),
+            );
+        sheet.set_column_width((col_idx * 2 + 1) as u16, 2.5)?;
+    }
+
     sheet.autofit();
+    // for col_idx in 0..semesters {
+    // }
 
     Ok(())
 }
