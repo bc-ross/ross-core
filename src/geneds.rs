@@ -110,7 +110,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     // 1. Core: each must be satisfied, overlap allowed
     let mut all_core_ok = true;
     for gened in sched.catalog.geneds.iter() {
-        if let GenEd::Core { req, name } = gened {
+        if let GenEd::Core { req, .. } = gened {
             if satisfy_req(req, &sched_courses, &sched.catalog).is_none() {
                 all_core_ok = false;
             }
@@ -134,12 +134,6 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
                 ElectiveReq::Courses { courses, .. } => courses.clone(),
                 ElectiveReq::Credits { courses, .. } => courses.clone(),
             };
-            // Print which eligible courses are present in the schedule
-            let sched_courses: HashSet<&CourseCode> = sched.courses.iter().flatten().collect();
-            let present: Vec<_> = eligible
-                .iter()
-                .filter(|c| sched_courses.contains(c))
-                .collect();
         }
     }
     // Try all possible assignments of courses to foundation geneds (backtracking)

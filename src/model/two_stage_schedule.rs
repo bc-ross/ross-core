@@ -1,7 +1,7 @@
 use super::{ModelBuilderContext, build_model_pipeline};
-use crate::schedule::{CourseCode, Schedule};
+use crate::schedule::Schedule;
 use anyhow::{Result, anyhow};
-use cp_sat::builder::{CpModelBuilder, IntVar, LinearExpr};
+use cp_sat::builder::LinearExpr;
 use cp_sat::proto::CpSolverStatus;
 
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.

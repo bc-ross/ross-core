@@ -1,5 +1,4 @@
 //! Functions for adding GenEd constraints.
-use super::context::Course;
 use super::context::ModelBuilderContext;
 use crate::geneds::{ElectiveReq, GenEd};
 use cp_sat::builder::LinearExpr;
@@ -65,7 +64,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             // model.add_le(all_present.clone(), LinearExpr::from(opt.len() as i64) + (LinearExpr::from(1) - opt_var.clone()) * (opt.len() as i64));
                             // model.add_ge(all_present, LinearExpr::from(opt.len() as i64) - (LinearExpr::from(1) - opt_var.clone()) * (opt.len() as i64));
                             // Instead, expand (LinearExpr * n) as repeated addition
-                            let mut le_expr = LinearExpr::from(1) - opt_var.clone();
+                            let le_expr = LinearExpr::from(1) - opt_var.clone();
                             let mut le_scaled = LinearExpr::from(0);
                             for _ in 0..opt.len() {
                                 le_scaled = le_scaled + le_expr.clone();
@@ -153,7 +152,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             }
                             // Use a bool var to represent this option
                             let opt_var = model.new_bool_var();
-                            let mut le_expr = LinearExpr::from(1) - opt_var.clone();
+                            let le_expr = LinearExpr::from(1) - opt_var.clone();
                             let mut le_scaled = LinearExpr::from(0);
                             for _ in 0..opt.len() {
                                 le_scaled = le_scaled + le_expr.clone();

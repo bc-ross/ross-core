@@ -1,5 +1,5 @@
 //! Functions for adding course variables and required/optional constraints.
-use super::context::{Course, ModelBuilderContext};
+use super::context::ModelBuilderContext;
 
 pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
     let mut vars = Vec::new();
