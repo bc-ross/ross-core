@@ -29,7 +29,7 @@ fn main() -> Result<()> {
             .programs
             .iter()
             .map(|x| x.name.as_str())
-            .take(1)
+            // .take(1)
             .collect(),
         CATALOGS
             .first()
@@ -75,7 +75,6 @@ fn main() -> Result<()> {
     }
     println!("Total credits (excluding incoming): {}", sched_credits);
 
-    save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 
     println!(
