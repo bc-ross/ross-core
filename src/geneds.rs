@@ -311,7 +311,7 @@ impl GenEd {
 
 #[allow(dead_code)]
 impl ElectiveReq {
-    fn all_course_codes(&self) -> Vec<CourseCode> {
+    pub fn all_course_codes(&self) -> Vec<CourseCode> {
         let mut codes = Vec::new();
         self.collect_course_codes(&mut codes);
         codes.into_iter().map(|x| x.clone()).collect()
