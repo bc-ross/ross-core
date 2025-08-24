@@ -20,7 +20,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
             (col_idx * 2) as u16,
             0,
             ((col_idx * 2) + 1) as u16,
-            &format!("Semester {}", col_idx),
+            &format!("Semester {col_idx}"),
             &center_format,
         )?;
     }
@@ -61,7 +61,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                 sched
                     .catalog
                     .courses
-                    .get(&val)
+                    .get(val)
                     .map(|(_, x, _)| x.unwrap_or(0))
                     .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
                 &center_format,
@@ -102,7 +102,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
             .set_formula_result(
                 (last_row + 2) as u32,
                 (col_idx * 2 + 1) as u16,
-                format!("{}", sum),
+                format!("{sum}"),
             );
         sheet.set_column_width((col_idx * 2 + 1) as u16, 2.5)?;
     }
@@ -126,7 +126,7 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
-    pretty_print_sched_to_sheet(&sched, schedule_sheet)?;
+    pretty_print_sched_to_sheet(sched, schedule_sheet)?;
     schedule_sheet.protect();
 
     let internal_sheet = workbook.add_worksheet().set_name("Internals")?;

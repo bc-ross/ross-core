@@ -60,9 +60,9 @@ impl From<&str> for CourseCodeSuffix {
 impl Display for CourseCodeSuffix {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CourseCodeSuffix::Number(num) => write!(f, "{}", num),
-            CourseCodeSuffix::Special(s) => write!(f, "{}", s),
-            CourseCodeSuffix::Unique(id) => write!(f, "{}", id),
+            CourseCodeSuffix::Number(num) => write!(f, "{num}"),
+            CourseCodeSuffix::Special(s) => write!(f, "{s}"),
+            CourseCodeSuffix::Unique(id) => write!(f, "{id}"),
         }
     }
 }
@@ -86,13 +86,13 @@ macro_rules! CC {
 
 impl Display for CourseCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{}", self.stem, self.code.to_string())
+        write!(f, "{}-{}", self.stem, self.code)
     }
 }
 
 impl std::fmt::Debug for CourseCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CC({}-{})", self.stem, self.code.to_string())
+        write!(f, "CC({}-{})", self.stem, self.code)
     }
 }
 
@@ -184,7 +184,7 @@ pub fn generate_schedule(
 }
 
 impl Schedule {
-    pub fn reduce<'a>(&'a mut self) -> Result<&'a mut Self> {
+    pub fn reduce(&mut self) -> Result<&mut Self> {
         let mut all_codes: HashSet<CourseCode> = HashSet::new();
         self.courses.iter_mut().for_each(|sem| {
             sem.retain(|code| {

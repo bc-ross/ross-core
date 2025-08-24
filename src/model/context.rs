@@ -143,11 +143,7 @@ impl<'a> ModelBuilderContext<'a> {
             total_credits += credits;
             let required = if sched.incoming.contains(code) {
                 true
-            } else if sched.courses.iter().flatten().any(|c| c == code) {
-                true
-            } else {
-                false
-            };
+            } else { sched.courses.iter().flatten().any(|c| c == code) };
             courses.push(Course {
                 code: code.clone(),
                 credits,
@@ -168,7 +164,7 @@ impl<'a> ModelBuilderContext<'a> {
             geneds: Some(&sched.catalog.geneds),
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
-            program_electives: program_electives,
+            program_electives,
         }
     }
 
@@ -205,7 +201,7 @@ pub fn build_model_pipeline<'a>(
     // Build flat_courses as (Course, credits)
     let flat_courses = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
     (
-        std::mem::replace(&mut ctx.model, CpModelBuilder::default()),
+        std::mem::take(&mut ctx.model),
         ctx.vars.clone(),
         flat_courses,
     )

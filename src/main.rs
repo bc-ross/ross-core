@@ -49,7 +49,7 @@ fn main() -> Result<()> {
         if s == 0 {
             println!("Semester 0 (incoming only):");
         } else {
-            println!("Semester {}", s);
+            println!("Semester {s}");
         }
         let mut sem_credits = 0;
         for code in semester {
@@ -59,15 +59,15 @@ fn main() -> Result<()> {
                 .get(code)
                 .and_then(|(_, cr, _)| *cr)
                 .unwrap_or(0);
-            println!("  {} ({} credits)", code, credits);
+            println!("  {code} ({credits} credits)");
             sem_credits += credits;
         }
-        println!("  Credits: {}", sem_credits);
+        println!("  Credits: {sem_credits}");
         if s > 0 {
             sched_credits += sem_credits;
         }
     }
-    println!("Total credits (excluding incoming): {}", sched_credits);
+    println!("Total credits (excluding incoming): {sched_credits}");
 
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 

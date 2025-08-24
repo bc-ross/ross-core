@@ -114,7 +114,7 @@ impl CourseReq {
     pub fn all_course_codes(&self) -> Vec<CourseCode> {
         let mut codes = Vec::new();
         self.collect_course_codes(&mut codes);
-        codes.into_iter().map(|x| x.clone()).collect()
+        codes.into_iter().cloned().collect()
     }
 
     fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {

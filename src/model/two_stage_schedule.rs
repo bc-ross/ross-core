@@ -29,7 +29,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     for s in first_sched_semester..num_semesters {
         for i in 0..flat_courses.len() {
             let credits = flat_courses[i].1;
-            total_credits_sched = total_credits_sched + (credits, vars[i][s].clone());
+            total_credits_sched += (credits, vars[i][s]);
         }
     }
     model.minimize(total_credits_sched.clone());
@@ -73,15 +73,15 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     for s in first_sched_semester..num_semesters {
         let mut expr = LinearExpr::from(0);
         for i in 0..flat_courses2.len() {
-            let var = vars2[i][s].clone();
+            let var = vars2[i][s];
             let coeff = flat_courses2[i].1;
             // Use a single scaled addition (supports negative coeffs) instead of repeated adds/subtracts
-            expr = expr + (coeff, var.clone());
+            expr += (coeff, var);
         }
         // Domain: [0, max_credits_per_semester * flat_courses2.len() as i64]
         let domain = vec![(0, max_credits_per_semester * flat_courses2.len() as i64)];
         let var = model2.new_int_var(domain.clone());
-        model2.add_eq(var.clone(), expr);
+        model2.add_eq(var, expr);
         semester_credit_vars.push(var);
     }
 
@@ -95,26 +95,26 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         let diff = model2.new_int_var(diff_domain);
         // diff = semester_credits - mean_load
         model2.add_eq(
-            diff.clone(),
-            LinearExpr::from(credit_var.clone()) - mean_load,
+            diff,
+            LinearExpr::from(*credit_var) - mean_load,
         );
         let abs_domain = vec![(0, max_credits_per_semester * flat_courses2.len() as i64)];
         let abs_diff = model2.new_int_var(abs_domain);
         // abs_diff >= diff
-        model2.add_ge(abs_diff.clone(), LinearExpr::from(diff.clone()));
+        model2.add_ge(abs_diff, LinearExpr::from(diff));
         // abs_diff >= -diff (negate by repeated subtraction)
         let mut neg_diff_expr = LinearExpr::from(0);
         for _ in 0..1 {
             // -1 * diff
-            neg_diff_expr = neg_diff_expr - LinearExpr::from(diff.clone());
+            neg_diff_expr -= LinearExpr::from(diff);
         }
-        model2.add_ge(abs_diff.clone(), neg_diff_expr);
+        model2.add_ge(abs_diff, neg_diff_expr);
         abs_deviation_vars.push(abs_diff);
     }
     // Minimize the sum of absolute deviations (primary objective)
     let mut spread_penalty = LinearExpr::from(0);
     for v in &abs_deviation_vars {
-        spread_penalty = spread_penalty + LinearExpr::from(v.clone());
+        spread_penalty += LinearExpr::from(*v);
     }
 
     // --- Ordering objective: penalize semesters where mean course code does not increase ---
@@ -136,8 +136,8 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
                     }
                 }
             };
-            sum = sum + (val, vars2[i][s].clone());
-            count = count + LinearExpr::from(vars2[i][s].clone());
+            sum += (val, vars2[i][s]);
+            count += LinearExpr::from(vars2[i][s]);
         }
         sum_codes.push(sum);
         count_courses.push(count);
@@ -148,13 +148,13 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         let diff = sum_codes[s].clone() - sum_codes[s + 1].clone();
         // Only penalize positive differences
         let diff_var = model2.new_int_var(vec![(0, 1000000)]);
-        model2.add_ge(diff_var.clone(), diff);
-        order_penalty = order_penalty + diff_var;
+        model2.add_ge(diff_var, diff);
+        order_penalty += diff_var;
     }
     // Add mini-objective to main objective (small weight)
     let mut weighted_spread = LinearExpr::from(0);
     for _ in 0..50 {
-        weighted_spread = weighted_spread + spread_penalty.clone();
+        weighted_spread += spread_penalty.clone();
     }
     let total_objective = weighted_spread + order_penalty;
     model2.minimize(total_objective);

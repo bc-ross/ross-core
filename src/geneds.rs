@@ -90,7 +90,7 @@ fn satisfy_req<'a>(
                     .courses
                     .get(c)
                     .and_then(|(_, cr, _)| *cr)
-                    .unwrap_or(0) as u32;
+                    .unwrap_or(0);
                 selected.insert(c);
                 total += cr;
                 if total >= *num {
@@ -156,8 +156,8 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
                 return false;
             }
             // Try all combinations of candidates from available (order doesn't matter)
-            fn combinations<'b, T: Clone>(
-                data: &'b [T],
+            fn combinations<T: Clone>(
+                data: &[T],
                 k: usize,
                 out: &mut Vec<T>,
                 res: &mut Vec<Vec<T>>,
@@ -201,8 +201,8 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     if !foundation_reqs.is_empty() {
         let mut used = HashSet::new();
         let mut fail_foundation = None;
-        let req_refs: Vec<&ElectiveReq> = foundation_reqs.iter().map(|r| *r).collect();
-        let name_refs: Vec<&String> = foundation_names.iter().map(|r| *r).collect();
+        let req_refs: Vec<&ElectiveReq> = foundation_reqs.to_vec();
+        let name_refs: Vec<&String> = foundation_names.to_vec();
         if !assign_foundations(
             &req_refs,
             &name_refs,
@@ -269,7 +269,7 @@ impl ElectiveReq {
     pub fn all_course_codes(&self) -> Vec<CourseCode> {
         let mut codes = Vec::new();
         self.collect_course_codes(&mut codes);
-        codes.into_iter().map(|x| x.clone()).collect()
+        codes.into_iter().cloned().collect()
     }
 
     fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {

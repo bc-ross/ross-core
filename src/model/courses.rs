@@ -6,7 +6,7 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
     for i in 0..ctx.courses.len() {
         let mut sem_vars = Vec::new();
         for s in 0..ctx.num_semesters {
-            let v = ctx.model.new_bool_var_with_name(format!("c_{}_{}", i, s));
+            let v = ctx.model.new_bool_var_with_name(format!("c_{i}_{s}"));
             sem_vars.push(v);
         }
         vars.push(sem_vars);
@@ -69,10 +69,8 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
                 } else {
                     ctx.model.add_eq(ctx.vars[i][s], 0); // Cannot be scheduled elsewhere
                 }
-            } else {
-                if s == incoming_semester {
-                    ctx.model.add_eq(ctx.vars[i][s], 0); // Only incoming courses allowed in semester 0
-                }
+            } else if s == incoming_semester {
+                ctx.model.add_eq(ctx.vars[i][s], 0); // Only incoming courses allowed in semester 0
             }
         }
     }
