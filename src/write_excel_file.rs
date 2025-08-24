@@ -30,7 +30,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                 .catalog
                 .courses
                 .get(val)
-                .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("cr".into()))
+                .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("0".into()))
                 .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
         )?;
     }
@@ -49,7 +49,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                     .catalog
                     .courses
                     .get(&val)
-                    .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("cr".into()))
+                    .map(|(_, x, _)| x.map(|x| x.to_string()).unwrap_or("0".into()))
                     .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
             )?;
 
