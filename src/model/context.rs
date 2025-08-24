@@ -23,6 +23,7 @@ pub struct ModelBuilderContext<'a> {
     pub geneds: Option<&'a [crate::geneds::GenEd]>,
     pub catalog: Option<&'a Catalog>,
     pub incoming_codes: Vec<CourseCode>,
+    pub program_electives: Vec<&'a crate::schedule::Elective>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
@@ -70,25 +71,52 @@ impl<'a> ModelBuilderContext<'a> {
         }
         // Add GenEd-eligible courses
         for gened in &sched.catalog.geneds {
-            use crate::geneds::{GenEd, GenEdReq};
-            let reqs: Vec<&GenEdReq> = match gened {
+            use crate::geneds::{ElectiveReq, GenEd};
+            let reqs: Vec<&ElectiveReq> = match gened {
                 GenEd::Core { req, .. } => vec![req],
                 GenEd::Foundation { req, .. } => vec![req],
                 GenEd::SkillAndPerspective { req, .. } => vec![req],
             };
             for req in reqs {
                 match req {
-                    GenEdReq::Set(codes)
-                    | GenEdReq::Courses { courses: codes, .. }
-                    | GenEdReq::Credits { courses: codes, .. } => {
+                    ElectiveReq::Set(codes)
+                    | ElectiveReq::Courses { courses: codes, .. }
+                    | ElectiveReq::Credits { courses: codes, .. } => {
                         for code in codes {
                             all_codes.insert(code.clone());
                         }
                     }
-                    GenEdReq::SetOpts(opts) => {
+                    ElectiveReq::SetOpts(opts) => {
                         for opt in opts {
                             for code in opt {
                                 all_codes.insert(code.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Collect program electives for the selected programs
+        let mut program_electives: Vec<&crate::schedule::Elective> = Vec::new();
+        for prog_name in &sched.programs {
+            if let Some(prog) = sched.catalog.programs.iter().find(|p| &p.name == prog_name) {
+                for elective in &prog.electives {
+                    program_electives.push(elective);
+                    // Also ensure elective courses are included in all_codes so they can be modelled
+                    use crate::geneds::ElectiveReq;
+                    match &elective.req {
+                        ElectiveReq::Set(codes)
+                        | ElectiveReq::Courses { courses: codes, .. }
+                        | ElectiveReq::Credits { courses: codes, .. } => {
+                            for code in codes {
+                                all_codes.insert(code.clone());
+                            }
+                        }
+                        ElectiveReq::SetOpts(opts) => {
+                            for opt in opts {
+                                for code in opt {
+                                    all_codes.insert(code.clone());
+                                }
                             }
                         }
                     }
@@ -173,6 +201,7 @@ impl<'a> ModelBuilderContext<'a> {
             geneds: Some(&sched.catalog.geneds),
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
+            program_electives: program_electives,
         }
     }
 
