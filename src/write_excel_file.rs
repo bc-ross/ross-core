@@ -7,14 +7,13 @@ use std::path::PathBuf;
 
 fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Result<()> {
     let semesters = sched.courses.len() + 1;
-    let format = Format::new().set_align(FormatAlign::Center);
     let mut last_row = 0;
     let mut sem_sums = vec![0; semesters];
 
     let total_format = Format::new().set_italic();
-    let cr_format = Format::new().set_align(FormatAlign::Center);
+    let center_format = Format::new().set_align(FormatAlign::Center);
 
-    sheet.merge_range(0, 0, 0, 1, "Incoming", &format)?;
+    sheet.merge_range(0, 0, 0, 1, "Incoming", &center_format)?;
     for col_idx in 1..semesters {
         sheet.merge_range(
             0,
@@ -22,7 +21,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
             0,
             ((col_idx * 2) + 1) as u16,
             &format!("Semester {}", col_idx),
-            &format,
+            &center_format,
         )?;
     }
 
@@ -37,7 +36,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                 .get(val)
                 .map(|(_, x, _)| x.unwrap_or(0))
                 .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
-            &cr_format,
+            &center_format,
         )?;
 
         sem_sums[0] += sched
@@ -65,7 +64,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                     .get(&val)
                     .map(|(_, x, _)| x.unwrap_or(0))
                     .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
-                &cr_format,
+                &center_format,
             )?;
 
             sem_sums[col_idx] += sched
@@ -98,7 +97,7 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
                     )
                 )
                 .as_str(),
-                &cr_format,
+                &center_format,
             )?
             .set_formula_result(
                 (last_row + 2) as u32,
@@ -109,8 +108,6 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
     }
 
     sheet.autofit();
-    // for col_idx in 0..semesters {
-    // }
 
     Ok(())
 }
