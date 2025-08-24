@@ -168,7 +168,7 @@ impl<'a> ModelBuilderContext<'a> {
     pub fn total_credits_expr(
         &self,
         vars: &[Vec<BoolVar>],
-        flat_courses: &Vec<(Course, i64)>,
+        flat_courses: &[(Course, i64)],
     ) -> LinearExpr {
         let mut obj_terms = Vec::new();
         for (i, (_course, credits)) in flat_courses.iter().enumerate() {

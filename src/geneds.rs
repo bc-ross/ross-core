@@ -234,7 +234,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     }
     // No course can be used for more than 3 S&Ps
     let mut sp_overlap_fail = false;
-    for (_, count) in &sp_course_counts {
+    for count in sp_course_counts.values() {
         if *count > 3 {
             sp_overlap_fail = true;
         }
