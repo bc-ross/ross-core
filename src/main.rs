@@ -11,6 +11,7 @@ mod version;
 mod write_excel_file;
 
 use load_catalogs::CATALOGS;
+use read_excel_file::read_file;
 use schedule::CourseCode;
 use schedule::generate_schedule;
 pub use version::{SAVEFILE_VERSION, VERSION};
@@ -52,13 +53,6 @@ fn main() -> Result<()> {
         }
         let mut sem_credits = 0;
         for code in semester {
-            // Look up credits from catalog
-            let credits = sched
-                .catalog
-                .courses
-                .get(code)
-                .and_then(|(_, cr, _)| *cr)
-                .unwrap_or(0);
             let credits = sched
                 .catalog
                 .courses
@@ -85,6 +79,8 @@ fn main() -> Result<()> {
             "invalid"
         }
     );
+
+    let _new_sched = read_file(&Path::new(FNAME).to_path_buf())?;
 
     Ok(())
 }
