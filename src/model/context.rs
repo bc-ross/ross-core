@@ -4,26 +4,22 @@ use crate::schedule::{Catalog, CourseCode, Schedule};
 use cp_sat::builder::{BoolVar, CpModelBuilder, LinearExpr};
 
 #[derive(Clone)]
-pub struct Course<'a> {
+pub struct Course {
     pub code: CourseCode,
     pub credits: i64,
     pub required: bool,
-    pub geneds: Vec<&'a str>,
-    pub elective_group: Option<&'a str>,
     pub prereqs: CourseReq,
 }
 
 pub struct ModelBuilderContext<'a> {
     pub model: CpModelBuilder,
     pub vars: Vec<Vec<BoolVar>>,
-    pub courses: Vec<Course<'a>>,
+    pub courses: Vec<Course>,
     pub num_semesters: usize,
     pub max_credits_per_semester: i64,
     pub min_credits: Option<i64>,
-    pub geneds: Option<&'a [crate::geneds::GenEd]>,
     pub catalog: Option<&'a Catalog>,
     pub incoming_codes: Vec<CourseCode>,
-    pub program_electives: Vec<&'a crate::schedule::Elective>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
@@ -147,8 +143,6 @@ impl<'a> ModelBuilderContext<'a> {
                 code: code.clone(),
                 credits,
                 required,
-                geneds: vec![],
-                elective_group: None,
                 prereqs,
             });
         }
@@ -160,10 +154,8 @@ impl<'a> ModelBuilderContext<'a> {
             num_semesters: sched.courses.len(), // already includes semester 0 after transformation
             max_credits_per_semester,
             min_credits: None,
-            geneds: Some(&sched.catalog.geneds),
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
-            program_electives,
         }
     }
 
@@ -190,9 +182,9 @@ impl<'a> ModelBuilderContext<'a> {
 }
 
 /// Build the model pipeline: add variables, constraints, and return (model, vars, flat_courses)
-pub fn build_model_pipeline<'a>(
-    ctx: &mut ModelBuilderContext<'a>,
-) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course<'a>, i64)>) {
+pub fn build_model_pipeline(
+    ctx: &mut ModelBuilderContext,
+) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course, i64)>) {
     super::courses::add_courses(ctx);
     super::prereqs::add_prereq_constraints(ctx);
     super::geneds::add_gened_constraints(ctx);

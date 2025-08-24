@@ -228,11 +228,11 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
             .unwrap();
         let (required, is_credits, course_credits) = match gened {
             GenEd::Foundation { req, .. } => match req {
-                ElectiveReq::Credits { num, courses } => {
+                ElectiveReq::Credits { num, .. } => {
                     let credits: Vec<_> = set.iter().map(|&idx| ctx.courses[idx].credits).collect();
                     (*num as i64, true, credits)
                 }
-                ElectiveReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
+                ElectiveReq::Set(_) => (set.len() as i64, false, vec![1; set.len()]), // FIXME?
                 ElectiveReq::SetOpts(_) | ElectiveReq::Courses { .. } => {
                     (set.len() as i64, false, vec![1; set.len()])
                 }
@@ -242,7 +242,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         foundation_reqs.push((set.clone(), required, is_credits, course_credits));
     }
     // For each Foundation, require that at least the required number of distinct eligible courses/credits are scheduled
-    for (set, required, is_credits, course_credits) in &foundation_reqs {
+    for (set, required, is_credits, ..) in &foundation_reqs {
         // Split eligible indices into required and non-required
         let mut required_idxs = Vec::new();
         let mut optional_idxs = Vec::new();
