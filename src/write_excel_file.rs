@@ -78,11 +78,11 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     pretty_print_sched_to_sheet(&sched, schedule_sheet)?;
     schedule_sheet.protect();
 
-    let test_sheet = workbook.add_worksheet().set_name("Internals")?;
-    embed_schedule_in_sheet(test_sheet, sched)?;
-    test_sheet.protect();
+    let internal_sheet = workbook.add_worksheet().set_name("Internals")?;
+    embed_schedule_in_sheet(internal_sheet, sched)?;
+    internal_sheet.protect();
     #[cfg(not(debug_assertions))]
-    test_sheet.set_hidden(true);
+    internal_sheet.set_hidden(true);
 
     workbook.save(fname)?;
     Ok(())
