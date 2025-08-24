@@ -6,11 +6,12 @@ use cp_sat::proto::CpSolverStatus;
 
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<()> {
-    let mut params = cp_sat::proto::SatParameters::default();
-    params.log_search_progress = Some(false);
-    params.num_search_workers = Some(8);
-    // Fix solver seed for reproducibility and easier debugging
-    params.random_seed = None;
+    let params = cp_sat::proto::SatParameters {
+        log_search_progress: Some(false),
+        num_search_workers: Some(8),
+        random_seed: None,
+        ..Default::default()
+    };
     // --- Transform schedule: add incoming as semester 0 (always present, even if empty) ---
     // Always set incoming courses before building model context for both stages
     let mut sched_for_model = sched.clone();
@@ -94,10 +95,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
         )];
         let diff = model2.new_int_var(diff_domain);
         // diff = semester_credits - mean_load
-        model2.add_eq(
-            diff,
-            LinearExpr::from(*credit_var) - mean_load,
-        );
+        model2.add_eq(diff, LinearExpr::from(*credit_var) - mean_load);
         let abs_domain = vec![(0, max_credits_per_semester * flat_courses2.len() as i64)];
         let abs_diff = model2.new_int_var(abs_domain);
         // abs_diff >= diff
@@ -165,9 +163,9 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
             // Build the schedule output: Vec<Vec<(CourseCode, i64)>>
             let mut result = vec![vec![]; num_semesters];
             for (i, (course, credits)) in flat_courses2.iter().enumerate() {
-                for s in 0..num_semesters {
+                for (s, item) in result.iter_mut().enumerate().take(num_semesters) {
                     if vars2[i][s].solution_value(&response2) {
-                        result[s].push((course.code.clone(), *credits));
+                        item.push((course.code.clone(), *credits));
                     }
                 }
             }

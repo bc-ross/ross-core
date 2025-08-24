@@ -48,14 +48,13 @@ impl<'a> ModelBuilderContext<'a> {
                 fn collect_prereq_codes(
                     req: &CourseReq,
                     all_codes: &mut std::collections::HashSet<CourseCode>,
-                    catalog: &Catalog,
                     queue: &mut std::collections::VecDeque<CourseCode>,
                 ) {
                     use crate::prereqs::CourseReq::*;
                     match req {
                         And(reqs) | Or(reqs) => {
                             for r in reqs {
-                                collect_prereq_codes(r, all_codes, catalog, queue);
+                                collect_prereq_codes(r, all_codes, queue);
                             }
                         }
                         PreCourse(code) | CoCourse(code) => {
@@ -66,7 +65,7 @@ impl<'a> ModelBuilderContext<'a> {
                         _ => {}
                     }
                 }
-                collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
+                collect_prereq_codes(req, &mut all_codes, &mut queue);
             }
         }
         // Add GenEd-eligible courses
@@ -125,7 +124,6 @@ impl<'a> ModelBuilderContext<'a> {
         }
         // Build Course structs for all codes, and print diagnostics
         let mut courses = Vec::new();
-        let mut total_credits = 0;
         for code in &all_codes {
             let (credits, prereqs) = match sched.catalog.courses.get(code) {
                 Some((_name, credits_opt, _offering)) => {
@@ -140,10 +138,11 @@ impl<'a> ModelBuilderContext<'a> {
                 }
                 None => (0, CourseReq::NotRequired),
             };
-            total_credits += credits;
             let required = if sched.incoming.contains(code) {
                 true
-            } else { sched.courses.iter().flatten().any(|c| c == code) };
+            } else {
+                sched.courses.iter().flatten().any(|c| c == code)
+            };
             courses.push(Course {
                 code: code.clone(),
                 credits,
@@ -176,7 +175,7 @@ impl<'a> ModelBuilderContext<'a> {
     /// Compute the total credits LinearExpr for the current context
     pub fn total_credits_expr(
         &self,
-        vars: &Vec<Vec<BoolVar>>,
+        vars: &[Vec<BoolVar>],
         flat_courses: &Vec<(Course, i64)>,
     ) -> LinearExpr {
         let mut obj_terms = Vec::new();

@@ -127,13 +127,6 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
         if let GenEd::Foundation { req, name } = gened {
             foundation_reqs.push(req);
             foundation_names.push(name);
-            // Print eligible courses for this Foundation
-            let eligible: Vec<_> = match req {
-                ElectiveReq::Set(codes) => codes.clone(),
-                ElectiveReq::SetOpts(opts) => opts.iter().flatten().cloned().collect(),
-                ElectiveReq::Courses { courses, .. } => courses.clone(),
-                ElectiveReq::Credits { courses, .. } => courses.clone(),
-            };
         }
     }
     // Try all possible assignments of courses to foundation geneds (backtracking)
@@ -227,7 +220,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     }
     let mut all_sp_ok = true;
     let mut sp_course_counts: HashMap<&CourseCode, usize> = HashMap::new();
-    for (i, req) in sp_reqs.iter().enumerate() {
+    for req in sp_reqs.iter() {
         if let Some(courses) = satisfy_req(req, &sched_courses, &sched.catalog) {
             for c in courses {
                 *sp_course_counts.entry(c).or_insert(0) += 1;
@@ -241,7 +234,7 @@ pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
     }
     // No course can be used for more than 3 S&Ps
     let mut sp_overlap_fail = false;
-    for (c, count) in &sp_course_counts {
+    for (_, count) in &sp_course_counts {
         if *count > 3 {
             sp_overlap_fail = true;
         }

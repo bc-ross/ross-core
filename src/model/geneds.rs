@@ -217,7 +217,6 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
     // --- Guarantee feasible, non-overlapping Foundation assignment (stronger set-cover constraints) ---
     use std::collections::HashSet;
     let num_foundations = foundation_sets.len();
-    let num_courses = courses.len();
 
     // For each Foundation, get the set of eligible indices and required number/credits
     let mut foundation_reqs: Vec<(Vec<usize>, i64, bool, Vec<i64>)> = Vec::new();
@@ -230,10 +229,7 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         let (required, is_credits, course_credits) = match gened {
             GenEd::Foundation { req, .. } => match req {
                 ElectiveReq::Credits { num, courses } => {
-                    let credits: Vec<_> = set
-                        .iter()
-                        .map(|&idx| ctx.courses[idx].credits)
-                        .collect();
+                    let credits: Vec<_> = set.iter().map(|&idx| ctx.courses[idx].credits).collect();
                     (*num as i64, true, credits)
                 }
                 ElectiveReq::Set(codes) => (set.len() as i64, false, vec![1; set.len()]),
@@ -435,10 +431,8 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
                             required_sum.clone() + optional_sum.clone(),
                             LinearExpr::from(required),
                         );
-                        let max_possible = indices
-                            .iter()
-                            .map(|&idx| ctx.courses[idx].credits)
-                            .sum();
+                        let max_possible =
+                            indices.iter().map(|&idx| ctx.courses[idx].credits).sum();
                         let max_expr = model.new_int_var([(0, max_possible)]);
                         model.add_ge(max_expr, required_sum.clone());
                         model.add_ge(max_expr, LinearExpr::from(required));
