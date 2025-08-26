@@ -42,10 +42,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
                 CoCourse(CC!("ARCH", 2201)),
             ]),
         ),
-        (
-            CC!("ARCH", 2112),
-            PreCourseGrade(CC!("ARCH", 2111), GR!(C)),
-        ),
+        (CC!("ARCH", 2112), PreCourseGrade(CC!("ARCH", 2111), GR!(C))),
         (
             CC!("ARCH", 2201),
             And(vec![
@@ -70,10 +67,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
                 ]),
             ]),
         ),
-        (
-            CC!("ARCH", 3114),
-            PreCourseGrade(CC!("ARCH", 3113), GR!(C)),
-        ),
+        (CC!("ARCH", 3114), PreCourseGrade(CC!("ARCH", 3113), GR!(C))),
         (CC!("ARCH", 3200), PreCourse(CC!("ARCH", 2201))),
         (CC!("ARCH", 3310), PreCourse(CC!("ARCH", 2112))),
         (

@@ -5,6 +5,7 @@ use std::iter::empty;
 
 mod stem_acct;
 mod stem_arch;
+mod stem_art;
 mod stem_astr;
 mod stem_biol;
 mod stem_chem;
@@ -12,11 +13,12 @@ mod stem_csci;
 
 pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
     empty()
-        .chain(stem_acct::prereqs())
-        .chain(stem_arch::prereqs())
-        .chain(stem_astr::prereqs())
-        .chain(stem_biol::prereqs())
-        .chain(stem_chem::prereqs())
-        .chain(stem_csci::prereqs())
+        .chain(stem_acct::prereqs().into_iter())
+        .chain(stem_arch::prereqs().into_iter())
+        .chain(stem_art::prereqs().into_iter())
+        .chain(stem_astr::prereqs().into_iter())
+        .chain(stem_biol::prereqs().into_iter())
+        .chain(stem_chem::prereqs().into_iter())
+        .chain(stem_csci::prereqs().into_iter())
         .collect()
 }
