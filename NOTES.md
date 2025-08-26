@@ -1,10 +1,22 @@
 ## Wishlist
 
 - [ ] Fall/Spring classification
-  - [ ] Collect with `credit_scraper.py`
-  - [ ] Only shuffle/insert courses where allowed
+  - [x] Collect with `credit_scraper.py`
+  - [x] Only shuffle/insert courses where allowed
   - [ ] Dissuade from I/D?
 - [ ] Prereqs
   - [ ] Add all collected to `resources/course_reqs`
   - [x] Check fulfillment for course validity
-  - [ ] Automatically fix unfulfilled
+  - [x] Automatically fix unfulfilled
+- [x] Investigate SAT dependency solvers
+- [ ] GenEds
+  - [x] Validate geneds properly
+  - [x] Add gened resources
+  - [x] Properly count max used geneds per course (and options thereof)
+    - [x] Since course assignment to gened is based on gened order iterate through permutations of geneds until satisfied?
+  - [x] Add GenEd courses to the `scripts_assistant` exporter
+  - [ ] Add these constraints to `Natural World`:
+    - [ ] "Must be taken in two different disciplines."
+    - [ ] "including one lab"
+- [x] Add incoming (HS) courses
+- [ ] Add customizable test harness in `main.rs`

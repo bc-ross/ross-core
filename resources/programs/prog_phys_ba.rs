@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 
-use crate::schedule::{CourseCode, Elective::*, Program};
 use crate::CC;
+use crate::geneds::ElectiveReq::*;
+use crate::schedule::{CourseCode, Elective, Program};
 
 pub fn prog() -> Program {
     Program {

@@ -1,7 +1,7 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{Catalog, CourseCode, Schedule, Semester};
+use crate::schedule::{CourseCode, Schedule};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -15,7 +15,7 @@ pub enum CourseReq {
     // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
     Instructor,
     #[default]
-    None,
+    NotRequired,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -114,7 +114,7 @@ impl CourseReq {
     pub fn all_course_codes(&self) -> Vec<CourseCode> {
         let mut codes = Vec::new();
         self.collect_course_codes(&mut codes);
-        codes.into_iter().map(|x| x.clone()).collect()
+        codes.into_iter().cloned().collect()
     }
 
     fn collect_course_codes<'a>(&'a self, codes: &mut Vec<&'a CourseCode>) {
@@ -141,18 +141,20 @@ impl CourseReq {
         match self {
             CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(sched, sem_idx)),
             CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(sched, sem_idx)),
-            CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => sched
-                .courses
-                .iter()
-                .take(sem_idx)
-                .flatten()
-                .any(|c| c == code),
-            CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => sched
-                .courses
-                .iter()
-                .take(sem_idx + 1)
-                .flatten()
-                .any(|c| c == code),
+            CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
+                std::iter::once(&sched.incoming)
+                    .chain(sched.courses.iter())
+                    .take(sem_idx + 1)
+                    .flatten()
+                    .any(|c| c == code)
+            }
+            CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => {
+                std::iter::once(&sched.incoming)
+                    .chain(sched.courses.iter())
+                    .take(sem_idx + 2)
+                    .flatten()
+                    .any(|c| c == code)
+            }
             CourseReq::Program(x) => sched.programs.iter().any(|p| {
                 sched
                     .catalog
@@ -160,8 +162,8 @@ impl CourseReq {
                     .iter()
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
-            CourseReq::Instructor => unimplemented!(),
-            CourseReq::None => true,
+            CourseReq::Instructor => todo!(),
+            CourseReq::NotRequired => true,
         }
     }
 }
