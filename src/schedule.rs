@@ -106,10 +106,10 @@ pub struct Elective {
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]
 pub struct Program {
-    pub(crate) name: String,
-    pub(crate) semesters: Vec<Semester>,
-    pub(crate) electives: Vec<Elective>,
-    pub(crate) assoc_stems: Vec<String>,
+    pub name: String,
+    pub semesters: Vec<Semester>,
+    pub electives: Vec<Elective>,
+    pub assoc_stems: Vec<String>,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone)]

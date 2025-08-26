@@ -1,26 +1,15 @@
 use anyhow::{Result, anyhow};
 use std::path::Path;
 
-mod geneds;
-mod load_catalogs;
-mod model;
-mod prereqs;
-mod read_excel_file;
-mod schedule;
-mod version;
-mod write_excel_file;
+use ross_core::CC;
+use ross_core::load_catalogs::CATALOGS;
+use ross_core::read_excel_file::read_file;
+use ross_core::schedule::CourseCode;
+use ross_core::schedule::generate_schedule;
+use ross_core::write_excel_file::save_schedule;
 
-use load_catalogs::CATALOGS;
-use read_excel_file::read_file;
-use schedule::CourseCode;
-use schedule::generate_schedule;
-pub use version::{SAVEFILE_VERSION, VERSION};
-use write_excel_file::save_schedule;
-
-pub static TEMPLATE_PNG: &[u8] = include_bytes!("../assets/template.png");
-pub const MAX_CREDITS_PER_SEMESTER: i64 = 18;
-
-fn main() -> Result<()> {
+#[test]
+fn test_ross() -> Result<()> {
     const FNAME: &str = "ross_test.xlsx";
 
     let sched = generate_schedule(
