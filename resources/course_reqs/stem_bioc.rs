@@ -8,5 +8,5 @@ use crate::schedule::CourseCode;
 use crate::{CC, GR};
 
 pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
-    vec![(CC!("BIOC", COMP), Instructor)]
+    vec![(CC!("BIOC", "COMP"), Instructor)]
 }

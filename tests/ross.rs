@@ -19,6 +19,7 @@ fn test_ross() -> Result<()> {
             .programs
             .iter()
             .map(|x| x.name.as_str())
+            .filter(|&x| x == "BA Accounting")
             // .take(1)
             .collect(),
         CATALOGS
