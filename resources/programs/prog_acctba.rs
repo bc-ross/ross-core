@@ -25,7 +25,7 @@ pub fn prog() -> Program {
             ],
             vec![CC!("ACCT", 3640)],
             vec![CC!("ACCT", 4200), CC!("ACCT", 4930), CC!("BUSI", 4850)],
-            vec![CC!("BUSI", 4860), CC!("BUSI", 4900)],
+            vec![CC!("BUSI", 4860), CC!("BUSI", 4900), CC!("ACCT", "COMP")],
         ],
         assoc_stems: vec!["ACCT".to_string(), "BUSI".to_string()],
         electives: vec![],
