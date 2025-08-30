@@ -10,6 +10,8 @@ mod stem_astr;
 mod stem_athc;
 mod stem_bioc;
 mod stem_biol;
+mod stem_busi;
+mod stem_ceng;
 mod stem_chem;
 mod stem_csci;
 
@@ -22,6 +24,8 @@ pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
         .chain(stem_athc::prereqs().into_iter())
         .chain(stem_bioc::prereqs().into_iter())
         .chain(stem_biol::prereqs().into_iter())
+        .chain(stem_busi::prereqs().into_iter())
+        .chain(stem_ceng::prereqs().into_iter())
         .chain(stem_chem::prereqs().into_iter())
         .chain(stem_csci::prereqs().into_iter())
         .collect()

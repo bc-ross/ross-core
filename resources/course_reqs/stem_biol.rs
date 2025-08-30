@@ -28,7 +28,6 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
         (CC!("BIOL", 3313), PreCourse(CC!("CHEM", 1210))),
         (CC!("BIOL", 3345), PreCourse(CC!("CHEM", 1210))),
         (CC!("BIOL", 3346), PreCourse(CC!("CHEM", 1210))),
-        (CC!("BIOL", 3346), PreCourse(CC!("CHEM", 1210))),
         (CC!("BIOL", 3347), PreCourse(CC!("CHEM", 1210))),
         (CC!("BIOL", 3353), PreCourse(CC!("CHEM", 1210))),
         (CC!("BIOL", 3354), PreCourse(CC!("CHEM", 1210))),
