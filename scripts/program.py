@@ -36,6 +36,8 @@ def main():
         semesters.append(f"            vec![{', '.join(codes)}],")
         sem_num += 1
 
+    electives_info = input("Add single-line comment about what elective sets are needed (or leave blank): ").strip()
+
     stems_line = input("Associated stems (comma-separated): ").strip()
     stems = [f'"{s.strip().upper()}".to_string()' for s in stems_line.split(",") if s.strip()]
 
@@ -61,6 +63,7 @@ pub fn prog() -> Program {
     )
     with open(PATH.joinpath("TEMP.rs").with_stem(f"prog_{fname.lower()}"), "w", encoding="utf-8") as f:
         f.write(rust_code)
+        f.write("\n// Elective info: " + electives_info + "\n")
     print(f"Program written to {PATH.joinpath('TEMP.rs').with_stem(f'prog_{fname.lower()}')}")
 
     with open(PATH.joinpath("mod.rs"), "w", encoding="utf-8") as base_f:
