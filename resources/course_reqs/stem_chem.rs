@@ -9,22 +9,50 @@ use crate::{CC, GR};
 
 pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
     vec![
+        (CC!("CHEM", 1010), CoCourse(CC!("CHEM", 1011))),
+        (CC!("CHEM", 1011), CoCourse(CC!("CHEM", 1010))),
+        (CC!("CHEM", 1200), CoCourse(CC!("CHEM", 1201))),
+        (CC!("CHEM", 1201), CoCourse(CC!("CHEM", 1200))),
+        (
+            CC!("CHEM", 1210),
+            And(vec![
+                PreCourse(CC!("CHEM", 1201)),
+                CoCourse(CC!("CHEM", 1211)),
+            ]),
+        ),
+        (CC!("CHEM", 1211), CoCourse(CC!("CHEM", 1210))),
         (
             CC!("CHEM", 2200),
             And(vec![
                 PreCourse(CC!("CHEM", 1210)),
                 PreCourse(CC!("CHEM", 1211)),
+                CoCourse(CC!("CHEM", 2201)),
             ]),
         ),
-        (CC!("CHEM", 1210), PreCourse(CC!("CHEM", 1201))),
-        (CC!("CHEM", 2210), PreCourse(CC!("CHEM", 2200))),
-        (CC!("CHEM", 2211), PreCourse(CC!("CHEM", 2201))),
+        (CC!("CHEM", 2201), CoCourse(CC!("CHEM", 2200))),
+        (
+            CC!("CHEM", 2210),
+            And(vec![
+                PreCourse(CC!("CHEM", 2200)),
+                CoCourse(CC!("CHEM", 2211)),
+            ]),
+        ),
+        (
+            CC!("CHEM", 2211),
+            And(vec![
+                PreCourse(CC!("CHEM", 2201)),
+                CoCourse(CC!("CHEM", 2210)),
+            ]),
+        ),
         (
             CC!("CHEM", 3150),
-            And(vec![
-                PreCourse(CC!("CHEM", 1210)),
-                PreCourse(CC!("MATH", 1350)),
-                PreCourse(CC!("PHYS", 2110)),
+            Or(vec![
+                And(vec![
+                    PreCourse(CC!("CHEM", 1210)),
+                    PreCourse(CC!("MATH", 1350)),
+                    PreCourse(CC!("PHYS", 2110)),
+                ]),
+                Instructor,
             ]),
         ),
         (CC!("CHEM", 3250), PreCourse(CC!("CHEM", 2200))),
@@ -33,8 +61,10 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             And(vec![
                 PreCourse(CC!("CHEM", 1210)),
                 PreCourse(CC!("CHEM", 1211)),
+                CoCourse(CC!("CHEM", 3301)),
             ]),
         ),
+        (CC!("CHEM", 3301), CoCourse(CC!("CHEM", 3300))),
         (
             CC!("CHEM", 3311),
             And(vec![
@@ -47,17 +77,71 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             And(vec![
                 PreCourse(CC!("CHEM", 2210)),
                 PreCourse(CC!("CHEM", 2211)),
+                CoCourse(CC!("CHEM", 3401)),
             ]),
         ),
+        (CC!("CHEM", 3401), CoCourse(CC!("CHEM", 3400))),
         (
             CC!("CHEM", 3500),
             And(vec![
                 PreCourse(CC!("CHEM", 2210)),
                 PreCourse(CC!("CHEM", 2211)),
+                CoCourse(CC!("CHEM", 3501)),
             ]),
         ),
-        (CC!("CHEM", 3510), PreCourse(CC!("CHEM", 2500))),
-        (CC!("CHEM", 3510), PreCourse(CC!("CHEM", 3500))),
-        (CC!("CHEM", terminate), PreCourse(CC!("CHEM", "EXIT"))),
+        (CC!("CHEM", 3501), CoCourse(CC!("CHEM", 3500))),
+        (
+            CC!("CHEM", 3510),
+            And(vec![
+                PreCourse(CC!("CHEM", 3500)),
+                CoCourse(CC!("CHEM", 3511)),
+            ]),
+        ),
+        (CC!("CHEM", 3511), CoCourse(CC!("CHEM", 3510))),
+        (CC!("CHEM", 3650), PreCourse(CC!("CHEM", 2210))),
+        (
+            CC!("CHEM", 3800),
+            And(vec![
+                PreCourse(CC!("CHEM", 1210)),
+                PreCourse(CC!("CHEM", 1211)),
+                PreCourse(CC!("MATH", 1350)),
+                PreCourse(CC!("PHYS", 2110)),
+                CoCourse(CC!("CHEM", 3801)),
+            ]),
+        ),
+        (CC!("CHEM", 3801), CoCourse(CC!("CHEM", 3800))),
+        (
+            CC!("CHEM", 4200),
+            And(vec![
+                PreCourse(CC!("CHEM", 1210)),
+                PreCourse(CC!("CHEM", 1211)),
+                PreCourse(CC!("MATH", 1350)),
+                PreCourse(CC!("PHYS", 2110)),
+                CoCourse(CC!("CHEM", 4201)),
+            ]),
+        ),
+        (CC!("CHEM", 4201), CoCourse(CC!("CHEM", 4200))),
+        (CC!("CHEM", 4350), PreCourse(CC!("CHEM", 2210))),
+        (
+            CC!("CHEM", 4450),
+            And(vec![
+                PreCourse(CC!("CHEM", 3500)),
+                CoCourse(CC!("CHEM", 4451)),
+            ]),
+        ),
+        (CC!("CHEM", 4451), CoCourse(CC!("CHEM", 4450))),
+        (CC!("CHEM", 4650), PreCourse(CC!("CHEM", 2210))),
+        (
+            CC!("CHEM", 4811),
+            And(vec![PreCourse(CC!("CHEM", 4801)), Instructor]),
+        ),
+        (
+            CC!("CHEM", 4812),
+            And(vec![PreCourse(CC!("CHEM", 4802)), Instructor]),
+        ),
+        (
+            CC!("CHEM", 4813),
+            And(vec![PreCourse(CC!("CHEM", 4803)), Instructor]),
+        ),
     ]
 }
