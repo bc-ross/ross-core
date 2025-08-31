@@ -4,6 +4,7 @@ mod prog_arch_ba;
 mod prog_art_ba;
 mod prog_astr_bs;
 mod prog_athlhc_ba;
+mod prog_bio_ba;
 mod prog_biochem_ba;
 mod prog_biochem_bs;
 mod prog_chem_ba;
@@ -18,6 +19,7 @@ pub fn programs() -> Vec<Program> {
         prog_athlhc_ba::prog(),
         prog_biochem_ba::prog(),
         prog_biochem_bs::prog(),
+        prog_bio_ba::prog(),
         prog_chem_ba::prog(),
         prog_phys_ba::prog(),
     ]

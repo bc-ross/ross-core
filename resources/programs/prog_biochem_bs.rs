@@ -63,4 +63,4 @@ pub fn prog() -> Program {
         electives: vec![],
     }
 }
-// Elective info: Must take one of these: CHEM-3150, CHEM-3250, CHEM-3400, CHEM-3650, CHEM-3800, CHEM-3980, CHEM-4980, CHEM-4350, CHEM-4650
+// Elective info: Must take one of these: CHEM-3150, CHEM-3250, CHEM-3400, CHEM-3650, CHEM-4200, CHEM-3980, CHEM-4980, CHEM-4350, CHEM-4650
