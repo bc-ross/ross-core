@@ -17,7 +17,7 @@ pub fn prog() -> Program {
             vec![],
             vec![CC!("BIOL", "COMP")],
         ],
-        assoc_stems: vec!["BIOL".to_string(), "CHEM".to_string()],
+        assoc_stems: vec!["BIOL".to_string()],
         electives: vec![],
     }
 }
