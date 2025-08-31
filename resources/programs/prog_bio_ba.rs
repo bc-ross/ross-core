@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 
+use crate::CC;
 use crate::geneds::ElectiveReq::*;
 use crate::schedule::{CourseCode, Elective, Program};
-use crate::CC;
 
 pub fn prog() -> Program {
     Program {
@@ -12,9 +12,9 @@ pub fn prog() -> Program {
             vec![CC!("CHEM", 1210), CC!("CHEM", 1211), CC!("BIOL", 1122)],
             vec![CC!("CHEM", 2200), CC!("CHEM", 2201), CC!("BIOL", 3310)],
             vec![CC!("CHEM", 2210), CC!("CHEM", 2211), CC!("BIOL", 3305)],
-            vec![CC!("XD", "XP")],
-            vec![CC!("XD", "XP")],
-            vec![CC!("XD", "XP")],
+            vec![],
+            vec![],
+            vec![],
             vec![CC!("BIOL", "COMP")],
         ],
         assoc_stems: vec!["BIOL".to_string(), "CHEM".to_string()],
