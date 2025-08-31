@@ -9,6 +9,7 @@ mod prog_bio_bs;
 mod prog_biochem_ba;
 mod prog_biochem_bs;
 mod prog_chem_ba;
+mod prog_chem_bs;
 mod prog_cheng_bs;
 mod prog_phys_ba;
 
@@ -24,6 +25,7 @@ pub fn programs() -> Vec<Program> {
         prog_bio_ba::prog(),
         prog_bio_bs::prog(),
         prog_chem_ba::prog(),
+        prog_chem_bs::prog(),
         prog_cheng_bs::prog(),
         prog_phys_ba::prog(),
     ]
