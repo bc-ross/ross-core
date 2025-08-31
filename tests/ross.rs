@@ -25,7 +25,7 @@ fn test_ross() -> Result<()> {
             .first()
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
-        Some(vec![CC!("THEO", 1100)]), // None,
+        Some(vec![CC!("PHYS", 4200), CC!("THEO", 1100)]), // None,
     )?;
 
     println!("Final schedule (two-stage, balanced):");
