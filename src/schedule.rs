@@ -178,8 +178,6 @@ pub fn generate_schedule(
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
-    crate::model::two_stage_lex_schedule(&mut sched, crate::MAX_CREDITS_PER_SEMESTER)?;
-
     Ok(sched)
 }
 
@@ -203,6 +201,11 @@ impl Schedule {
         Ok(dbg!(self.are_programs_valid()?)
             && dbg!(self.validate_prereqs()?)
             && dbg!(self.are_geneds_fulfilled()?))
+    }
+
+    pub fn validate(&mut self) -> Result<()> {
+        crate::model::two_stage_lex_schedule(self, crate::MAX_CREDITS_PER_SEMESTER)?;
+        Ok(())
     }
 
     fn are_geneds_fulfilled(&self) -> Result<bool> {
