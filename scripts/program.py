@@ -29,8 +29,8 @@ def main():
     semesters = []
     sem_num = 1
     while True:
-        line = input(f"Semester {sem_num} course codes (comma-separated, blank to finish): ").strip()
-        if not line:
+        line = input(f"Semester {sem_num} course codes (comma-separated, 'q' to finish): ").strip()
+        if line.strip() == "q":
             break
         codes = [parse_course_code(code) for code in line.split(",") if code.strip()]
         semesters.append(f"            vec![{', '.join(codes)}],")
