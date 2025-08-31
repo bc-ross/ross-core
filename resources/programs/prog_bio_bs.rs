@@ -6,7 +6,7 @@ use crate::CC;
 
 pub fn prog() -> Program {
     Program {
-        name: "BA Biology".to_string(),
+        name: "BS Biology".to_string(),
         semesters: vec![
             vec![CC!("CHEM", 1200), CC!("CHEM", 1201), CC!("BIOL", 1121)],
             vec![CC!("CHEM", 1210), CC!("CHEM", 1211), CC!("BIOL", 1122)],
@@ -17,8 +17,8 @@ pub fn prog() -> Program {
             vec![],
             vec![CC!("BIOL", "COMP")],
         ],
-        assoc_stems: vec!["BIOL".to_string(), "CHEM".to_string()],
+        assoc_stems: vec!["BIOL".to_string()],
         electives: vec![],
     }
 }
-// Elective info: Electives for bio_ba: MATH-1300 or MATH-1250, PHYS-2000+PHYS-2001 or PHYS-2100+PHYS-2101, PHYS-2010+PHYS-2011 or PHYS-2110+PHYS-2111, & 5 BIOL+labs above BIOL-3311
+// Elective info: Electives for bio_ba: MATH-1300 or MATH-1250, PHYS-1100 or PHYS-2000+PHYS-2001 or PHYS-2100+PHYS-2101, & 6 BIOL+labs above BIOL-3311
