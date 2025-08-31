@@ -16,6 +16,7 @@ mod prog_classl_ba;
 mod prog_classlg_ba;
 mod prog_classlgh_ba;
 mod prog_compsci_ba;
+mod prog_compsci_bs;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -37,6 +38,7 @@ pub fn programs() -> Vec<Program> {
         prog_classlg_ba::prog(),
         prog_classl_ba::prog(),
         prog_compsci_ba::prog(),
+        prog_compsci_bs::prog(),
         prog_phys_ba::prog(),
     ]
 }
