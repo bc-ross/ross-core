@@ -9,6 +9,21 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     second_stage_sched(sched, max_credits_per_semester, min_credits)
 }
 
+pub fn generate_multi_schedules(
+    mut sched: Schedule,
+    max_credits_per_semester: i64,
+    num_scheds: u64,
+) -> Result<Vec<Schedule>> {
+    let min_credits = first_stage_sched(&mut sched, max_credits_per_semester)?;
+    let mut scheds = Vec::new();
+    for _ in 0..num_scheds {
+        let mut new_sched = sched.clone();
+        second_stage_sched(&mut new_sched, max_credits_per_semester, min_credits)?;
+        scheds.push(new_sched);
+    }
+    Ok(scheds)
+}
+
 /// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 fn first_stage_sched(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<i64> {
     let params = cp_sat::proto::SatParameters {
