@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     schedule::{CourseCode, Schedule},
-    transparency::ScheduleReasons,
+    transparency::{CourseReasons, ScheduleReasons},
 };
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
@@ -138,34 +138,56 @@ impl CourseReq {
     }
 }
 
+fn check_maybe_reason(
+    c: &CourseCode,
+    code: &CourseCode,
+    reasons: Option<&ScheduleReasons>,
+    course: &CourseCode,
+) -> bool {
+    if c == code {
+        if let Some(r) = reasons {
+            r.0.borrow_mut()
+                .entry((*code).clone())
+                .or_default()
+                .push(CourseReasons::CourseReq {
+                    course: (*course).clone(),
+                });
+        };
+        true
+    } else {
+        false
+    }
+}
+
 impl CourseReq {
     pub fn is_satisfied(
         &self,
         sched: &Schedule,
         sem_idx: usize,
+        course: &CourseCode,
         reasons: Option<&ScheduleReasons>,
     ) -> bool {
         // TODO: grade is not implemented
         match self {
             CourseReq::And(reqs) => reqs
                 .iter()
-                .all(|req| req.is_satisfied(sched, sem_idx, reasons)),
+                .all(|req| req.is_satisfied(sched, sem_idx, course, reasons)),
             CourseReq::Or(reqs) => reqs
                 .iter()
-                .any(|req| req.is_satisfied(sched, sem_idx, reasons)),
+                .any(|req| req.is_satisfied(sched, sem_idx, course, reasons)),
             CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
                 std::iter::once(&sched.incoming)
                     .chain(sched.courses.iter())
                     .take(sem_idx + 1)
                     .flatten()
-                    .any(|c| c == code)
+                    .any(|c| check_maybe_reason(c, code, reasons, course))
             }
             CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => {
                 std::iter::once(&sched.incoming)
                     .chain(sched.courses.iter())
                     .take(sem_idx + 2)
                     .flatten()
-                    .any(|c| c == code)
+                    .any(|c| check_maybe_reason(c, code, reasons, course))
             }
             CourseReq::Program(x) => sched.programs.iter().any(|p| {
                 sched

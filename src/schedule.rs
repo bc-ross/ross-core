@@ -270,7 +270,7 @@ impl Schedule {
                     .prereqs
                     .get(code)
                     .unwrap_or(&CourseReq::NotRequired);
-                if !req.is_satisfied(self, sem_idx, reasons) {
+                if !req.is_satisfied(self, sem_idx, code, reasons) {
                     return Ok(false);
                 }
             }
