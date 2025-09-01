@@ -20,6 +20,7 @@ pub struct ModelBuilderContext<'a> {
     pub min_credits: Option<i64>,
     pub catalog: Option<&'a Catalog>,
     pub incoming_codes: Vec<CourseCode>,
+    pub programs: Vec<String>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
@@ -156,6 +157,7 @@ impl<'a> ModelBuilderContext<'a> {
             min_credits: None,
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
+            programs: sched.programs.clone(),
         }
     }
 

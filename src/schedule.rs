@@ -3,6 +3,7 @@ use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    f32::consts::E,
     fmt::{self, Display},
 };
 
@@ -216,6 +217,10 @@ impl Schedule {
 
     pub fn validate(&mut self) -> Result<()> {
         crate::model::two_stage_lex_schedule(self, crate::MAX_CREDITS_PER_SEMESTER)?;
+        // After solving, verify the schedule is valid
+        if !self.is_valid()? {
+            return Err(anyhow::anyhow!("Generated schedule is not valid"));
+        }
         Ok(())
     }
 
