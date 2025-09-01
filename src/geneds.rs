@@ -105,10 +105,7 @@ fn satisfy_req<'a>(
     }
 }
 
-pub fn are_geneds_satisfied(
-    sched: &Schedule,
-    reasons: Option<&mut ScheduleReasons>,
-) -> Result<bool> {
+pub fn are_geneds_satisfied(sched: &Schedule, reasons: Option<&ScheduleReasons>) -> Result<bool> {
     let sched_courses: HashSet<&CourseCode> = std::iter::once(&sched.incoming)
         .chain(sched.courses.iter())
         .flatten()

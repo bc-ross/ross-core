@@ -6,11 +6,11 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::prereqs::CourseReq;
 use crate::{
     geneds::{ElectiveReq, GenEd, are_geneds_satisfied},
     transparency::ScheduleReasons,
 };
+use crate::{prereqs::CourseReq, transparency::CourseReasons};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
@@ -200,12 +200,12 @@ impl Schedule {
         Ok(self)
     }
 
-    pub fn get_reasons(&self) -> Result<ScheduleReasons> {
-        let mut reasons = ScheduleReasons::default();
-        Ok(dbg!(self.are_programs_valid()?)
-            && dbg!(self.validate_prereqs()?)
-            && dbg!(self.are_geneds_fulfilled()?));
-        Ok(reasons)
+    pub fn get_reasons(&self) -> Result<HashMap<String, Vec<CourseReasons>>> {
+        let reasons = ScheduleReasons::default();
+        let _validity = dbg!(self.are_programs_valid(Some(&reasons))?)
+            && dbg!(self.validate_prereqs(Some(&reasons))?)
+            && dbg!(self.are_geneds_fulfilled(Some(&reasons))?);
+        Ok(reasons.0.take())
     }
 
     pub fn is_valid(&self) -> Result<bool> {
@@ -219,11 +219,11 @@ impl Schedule {
         Ok(())
     }
 
-    fn are_geneds_fulfilled(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
+    fn are_geneds_fulfilled(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
         are_geneds_satisfied(self, reasons)
     }
 
-    fn are_programs_valid(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
+    fn are_programs_valid(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
         let all_sched_codes = self
             .courses
             .iter()
@@ -251,7 +251,7 @@ impl Schedule {
             .all(|x| *x))
     }
 
-    pub fn validate_prereqs(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
+    pub fn validate_prereqs(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self

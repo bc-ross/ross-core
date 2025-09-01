@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CourseReasons {
@@ -9,4 +9,4 @@ pub enum CourseReasons {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct ScheduleReasons(HashMap<String, Vec<CourseReasons>>);
+pub struct ScheduleReasons(pub Rc<RefCell<HashMap<String, Vec<CourseReasons>>>>);

@@ -143,7 +143,7 @@ impl CourseReq {
         &self,
         sched: &Schedule,
         sem_idx: usize,
-        reasons: Option<&mut ScheduleReasons>,
+        reasons: Option<&ScheduleReasons>,
     ) -> bool {
         // TODO: grade is not implemented
         match self {
