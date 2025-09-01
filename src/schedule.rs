@@ -200,7 +200,7 @@ impl Schedule {
         Ok(self)
     }
 
-    pub fn get_reasons(&self) -> Result<HashMap<String, Vec<CourseReasons>>> {
+    pub fn get_reasons(&self) -> Result<HashMap<CourseCode, Vec<CourseReasons>>> {
         let reasons = ScheduleReasons::default();
         let _validity = dbg!(self.are_programs_valid(Some(&reasons))?)
             && dbg!(self.validate_prereqs(Some(&reasons))?)
@@ -244,6 +244,18 @@ impl Schedule {
                     .iter()
                     .flatten()
                     .collect::<HashSet<&CourseCode>>();
+                if let Some(r) = &reasons {
+                    let mut reason_map = r.0.borrow_mut();
+                    for code in &all_prog_codes {
+                        if all_sched_codes.contains(code) {
+                            reason_map.entry((*code).clone()).or_default().push(
+                                CourseReasons::ProgramRequired {
+                                    prog: prog_name.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
                 Ok(all_sched_codes.is_superset(&all_prog_codes))
             })
             .collect::<Result<Vec<_>>>()?
