@@ -22,6 +22,7 @@ mod prog_crim_ba;
 mod prog_econ_ba;
 mod prog_eled_ba;
 mod prog_eleng_bs;
+mod prog_eng_ba;
 mod prog_engphys_bs;
 mod prog_phys_ba;
 
@@ -51,6 +52,7 @@ pub fn programs() -> Vec<Program> {
         prog_eled_ba::prog(),
         prog_eleng_bs::prog(),
         prog_engphys_bs::prog(),
+        prog_eng_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
