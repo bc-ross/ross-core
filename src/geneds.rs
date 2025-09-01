@@ -1,6 +1,6 @@
 use crate::{
     schedule::{Catalog, CourseCode, Schedule},
-    transparency::ScheduleReasons,
+    transparency::{CourseReasons, ScheduleReasons},
 };
 use anyhow::Result;
 use savefile_derive::Savefile;
@@ -110,6 +110,45 @@ pub fn are_geneds_satisfied(sched: &Schedule, reasons: Option<&ScheduleReasons>)
         .chain(sched.courses.iter())
         .flatten()
         .collect();
+
+    if let Some(r) = &reasons {
+        let mut reason_map = r.0.borrow_mut();
+        for gened in sched.catalog.geneds.iter() {
+            match gened {
+                GenEd::Core { name, req } => {
+                    for code in req.all_course_codes() {
+                        if sched_courses.contains(&code) {
+                            reason_map
+                                .entry(code)
+                                .or_default()
+                                .push(CourseReasons::Core { name: name.clone() });
+                        }
+                    }
+                }
+                GenEd::Foundation { name, req } => {
+                    for code in req.all_course_codes() {
+                        if sched_courses.contains(&code) {
+                            reason_map
+                                .entry(code)
+                                .or_default()
+                                .push(CourseReasons::Foundation { name: name.clone() });
+                        }
+                    }
+                }
+                GenEd::SkillAndPerspective { name, req } => {
+                    for code in req.all_course_codes() {
+                        if sched_courses.contains(&code) {
+                            reason_map
+                                .entry(code)
+                                .or_default()
+                                .push(CourseReasons::SkillsAndPerspective { name: name.clone() });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 1. Core: each must be satisfied, overlap allowed
     let mut all_core_ok = true;
     for gened in sched.catalog.geneds.iter() {

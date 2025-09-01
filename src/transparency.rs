@@ -6,7 +6,7 @@ use crate::schedule::CourseCode;
 pub enum CourseReasons {
     Core { name: String },
     Foundation { name: String },
-    SkillsAndPerspectives { name: String },
+    SkillsAndPerspective { name: String },
     ProgramRequired { prog: String },
     ProgramElective { prog: String, name: String },
     CourseReq { course: CourseCode },
