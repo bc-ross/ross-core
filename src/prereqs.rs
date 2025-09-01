@@ -1,7 +1,10 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{CourseCode, Schedule};
+use crate::{
+    schedule::{CourseCode, Schedule},
+    transparency::ScheduleReasons,
+};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -136,11 +139,20 @@ impl CourseReq {
 }
 
 impl CourseReq {
-    pub fn is_satisfied(&self, sched: &Schedule, sem_idx: usize) -> bool {
+    pub fn is_satisfied(
+        &self,
+        sched: &Schedule,
+        sem_idx: usize,
+        reasons: Option<&mut ScheduleReasons>,
+    ) -> bool {
         // TODO: grade is not implemented
         match self {
-            CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(sched, sem_idx)),
-            CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(sched, sem_idx)),
+            CourseReq::And(reqs) => reqs
+                .iter()
+                .all(|req| req.is_satisfied(sched, sem_idx, reasons)),
+            CourseReq::Or(reqs) => reqs
+                .iter()
+                .any(|req| req.is_satisfied(sched, sem_idx, reasons)),
             CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
                 std::iter::once(&sched.incoming)
                     .chain(sched.courses.iter())

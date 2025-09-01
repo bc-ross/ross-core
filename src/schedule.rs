@@ -6,8 +6,11 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::geneds::{ElectiveReq, GenEd, are_geneds_satisfied};
 use crate::prereqs::CourseReq;
+use crate::{
+    geneds::{ElectiveReq, GenEd, are_geneds_satisfied},
+    transparency::ScheduleReasons,
+};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
@@ -197,10 +200,18 @@ impl Schedule {
         Ok(self)
     }
 
-    pub fn is_valid(&self) -> Result<bool> {
+    pub fn get_reasons(&self) -> Result<ScheduleReasons> {
+        let mut reasons = ScheduleReasons::default();
         Ok(dbg!(self.are_programs_valid()?)
             && dbg!(self.validate_prereqs()?)
-            && dbg!(self.are_geneds_fulfilled()?))
+            && dbg!(self.are_geneds_fulfilled()?));
+        Ok(reasons)
+    }
+
+    pub fn is_valid(&self) -> Result<bool> {
+        Ok(dbg!(self.are_programs_valid(None)?)
+            && dbg!(self.validate_prereqs(None)?)
+            && dbg!(self.are_geneds_fulfilled(None)?))
     }
 
     pub fn validate(&mut self) -> Result<()> {
@@ -208,11 +219,11 @@ impl Schedule {
         Ok(())
     }
 
-    fn are_geneds_fulfilled(&self) -> Result<bool> {
-        are_geneds_satisfied(self)
+    fn are_geneds_fulfilled(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
+        are_geneds_satisfied(self, reasons)
     }
 
-    fn are_programs_valid(&self) -> Result<bool> {
+    fn are_programs_valid(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
         let all_sched_codes = self
             .courses
             .iter()
@@ -240,7 +251,7 @@ impl Schedule {
             .all(|x| *x))
     }
 
-    pub fn validate_prereqs(&self) -> Result<bool> {
+    pub fn validate_prereqs(&self, reasons: Option<&mut ScheduleReasons>) -> Result<bool> {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self
@@ -248,7 +259,7 @@ impl Schedule {
                     .prereqs
                     .get(code)
                     .unwrap_or(&CourseReq::NotRequired);
-                if !req.is_satisfied(self, sem_idx) {
+                if !req.is_satisfied(self, sem_idx, reasons) {
                     return Ok(false);
                 }
             }

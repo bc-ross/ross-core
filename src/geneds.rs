@@ -1,4 +1,7 @@
-use crate::schedule::{Catalog, CourseCode, Schedule};
+use crate::{
+    schedule::{Catalog, CourseCode, Schedule},
+    transparency::ScheduleReasons,
+};
 use anyhow::Result;
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
@@ -102,7 +105,10 @@ fn satisfy_req<'a>(
     }
 }
 
-pub fn are_geneds_satisfied(sched: &Schedule) -> Result<bool> {
+pub fn are_geneds_satisfied(
+    sched: &Schedule,
+    reasons: Option<&mut ScheduleReasons>,
+) -> Result<bool> {
     let sched_courses: HashSet<&CourseCode> = std::iter::once(&sched.incoming)
         .chain(sched.courses.iter())
         .flatten()
