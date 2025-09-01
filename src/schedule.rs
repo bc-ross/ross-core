@@ -224,9 +224,8 @@ impl Schedule {
     }
 
     fn are_programs_valid(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
-        let all_sched_codes = self
-            .courses
-            .iter()
+        let all_sched_codes = std::iter::once(&self.incoming)
+            .chain(self.courses.iter())
             .flatten()
             .collect::<HashSet<&CourseCode>>();
         Ok(self
