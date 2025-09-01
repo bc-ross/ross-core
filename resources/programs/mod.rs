@@ -1,4 +1,5 @@
 use crate::schedule::Program;
+mod prog_;
 mod prog_acctba;
 mod prog_arch_ba;
 mod prog_art_ba;
@@ -18,10 +19,12 @@ mod prog_classlgh_ba;
 mod prog_compsci_ba;
 mod prog_compsci_bs;
 mod prog_crim_ba;
+mod prog_econ_ba;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
     vec![
+        prog_::prog(),
         prog_acctba::prog(),
         prog_arch_ba::prog(),
         prog_art_ba::prog(),
@@ -41,6 +44,7 @@ pub fn programs() -> Vec<Program> {
         prog_compsci_ba::prog(),
         prog_compsci_bs::prog(),
         prog_crim_ba::prog(),
+        prog_econ_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
