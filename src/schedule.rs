@@ -3,7 +3,6 @@ use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    f32::consts::E,
     fmt::{self, Display},
 };
 
@@ -308,7 +307,6 @@ fn prog_electives_valid(
         match elective.req {
             ElectiveReq::Set(ref codes) => {
                 if !codes.iter().all(|c| all_sched_codes.contains(c)) {
-                    dbg!(&elective.name);
                     return Ok(false);
                 }
             }
@@ -317,8 +315,6 @@ fn prog_electives_valid(
                     .iter()
                     .any(|o| o.iter().all(|c| all_sched_codes.contains(c)))
                 {
-                    dbg!(&elective.name);
-
                     return Ok(false);
                 }
             }
@@ -328,9 +324,6 @@ fn prog_electives_valid(
                     .filter(|c| all_sched_codes.contains(c))
                     .collect();
                 if available.len() < num {
-                    dbg!(&available);
-                    dbg!(&elective.name);
-
                     return Ok(false);
                 }
             }
@@ -346,8 +339,6 @@ fn prog_electives_valid(
                     }
                 }
                 if total < num {
-                    dbg!(&elective.name);
-
                     return Ok(false);
                 }
             }
