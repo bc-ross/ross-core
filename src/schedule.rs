@@ -255,7 +255,8 @@ impl Schedule {
                         }
                     }
                 }
-                Ok(all_sched_codes.is_superset(&all_prog_codes))
+                Ok(all_sched_codes.is_superset(&all_prog_codes)
+                    && prog_electives_valid(prog, &self.catalog, &all_sched_codes, reasons)?)
             })
             .collect::<Result<Vec<_>>>()?
             .iter()
@@ -277,4 +278,75 @@ impl Schedule {
         }
         Ok(true)
     }
+}
+
+fn prog_electives_valid(
+    prog: &Program,
+    catalog: &Catalog,
+    all_sched_codes: &HashSet<&CourseCode>,
+    reasons: Option<&ScheduleReasons>,
+) -> Result<bool> {
+    for elective in &prog.electives {
+        if let Some(r) = &reasons {
+            let mut reason_map = r.0.borrow_mut();
+            for code in elective.req.all_course_codes() {
+                if all_sched_codes.contains(&code) {
+                    reason_map.entry(code.clone()).or_default().push(
+                        CourseReasons::ProgramElective {
+                            prog: prog.name.clone(),
+                            name: elective.name.clone(),
+                        },
+                    );
+                }
+            }
+        }
+        match elective.req {
+            ElectiveReq::Set(ref codes) => {
+                if !codes.iter().all(|c| all_sched_codes.contains(c)) {
+                    dbg!(&elective.name);
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::SetOpts(ref opts) => {
+                if !opts
+                    .iter()
+                    .any(|o| o.iter().all(|c| all_sched_codes.contains(c)))
+                {
+                    dbg!(&elective.name);
+
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::Courses { num, ref courses } => {
+                let available: Vec<_> = courses
+                    .iter()
+                    .filter(|c| all_sched_codes.contains(c))
+                    .collect();
+                if available.len() < num {
+                    dbg!(&available);
+                    dbg!(&elective.name);
+
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::Credits { num, ref courses } => {
+                let mut total = 0;
+                for c in courses {
+                    if all_sched_codes.contains(c) {
+                        total += catalog
+                            .courses
+                            .get(c)
+                            .and_then(|(_, cr, _)| *cr)
+                            .unwrap_or(0);
+                    }
+                }
+                if total < num {
+                    dbg!(&elective.name);
+
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(true)
 }
