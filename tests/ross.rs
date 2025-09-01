@@ -30,7 +30,6 @@ fn test_ross() -> Result<()> {
     sched.validate()?;
 
     println!("Final schedule (two-stage, balanced):");
-    println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
     for (s, semester) in std::iter::once(&sched.incoming)
         .chain(sched.courses.iter())

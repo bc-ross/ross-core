@@ -49,8 +49,7 @@ fn add_prereq_for_course<'a>(
                         PreCourse(code) => {
                             if let Some(&pre_idx) = idx_map.get(code) {
                                 // Allow prereqs to be satisfied in semester 0 (incoming)
-                                let earlier_vars: Vec<_> =
-                                    ctx.vars[pre_idx][..s].to_vec();
+                                let earlier_vars: Vec<_> = ctx.vars[pre_idx][..s].to_vec();
                                 if !earlier_vars.is_empty() {
                                     let sum_earlier: LinearExpr =
                                         earlier_vars.into_iter().collect();
@@ -64,8 +63,7 @@ fn add_prereq_for_course<'a>(
                         }
                         CoCourse(code) => {
                             if let Some(&co_idx) = idx_map.get(code) {
-                                let upto_vars: Vec<_> =
-                                    ctx.vars[co_idx][..=s].to_vec();
+                                let upto_vars: Vec<_> = ctx.vars[co_idx][..=s].to_vec();
                                 if !upto_vars.is_empty() {
                                     let sum_upto: LinearExpr = upto_vars.into_iter().collect();
                                     ctx.model
