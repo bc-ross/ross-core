@@ -196,7 +196,10 @@ impl CourseReq {
                     .iter()
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
-            CourseReq::Instructor => todo!(),
+            CourseReq::Instructor => {
+                eprintln!("Only PreCourse, CoCourse, And, Or supported, not {self:?}");
+                true
+            }
             CourseReq::NotRequired => true,
         }
     }
