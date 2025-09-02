@@ -1,7 +1,7 @@
 //! Context struct for model building and shared state.
 use crate::prereqs::CourseReq;
 use crate::schedule::{Catalog, CourseCode, Schedule};
-use cp_sat::builder::{BoolVar, CpModelBuilder, LinearExpr};
+use cp_sat::builder::{BoolVar, CpModelBuilder, IntVar, LinearExpr};
 
 #[derive(Clone)]
 pub struct Course<'a> {
@@ -24,6 +24,7 @@ pub struct ModelBuilderContext<'a> {
     pub catalog: Option<&'a Catalog>,
     pub incoming_codes: Vec<CourseCode>,
     pub program_electives: Vec<&'a crate::schedule::Elective>,
+    pub semester_credit_vars: Vec<IntVar>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
@@ -202,6 +203,7 @@ impl<'a> ModelBuilderContext<'a> {
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
             program_electives: program_electives,
+            semester_credit_vars: Vec::new(),
         }
     }
 
@@ -232,9 +234,9 @@ pub fn build_model_pipeline<'a>(
     ctx: &mut ModelBuilderContext<'a>,
 ) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course<'a>, i64)>) {
     crate::model_courses::add_courses(ctx);
+    crate::model_semester::add_semester_constraints(ctx);
     crate::model_prereqs::add_prereq_constraints(ctx);
     crate::model_geneds::add_gened_constraints(ctx);
-    crate::model_semester::add_semester_constraints(ctx);
     // Build flat_courses as (Course, credits)
     let flat_courses = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
     (

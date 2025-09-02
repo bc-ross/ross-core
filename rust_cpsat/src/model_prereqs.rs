@@ -1,6 +1,6 @@
 //! Functions for adding prerequisite constraints.
 use crate::model_context::{Course, ModelBuilderContext};
-use crate::prereqs::CourseReq;
+use crate::prereqs::{ClassStanding, CourseReq};
 use crate::schedule::CourseCode;
 use cp_sat::builder::LinearExpr;
 use std::collections::HashMap;
@@ -30,10 +30,6 @@ fn add_prereq_for_course<'a>(
     // If the target course is an incoming course, skip prereq constraints entirely.
     // Incoming courses are allowed in semester 0 and should not be blocked by prereqs.
     if ctx.incoming_codes.contains(&ctx.courses[course_idx].code) {
-        println!(
-            "[DIAG] Skipping prereq constraints for incoming course {:?}",
-            ctx.courses[course_idx].code
-        );
         return;
     }
     match req {
@@ -83,7 +79,7 @@ fn add_prereq_for_course<'a>(
                         }
                         _ => eprintln!("Only PreCourse, CoCourse, And, Or supported, not {:?}", r),
                     }
-                    or_exprs.push(or_var);
+                    // Note: only push the or_var above when that branch added a constraint.
                 }
                 if !or_exprs.is_empty() {
                     let sum_or: LinearExpr = or_exprs.iter().copied().collect();
@@ -134,6 +130,37 @@ fn add_prereq_for_course<'a>(
                 }
             }
         }
-        _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
+        Standing(standing) => {
+            let standing_credits = match standing {
+                ClassStanding::Freshman => 0,
+                ClassStanding::Sophomore => 30,
+                ClassStanding::Junior => 60,
+                ClassStanding::Senior => 90,
+            };
+            let course_code = ctx.courses[course_idx].code.clone();
+            for s in 0..num_semesters {
+                let cur = ctx.vars[course_idx][s];
+                if s == 0 {
+                    // Can't satisfy standing in semester 0 (incoming only)
+                    ctx.model.add_eq(cur, 0);
+                } else {
+                    // Build expression for credits earned before semester s using semester_credit_vars
+                    let mut credits_expr = LinearExpr::from(0);
+                    for prev_s in 0..s {
+                        credits_expr += LinearExpr::from(ctx.semester_credit_vars[prev_s].clone());
+                    }
+
+                    // If cur = 1, then credits_expr >= standing_credits
+                    // Use big-M: credits_expr - big_m * cur >= standing_credits - big_m
+                    let big_m = 1000i64;
+                    let lower = standing_credits - big_m;
+                    let mut constraint_expr = credits_expr;
+                    constraint_expr = constraint_expr - (big_m, cur);
+                    ctx.model
+                        .add_linear_constraint(constraint_expr, [(lower, i64::MAX)]);
+                }
+            }
+        }
+        _ => unimplemented!("Only PreCourse, CoCourse, And, Or, Standing supported"),
     }
 }

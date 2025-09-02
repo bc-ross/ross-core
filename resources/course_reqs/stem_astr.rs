@@ -1,6 +1,7 @@
 #![allow(unused_imports)]
 
 use crate::prereqs::{
+    ClassStanding,
     CourseReq::{self, *},
     Grade, GradeLetter, GradeQualifier,
 };
@@ -12,6 +13,12 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
         (CC!("ASTR", 3000), PreCourse(CC!("PHYS", 2110))),
         (CC!("ASTR", 4100), PreCourse(CC!("PHYS", 3200))),
         (CC!("ASTR", 4200), PreCourse(CC!("PHYS", 2110))),
-        (CC!("ASTR", 4300), PreCourse(CC!("PHYS", 3200))),
+        (
+            CC!("ASTR", 4300),
+            And(vec![
+                Standing(ClassStanding::Sophomore),
+                PreCourse(CC!("PHYS", 3200)),
+            ]),
+        ),
     ]
 }
