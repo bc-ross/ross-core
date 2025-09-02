@@ -1,7 +1,7 @@
 //! Context struct for model building and shared state.
 use crate::prereqs::CourseReq;
 use crate::schedule::{Catalog, CourseCode, Schedule};
-use cp_sat::builder::{BoolVar, CpModelBuilder, LinearExpr};
+use cp_sat::builder::{BoolVar, CpModelBuilder, IntVar, LinearExpr};
 
 #[derive(Clone)]
 pub struct Course {
@@ -21,6 +21,7 @@ pub struct ModelBuilderContext<'a> {
     pub catalog: Option<&'a Catalog>,
     pub incoming_codes: Vec<CourseCode>,
     pub programs: Vec<String>,
+    pub semester_credit_vars: Vec<IntVar>,
 }
 
 impl<'a> ModelBuilderContext<'a> {
@@ -80,12 +81,14 @@ impl<'a> ModelBuilderContext<'a> {
                     | ElectiveReq::Credits { courses: codes, .. } => {
                         for code in codes {
                             all_codes.insert(code.clone());
+                            queue.push_back(code.clone());
                         }
                     }
                     ElectiveReq::SetOpts(opts) => {
                         for opt in opts {
                             for code in opt {
                                 all_codes.insert(code.clone());
+                                queue.push_back(code.clone());
                             }
                         }
                     }
@@ -106,12 +109,14 @@ impl<'a> ModelBuilderContext<'a> {
                         | ElectiveReq::Credits { courses: codes, .. } => {
                             for code in codes {
                                 all_codes.insert(code.clone());
+                                queue.push_back(code.clone());
                             }
                         }
                         ElectiveReq::SetOpts(opts) => {
                             for opt in opts {
                                 for code in opt {
                                     all_codes.insert(code.clone());
+                                    queue.push_back(code.clone());
                                 }
                             }
                         }
@@ -119,6 +124,34 @@ impl<'a> ModelBuilderContext<'a> {
                 }
             }
         }
+
+        while let Some(code) = queue.pop_front() {
+            if let Some(req) = sched.catalog.prereqs.get(&code) {
+                fn collect_prereq_codes(
+                    req: &CourseReq,
+                    all_codes: &mut std::collections::HashSet<CourseCode>,
+                    catalog: &Catalog,
+                    queue: &mut std::collections::VecDeque<CourseCode>,
+                ) {
+                    use crate::prereqs::CourseReq::*;
+                    match req {
+                        And(reqs) | Or(reqs) => {
+                            for r in reqs {
+                                collect_prereq_codes(r, all_codes, catalog, queue);
+                            }
+                        }
+                        PreCourse(code) | CoCourse(code) => {
+                            if all_codes.insert(code.clone()) {
+                                queue.push_back(code.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                collect_prereq_codes(req, &mut all_codes, &sched.catalog, &mut queue);
+            }
+        }
+
         // Build Course structs for all codes, and print diagnostics
         let mut courses = Vec::new();
         for code in &all_codes {
@@ -158,6 +191,7 @@ impl<'a> ModelBuilderContext<'a> {
             catalog: Some(&sched.catalog),
             incoming_codes: sched.incoming.clone(),
             programs: sched.programs.clone(),
+            semester_credit_vars: Vec::new(),
         }
     }
 
@@ -188,9 +222,9 @@ pub fn build_model_pipeline(
     ctx: &mut ModelBuilderContext,
 ) -> (CpModelBuilder, Vec<Vec<BoolVar>>, Vec<(Course, i64)>) {
     super::courses::add_courses(ctx);
+    super::semester::add_semester_constraints(ctx);
     super::prereqs::add_prereq_constraints(ctx);
     super::geneds::add_gened_constraints(ctx);
-    super::semester::add_semester_constraints(ctx);
     // Build flat_courses as (Course, credits)
     let flat_courses = ctx.courses.iter().map(|c| (c.clone(), c.credits)).collect();
     (

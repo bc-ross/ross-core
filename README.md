@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Tests](https://github.com/bc-ross/ross/actions/workflows/tests.yml/badge.svg)](https://github.com/bc-ross/ross/actions/workflows/tests.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Tests](https://github.com/bc-ross/ross-core/actions/workflows/tests.yml/badge.svg)](https://github.com/bc-ross/ross-core/actions/workflows/tests.yml)
 
