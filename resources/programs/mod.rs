@@ -31,6 +31,7 @@ mod prog_exsci_c_ba;
 mod prog_exsci_ghc_ba;
 mod prog_exsci_sm_ba;
 mod prog_exsci_tpeh_ba;
+mod prog_fin_ba;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -67,6 +68,7 @@ pub fn programs() -> Vec<Program> {
         prog_exsci_ghc_ba::prog(),
         prog_exsci_sm_ba::prog(),
         prog_exsci_tpeh_ba::prog(),
+        prog_fin_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
