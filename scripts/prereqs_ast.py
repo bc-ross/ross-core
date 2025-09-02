@@ -25,7 +25,7 @@ PREAMBLE = """
 
 use crate::prereqs::{
     CourseReq::{self, *},
-    Grade, GradeLetter, GradeQualifier,
+    Grade, GradeLetter, GradeQualifier, ClassStanding,
 };
 use crate::schedule::CourseCode;
 use crate::{CC, GR};
@@ -75,6 +75,14 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
         if func == "Co":
             # Co(...) just sets co_prefix for the inner logic
             return rustify(ast.Tuple(elts=args, ctx=ast.Load()), default_stem, co_prefix=True)
+        if func == "Standing":
+            # Handle Standing(Fr), Standing(So), etc.
+            if len(args) == 1 and isinstance(args[0], ast.Name):
+                standing_map = {"Fr": "Freshman", "So": "Sophomore", "Ju": "Junior", "Sr": "Senior"}
+                standing_arg = args[0].id
+                if standing_arg in standing_map:
+                    return f"Standing(ClassStanding::{standing_map[standing_arg]})"
+            raise ValueError(f"Unsupported Standing argument: {ast.dump(node)}")
         if func.upper() == "GR":
             return f"GR!({', '.join(rustify(arg, default_stem) for arg in args)})"
     elif isinstance(node, ast.Tuple):
@@ -131,6 +139,10 @@ def rustify(node, default_stem, in_tuple=False, co_prefix=False):
             # Majors or Programs of Distinction (or say Nursing School etc.)
             # This will get calculated on the program's end with `assoc_stems`
             return f'Program("{default_stem}".into())'
+        elif node.id in ["Fr", "So", "Ju", "Sr"]:
+            # Handle class standing requirements
+            standing_map = {"Fr": "Freshman", "So": "Sophomore", "Ju": "Junior", "Sr": "Senior"}
+            return f"Standing(ClassStanding::{standing_map[node.id]})"
         if in_tuple:
             return f'"{node.id}"'
         # Parse as STEM-CODE or use default stem

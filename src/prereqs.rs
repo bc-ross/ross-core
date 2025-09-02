@@ -12,10 +12,19 @@ pub enum CourseReq {
     PreCourseGrade(CourseCode, Grade),
     CoCourseGrade(CourseCode, Grade),
     Program(String), // Assoc'd STEM
-    // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
+    Standing(ClassStanding),
     Instructor,
     #[default]
     NotRequired,
+}
+
+#[repr(u8)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
+pub enum ClassStanding {
+    Freshman = 0,
+    Sophomore = 30,
+    Junior = 62,
+    Senior = 94,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -162,6 +171,17 @@ impl CourseReq {
                     .iter()
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
+            CourseReq::Standing(cs) => {
+                let standing = *cs as u8 as u32;
+                let credits = std::iter::once(&sched.incoming)
+                    .chain(sched.courses.iter())
+                    .take(sem_idx + 1)
+                    .flatten()
+                    .filter_map(|c| sched.catalog.courses.get(c))
+                    .filter_map(|x| x.1)
+                    .sum::<u32>();
+                credits >= standing
+            }
             CourseReq::Instructor => todo!(),
             CourseReq::NotRequired => true,
         }

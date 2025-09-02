@@ -1,6 +1,6 @@
 //! Functions for adding prerequisite constraints.
 use super::context::{Course, ModelBuilderContext};
-use crate::prereqs::CourseReq;
+use crate::prereqs::{ClassStanding, CourseReq};
 use crate::schedule::CourseCode;
 use cp_sat::builder::LinearExpr;
 use std::collections::HashMap;
@@ -30,10 +30,6 @@ fn add_prereq_for_course<'a>(
     // If the target course is an incoming course, skip prereq constraints entirely.
     // Incoming courses are allowed in semester 0 and should not be blocked by prereqs.
     if ctx.incoming_codes.contains(&ctx.courses[course_idx].code) {
-        println!(
-            "[DIAG] Skipping prereq constraints for incoming course {:?}",
-            ctx.courses[course_idx].code
-        );
         return;
     }
     match req {
@@ -83,7 +79,7 @@ fn add_prereq_for_course<'a>(
                         }
                         _ => eprintln!("Only PreCourse, CoCourse, And, Or supported, not {:?}", r),
                     }
-                    or_exprs.push(or_var);
+                    // Note: only push the or_var above when that branch added a constraint.
                 }
                 if !or_exprs.is_empty() {
                     let sum_or: LinearExpr = or_exprs.iter().copied().collect();
@@ -134,6 +130,24 @@ fn add_prereq_for_course<'a>(
                 }
             }
         }
-        _ => unimplemented!("Only PreCourse, CoCourse, And, Or supported"),
+        Standing(standing) => {
+            let standing_credits = *standing as u8 as i64;
+            for s in 1..num_semesters {
+                let cur = ctx.vars[course_idx][s];
+                // Only enforce standing if course is scheduled in semester s
+                // credits_before = sum of semester_credit_vars[0..s]
+                let credits_before: LinearExpr =
+                    ctx.semester_credit_vars[..s].iter().cloned().collect();
+                // If cur == 1, then credits_before >= standing_credits
+                // Use implication: credits_before + big_m * (1 - cur) >= standing_credits
+                let big_m = 1000;
+                // Using (big_m, -cur) for the term big_m * (-1) * cur
+                let constraint = credits_before + big_m - (big_m, cur);
+                ctx.model.add_ge(constraint, standing_credits);
+            }
+            // Semester 0 cannot satisfy standing prereqs
+            ctx.model.add_eq(ctx.vars[course_idx][0], 0);
+        }
+        _ => unimplemented!("Only PreCourse, CoCourse, And, Or, Standing supported"),
     }
 }
