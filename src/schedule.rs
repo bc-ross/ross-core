@@ -6,8 +6,11 @@ use std::{
     fmt::{self, Display},
 };
 
-use crate::geneds::{ElectiveReq, GenEd, are_geneds_satisfied};
-use crate::prereqs::CourseReq;
+use crate::{
+    geneds::{ElectiveReq, GenEd, are_geneds_satisfied},
+    transparency::ScheduleReasons,
+};
+use crate::{prereqs::CourseReq, transparency::CourseReasons};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Clone, Hash, Eq, PartialEq)]
 pub enum CourseTermOffering {
@@ -178,8 +181,6 @@ pub fn generate_schedule(
     };
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
-    crate::model::two_stage_lex_schedule(&mut sched, crate::MAX_CREDITS_PER_SEMESTER)?;
-
     Ok(sched)
 }
 
@@ -199,20 +200,36 @@ impl Schedule {
         Ok(self)
     }
 
+    pub fn get_reasons(&self) -> Result<HashMap<CourseCode, Vec<CourseReasons>>> {
+        let reasons = ScheduleReasons::default();
+        let _validity = dbg!(self.are_programs_valid(Some(&reasons))?)
+            && dbg!(self.validate_prereqs(Some(&reasons))?)
+            && dbg!(self.are_geneds_fulfilled(Some(&reasons))?);
+        Ok(reasons.0.take())
+    }
+
     pub fn is_valid(&self) -> Result<bool> {
-        Ok(dbg!(self.are_programs_valid()?)
-            && dbg!(self.validate_prereqs()?)
-            && dbg!(self.are_geneds_fulfilled()?))
+        Ok(dbg!(self.are_programs_valid(None)?)
+            && dbg!(self.validate_prereqs(None)?)
+            && dbg!(self.are_geneds_fulfilled(None)?))
     }
 
-    fn are_geneds_fulfilled(&self) -> Result<bool> {
-        are_geneds_satisfied(self)
+    pub fn validate(&mut self) -> Result<()> {
+        crate::model::two_stage_lex_schedule(self, crate::MAX_CREDITS_PER_SEMESTER)?;
+        // After solving, verify the schedule is valid
+        if !self.is_valid()? {
+            return Err(anyhow::anyhow!("Generated schedule is not valid"));
+        }
+        Ok(())
     }
 
-    fn are_programs_valid(&self) -> Result<bool> {
-        let all_sched_codes = self
-            .courses
-            .iter()
+    fn are_geneds_fulfilled(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
+        are_geneds_satisfied(self, reasons)
+    }
+
+    fn are_programs_valid(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
+        let all_sched_codes = std::iter::once(&self.incoming)
+            .chain(self.courses.iter())
             .flatten()
             .collect::<HashSet<&CourseCode>>();
         Ok(self
@@ -230,14 +247,27 @@ impl Schedule {
                     .iter()
                     .flatten()
                     .collect::<HashSet<&CourseCode>>();
-                Ok(all_sched_codes.is_superset(&all_prog_codes))
+                if let Some(r) = &reasons {
+                    let mut reason_map = r.0.borrow_mut();
+                    for code in &all_prog_codes {
+                        if all_sched_codes.contains(code) {
+                            reason_map.entry((*code).clone()).or_default().push(
+                                CourseReasons::ProgramRequired {
+                                    prog: prog_name.clone(),
+                                },
+                            );
+                        }
+                    }
+                }
+                Ok(all_sched_codes.is_superset(&all_prog_codes)
+                    && prog_electives_valid(prog, &self.catalog, &all_sched_codes, reasons)?)
             })
             .collect::<Result<Vec<_>>>()?
             .iter()
             .all(|x| *x))
     }
 
-    pub fn validate_prereqs(&self) -> Result<bool> {
+    pub fn validate_prereqs(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
         for (sem_idx, sem) in self.courses.iter().enumerate() {
             for code in sem {
                 let req = self
@@ -245,11 +275,74 @@ impl Schedule {
                     .prereqs
                     .get(code)
                     .unwrap_or(&CourseReq::NotRequired);
-                if !req.is_satisfied(self, sem_idx) {
+                if !req.is_satisfied(self, sem_idx, code, reasons) {
                     return Ok(false);
                 }
             }
         }
         Ok(true)
     }
+}
+
+fn prog_electives_valid(
+    prog: &Program,
+    catalog: &Catalog,
+    all_sched_codes: &HashSet<&CourseCode>,
+    reasons: Option<&ScheduleReasons>,
+) -> Result<bool> {
+    for elective in &prog.electives {
+        if let Some(r) = &reasons {
+            let mut reason_map = r.0.borrow_mut();
+            for code in elective.req.all_course_codes() {
+                if all_sched_codes.contains(&code) {
+                    reason_map.entry(code.clone()).or_default().push(
+                        CourseReasons::ProgramElective {
+                            prog: prog.name.clone(),
+                            name: elective.name.clone(),
+                        },
+                    );
+                }
+            }
+        }
+        match elective.req {
+            ElectiveReq::Set(ref codes) => {
+                if !codes.iter().all(|c| all_sched_codes.contains(c)) {
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::SetOpts(ref opts) => {
+                if !opts
+                    .iter()
+                    .any(|o| o.iter().all(|c| all_sched_codes.contains(c)))
+                {
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::Courses { num, ref courses } => {
+                let available: Vec<_> = courses
+                    .iter()
+                    .filter(|c| all_sched_codes.contains(c))
+                    .collect();
+                if available.len() < num {
+                    return Ok(false);
+                }
+            }
+            ElectiveReq::Credits { num, ref courses } => {
+                let mut total = 0;
+                for c in courses {
+                    if all_sched_codes.contains(c) {
+                        total += catalog
+                            .courses
+                            .get(c)
+                            .and_then(|(_, cr, _)| *cr)
+                            .unwrap_or(0);
+                    }
+                }
+                if total < num {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(true)
 }

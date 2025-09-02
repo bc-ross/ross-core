@@ -42,13 +42,13 @@ pub fn add_courses<'a>(ctx: &mut ModelBuilderContext<'a>) {
             .map(|(_, _, off)| off);
         for s in 0..ctx.num_semesters {
             let allowed = match offering {
-                Some(crate::schedule::CourseTermOffering::Fall) => s % 2 == 1, // odd semesters
-                Some(crate::schedule::CourseTermOffering::Spring) => s % 2 == 0, // even semesters
-                Some(crate::schedule::CourseTermOffering::Both) => true,
-                Some(crate::schedule::CourseTermOffering::Discretion) => true, // allowed, but may change in future
-                Some(crate::schedule::CourseTermOffering::Infrequently) => true, // allowed, but may change in future
-                Some(crate::schedule::CourseTermOffering::Summer) => false,      // never schedule
-                None => true,                                                    // default: allow
+                Some(crate::schedule::CourseTermOffering::Fall) => (s == 0) || (s % 2 == 1), // odd semesters
+                Some(crate::schedule::CourseTermOffering::Spring) => (s == 0) || (s % 2 == 0), // even semesters
+                Some(crate::schedule::CourseTermOffering::Both) => (s == 0) || true,
+                Some(crate::schedule::CourseTermOffering::Discretion) => (s == 0) || true, // allowed, but may change in future
+                Some(crate::schedule::CourseTermOffering::Infrequently) => (s == 0) || true, // allowed, but may change in future
+                Some(crate::schedule::CourseTermOffering::Summer) => (s == 0) || false, // never schedule
+                None => true, // default: allow
             };
             if !allowed {
                 // Forbid scheduling this course in this semester

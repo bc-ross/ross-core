@@ -1,6 +1,5 @@
 //! Legacy model-building and schedule-building logic moved from main.rs
 use super::Course;
-use crate::model::Course;
 use crate::prereqs;
 use crate::prereqs;
 use crate::schedule::{CourseCode, Schedule};

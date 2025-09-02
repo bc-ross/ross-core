@@ -12,7 +12,7 @@ use ross_core::write_excel_file::save_schedule;
 fn test_ross() -> Result<()> {
     const FNAME: &str = "ross_test.xlsx";
 
-    let sched = generate_schedule(
+    let mut sched = generate_schedule(
         CATALOGS
             .first()
             .ok_or(anyhow!("no catalogs found"))?
@@ -25,10 +25,10 @@ fn test_ross() -> Result<()> {
             .first()
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
-        Some(vec![CC!("THEO", 1100)]), // None,
+        Some(vec![CC!("PHYS", 4200), CC!("THEO", 1100)]), // None,
     )?;
+    sched.validate()?;
 
-    println!("Final schedule (two-stage, balanced):");
     println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
     for (s, semester) in std::iter::once(&sched.incoming)

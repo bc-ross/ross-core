@@ -4,6 +4,7 @@ pub mod model;
 pub mod prereqs;
 pub mod read_excel_file;
 pub mod schedule;
+pub mod transparency;
 pub mod version;
 pub mod write_excel_file;
 

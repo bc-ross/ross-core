@@ -9,4 +9,4 @@ mod two_stage_schedule;
 
 use context::{ModelBuilderContext, build_model_pipeline};
 
-pub use two_stage_schedule::two_stage_lex_schedule;
+pub use two_stage_schedule::{generate_multi_schedules, two_stage_lex_schedule};

@@ -4,8 +4,28 @@ use anyhow::{Result, anyhow};
 use cp_sat::builder::LinearExpr;
 use cp_sat::proto::CpSolverStatus;
 
-/// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
 pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<()> {
+    let min_credits = first_stage_sched(sched, max_credits_per_semester)?;
+    second_stage_sched(sched, max_credits_per_semester, min_credits)
+}
+
+pub fn generate_multi_schedules(
+    mut sched: Schedule,
+    max_credits_per_semester: i64,
+    num_scheds: u64,
+) -> Result<Vec<Schedule>> {
+    let min_credits = first_stage_sched(&mut sched, max_credits_per_semester)?;
+    let mut scheds = Vec::new();
+    for _ in 0..num_scheds {
+        let mut new_sched = sched.clone();
+        second_stage_sched(&mut new_sched, max_credits_per_semester, min_credits)?;
+        scheds.push(new_sched);
+    }
+    Ok(scheds)
+}
+
+/// Returns Some(Vec<Vec<(CourseCode, i64)>>) if a feasible schedule is found, else None.
+fn first_stage_sched(sched: &mut Schedule, max_credits_per_semester: i64) -> Result<i64> {
     let params = cp_sat::proto::SatParameters {
         log_search_progress: Some(false),
         num_search_workers: Some(8),
@@ -23,7 +43,7 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
     let mut ctx = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);
     let (mut model, vars, flat_courses) = build_model_pipeline(&mut ctx);
     // Determine number of semesters (includes incoming semester 0)
-    let num_semesters = sched_for_model.courses.len();
+    let num_semesters: usize = sched_for_model.courses.len();
     let first_sched_semester = 1; // semester 0 is incoming only
     // Only sum credits for semesters 1..N (ignore semester 0)
     let mut total_credits_sched = cp_sat::builder::LinearExpr::from(0);
@@ -56,6 +76,30 @@ pub fn two_stage_lex_schedule(sched: &mut Schedule, max_credits_per_semester: i6
             ));
         }
     };
+    Ok(min_credits)
+}
+
+fn second_stage_sched(
+    sched: &mut Schedule,
+    max_credits_per_semester: i64,
+    min_credits: i64,
+) -> Result<()> {
+    let params = cp_sat::proto::SatParameters {
+        log_search_progress: Some(false),
+        num_search_workers: Some(8),
+        random_seed: None,
+        ..Default::default()
+    };
+    // --- Transform schedule: add incoming as semester 0 (always present, even if empty) ---
+    // Always set incoming courses before building model context for both stages
+    let mut sched_for_model = sched.clone();
+    sched_for_model.incoming = sched.incoming.clone();
+    let mut all_semesters = vec![sched_for_model.incoming.clone()];
+    all_semesters.extend(sched.courses.clone());
+    sched_for_model.courses = all_semesters;
+
+    let num_semesters: usize = sched_for_model.courses.len();
+    let first_sched_semester = 1; // semester 0 is incoming only
 
     // Stage 2: minimize spread, subject to min total credits
     let mut ctx2 = ModelBuilderContext::new(&sched_for_model, max_credits_per_semester);

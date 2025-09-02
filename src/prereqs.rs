@@ -1,7 +1,10 @@
 use savefile_derive::Savefile;
 use serde::{Deserialize, Serialize};
 
-use crate::schedule::{CourseCode, Schedule};
+use crate::{
+    schedule::{CourseCode, Schedule},
+    transparency::{CourseReasons, ScheduleReasons},
+};
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Default, Hash, Clone, PartialEq, Eq)]
 pub enum CourseReq {
@@ -12,10 +15,19 @@ pub enum CourseReq {
     PreCourseGrade(CourseCode, Grade),
     CoCourseGrade(CourseCode, Grade),
     Program(String), // Assoc'd STEM
-    // Standing(u8), // May be Sen, Ju/Sen, Ju+, or So/Fr only -- how represent? TODO
+    Standing(ClassStanding),
     Instructor,
     #[default]
     NotRequired,
+}
+
+#[repr(u8)]
+#[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
+pub enum ClassStanding {
+    Freshman = 0,
+    Sophomore = 30,
+    Junior = 62,
+    Senior = 94,
 }
 
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
@@ -135,25 +147,56 @@ impl CourseReq {
     }
 }
 
+fn check_maybe_reason(
+    c: &CourseCode,
+    code: &CourseCode,
+    reasons: Option<&ScheduleReasons>,
+    course: &CourseCode,
+) -> bool {
+    if c == code {
+        if let Some(r) = reasons {
+            r.0.borrow_mut()
+                .entry((*code).clone())
+                .or_default()
+                .push(CourseReasons::CourseReq {
+                    course: (*course).clone(),
+                });
+        };
+        true
+    } else {
+        false
+    }
+}
+
 impl CourseReq {
-    pub fn is_satisfied(&self, sched: &Schedule, sem_idx: usize) -> bool {
+    pub fn is_satisfied(
+        &self,
+        sched: &Schedule,
+        sem_idx: usize,
+        course: &CourseCode,
+        reasons: Option<&ScheduleReasons>,
+    ) -> bool {
         // TODO: grade is not implemented
         match self {
-            CourseReq::And(reqs) => reqs.iter().all(|req| req.is_satisfied(sched, sem_idx)),
-            CourseReq::Or(reqs) => reqs.iter().any(|req| req.is_satisfied(sched, sem_idx)),
+            CourseReq::And(reqs) => reqs
+                .iter()
+                .all(|req| req.is_satisfied(sched, sem_idx, course, reasons)),
+            CourseReq::Or(reqs) => reqs
+                .iter()
+                .any(|req| req.is_satisfied(sched, sem_idx, course, reasons)),
             CourseReq::PreCourse(code) | CourseReq::PreCourseGrade(code, _) => {
                 std::iter::once(&sched.incoming)
                     .chain(sched.courses.iter())
                     .take(sem_idx + 1)
                     .flatten()
-                    .any(|c| c == code)
+                    .any(|c| check_maybe_reason(c, code, reasons, course))
             }
             CourseReq::CoCourse(code) | CourseReq::CoCourseGrade(code, _) => {
                 std::iter::once(&sched.incoming)
                     .chain(sched.courses.iter())
                     .take(sem_idx + 2)
                     .flatten()
-                    .any(|c| c == code)
+                    .any(|c| check_maybe_reason(c, code, reasons, course))
             }
             CourseReq::Program(x) => sched.programs.iter().any(|p| {
                 sched
@@ -162,7 +205,21 @@ impl CourseReq {
                     .iter()
                     .any(|y| y.name == *p && y.assoc_stems.contains(x))
             }),
-            CourseReq::Instructor => todo!(),
+            CourseReq::Standing(cs) => {
+                let standing = *cs as u8 as u32;
+                let credits = std::iter::once(&sched.incoming)
+                    .chain(sched.courses.iter())
+                    .take(sem_idx + 1)
+                    .flatten()
+                    .filter_map(|c| sched.catalog.courses.get(c))
+                    .filter_map(|x| x.1)
+                    .sum::<u32>();
+                credits >= standing
+            }
+            CourseReq::Instructor => {
+                eprintln!("Only PreCourse, CoCourse, And, Or, Standing supported, not {self:?}");
+                true
+            }
             CourseReq::NotRequired => true,
         }
     }

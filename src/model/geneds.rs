@@ -36,6 +36,87 @@ pub fn add_gened_constraints<'a>(ctx: &mut ModelBuilderContext<'a>) {
         codes.iter().map(|c| code_to_idx.get(c).copied()).collect()
     };
 
+    // --- Program Electives: enforce elective requirements for each program ---
+    if let Some(catalog) = ctx.catalog {
+        for prog_name in &ctx.programs {
+            if let Some(prog) = catalog.programs.iter().find(|p| &p.name == prog_name) {
+                for elective in &prog.electives {
+                    match &elective.req {
+                        ElectiveReq::Set(codes) => {
+                            if let Some(indices) = codes_to_indices(codes) {
+                                // All courses in the set must be scheduled
+                                for idx in indices {
+                                    model.add_ge(course_in_schedule(idx), LinearExpr::from(1));
+                                }
+                            }
+                        }
+                        ElectiveReq::SetOpts(opts) => {
+                            // At least one option set must be fully present
+                            let mut option_vars = Vec::new();
+                            for opt in opts {
+                                if let Some(indices) = codes_to_indices(opt) {
+                                    let opt_var = model.new_bool_var();
+                                    option_vars.push(opt_var);
+
+                                    // If opt_var is true, all courses in this option must be scheduled
+                                    for idx in &indices {
+                                        model.add_ge(
+                                            course_in_schedule(*idx),
+                                            LinearExpr::from(opt_var),
+                                        );
+                                    }
+
+                                    // If all courses are scheduled, opt_var can be true
+                                    let mut sum_courses = LinearExpr::from(0);
+                                    for idx in &indices {
+                                        sum_courses += course_in_schedule(*idx);
+                                    }
+
+                                    // When opt_var is true, the sum of scheduled courses must equal the number of courses in the option
+                                    let mut opt_var_scaled = LinearExpr::from(0);
+                                    for _ in 0..indices.len() {
+                                        opt_var_scaled += LinearExpr::from(opt_var);
+                                    }
+                                    model.add_le(opt_var_scaled, sum_courses);
+                                }
+                            }
+
+                            // At least one option must be chosen
+                            if !option_vars.is_empty() {
+                                let mut sum_options = LinearExpr::from(0);
+                                for var in option_vars {
+                                    sum_options += LinearExpr::from(var);
+                                }
+                                model.add_ge(sum_options, LinearExpr::from(1));
+                            }
+                        }
+                        ElectiveReq::Courses { num, courses } => {
+                            if let Some(indices) = codes_to_indices(courses) {
+                                let mut sum = LinearExpr::from(0);
+                                for idx in indices {
+                                    sum += course_in_schedule(idx);
+                                }
+                                model.add_ge(sum, LinearExpr::from(*num as i64));
+                            }
+                        }
+                        ElectiveReq::Credits { num, courses } => {
+                            if let Some(indices) = codes_to_indices(courses) {
+                                let mut sum = LinearExpr::from(0);
+                                for idx in indices {
+                                    let credits = ctx.courses[idx].credits;
+                                    for _ in 0..credits {
+                                        sum += course_in_schedule(idx);
+                                    }
+                                }
+                                model.add_ge(sum, LinearExpr::from(*num as i64));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // --- Core GenEds: no overlap restrictions ---
     for gened in geneds.iter() {
         if let GenEd::Core { req, .. } = gened {
