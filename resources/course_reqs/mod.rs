@@ -20,12 +20,14 @@ mod stem_danc;
 mod stem_econ;
 mod stem_eeng;
 mod stem_engl;
+mod stem_engr;
 mod stem_entr;
 mod stem_eslg;
 mod stem_evca;
 mod stem_exsc;
 mod stem_finc;
 mod stem_fren;
+mod stem_grbk;
 
 pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
     empty()
@@ -46,11 +48,13 @@ pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
         .chain(stem_econ::prereqs().into_iter())
         .chain(stem_eeng::prereqs().into_iter())
         .chain(stem_engl::prereqs().into_iter())
+        .chain(stem_engr::prereqs().into_iter())
         .chain(stem_entr::prereqs().into_iter())
         .chain(stem_eslg::prereqs().into_iter())
         .chain(stem_evca::prereqs().into_iter())
         .chain(stem_exsc::prereqs().into_iter())
         .chain(stem_finc::prereqs().into_iter())
         .chain(stem_fren::prereqs().into_iter())
+        .chain(stem_grbk::prereqs().into_iter())
         .collect()
 }
