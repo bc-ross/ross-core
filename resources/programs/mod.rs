@@ -28,6 +28,7 @@ mod prog_ength_ba;
 mod prog_evca_nes_ba;
 mod prog_evca_ymc_ba;
 mod prog_exsci_c_ba;
+mod prog_exsci_ghc_ba;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -61,6 +62,7 @@ pub fn programs() -> Vec<Program> {
         prog_evca_nes_ba::prog(),
         prog_evca_ymc_ba::prog(),
         prog_exsci_c_ba::prog(),
+        prog_exsci_ghc_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
