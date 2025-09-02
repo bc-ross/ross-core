@@ -16,7 +16,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
         (
             CC!("ASTR", 4300),
             And(vec![
-                Standing(ClassStanding::Sophomore),
+                Standing(ClassStanding::Junior),
                 PreCourse(CC!("PHYS", 3200)),
             ]),
         ),

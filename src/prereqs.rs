@@ -18,6 +18,7 @@ pub enum CourseReq {
     NotRequired,
 }
 
+#[repr(u8)]
 #[derive(Savefile, Serialize, Deserialize, Debug, Hash, Clone, Copy, PartialEq, Eq)]
 pub enum ClassStanding {
     Freshman = 0,
