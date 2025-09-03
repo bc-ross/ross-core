@@ -22,6 +22,11 @@ pub mod prereqs;
 #[path = "../../src/geneds.rs"]
 pub mod geneds;
 
+#[path = "../../src/model/mod.rs"]
+pub mod model;
+
+const MAX_CREDITS_PER_SEMESTER: i64 = 18;
+
 fn main() {
     let mut new_courses = HashSet::new();
     for program in programs::programs() {
