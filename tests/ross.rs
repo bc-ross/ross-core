@@ -27,7 +27,7 @@ fn test_ross() -> Result<()> {
             .clone(),
         Some(vec![CC!("PHYS", 4200), CC!("THEO", 1100)]), // None,
     )?;
-    sched.validate()?;
+    sched.validate_unchecked()?;
 
     println!("Final schedule (two-stage, balanced):");
     let mut sched_credits = 0;
@@ -57,6 +57,8 @@ fn test_ross() -> Result<()> {
         }
     }
     println!("Total credits (excluding incoming): {sched_credits}");
+
+    assert!(sched.is_valid()?);
 
     save_schedule(&Path::new(FNAME).to_path_buf(), &sched)?;
 

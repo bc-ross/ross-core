@@ -223,6 +223,11 @@ impl Schedule {
         Ok(())
     }
 
+    pub fn validate_unchecked(&mut self) -> Result<()> {
+        crate::model::two_stage_lex_schedule(self, crate::MAX_CREDITS_PER_SEMESTER)?;
+        Ok(())
+    }
+
     fn are_geneds_fulfilled(&self, reasons: Option<&ScheduleReasons>) -> Result<bool> {
         are_geneds_satisfied(self, reasons)
     }
@@ -276,6 +281,7 @@ impl Schedule {
                     .get(code)
                     .unwrap_or(&CourseReq::NotRequired);
                 if !req.is_satisfied(self, sem_idx, code, reasons) {
+                    eprintln!("Prereq not satisfied for {code} in semester {sem_idx}");
                     return Ok(false);
                 }
             }

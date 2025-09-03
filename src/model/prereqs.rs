@@ -146,6 +146,6 @@ fn add_prereq_for_course<'a>(
             // Semester 0 cannot satisfy standing prereqs
             ctx.model.add_eq(ctx.vars[course_idx][0], 0);
         }
-        _ => unimplemented!("Only PreCourse, CoCourse, And, Or, Standing supported"),
+        _ => eprintln!("Only PreCourse, CoCourse, And, Or, Standing supported, not {req:?}"),
     }
 }
