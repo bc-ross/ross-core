@@ -67,6 +67,14 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         ),
         (CC!("ACCT", 4930), ("Auditing Theory".into(), Some(3), Fall)),
         (
+            CC!("ACCT", 5510),
+            (
+                "Accounting Information for Management".into(),
+                Some(3),
+                Both,
+            ),
+        ),
+        (
             CC!("ACCT", "COMP"),
             ("Senior Comprehensive Exam".into(), None, Both),
         ),
@@ -298,6 +306,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Galaxies & Cosmology".into(), Some(3), Spring),
         ),
         (
+            CC!("ASTR", "COMP"),
+            ("Senior Comprehensive Exam".into(), None, Both),
+        ),
+        (
             CC!("ATHC", 2212),
             (
                 "Beginning Athletic Health Care Practicum".into(),
@@ -312,6 +324,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
                 Some(3),
                 Spring,
             ),
+        ),
+        (
+            CC!("ATHC", 2325),
+            ("Medical Terminology & Conditions".into(), Some(2), Spring),
         ),
         (
             CC!("ATHC", 3312),
@@ -376,6 +392,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("ATHC", 4413),
             ("Advc Ath Hlth Care Practicum 2".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ATHC", "COMP"),
+            ("Senior Comprehensive Exam".into(), None, Both),
         ),
         (
             CC!("BIOC", "COMP"),
@@ -478,6 +498,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         ),
         (CC!("BIOL", 4486), ("Research".into(), Some(1), Discretion)),
         (
+            CC!("BIOL", "COMP"),
+            ("Senior Comprehensive Exam".into(), None, Both),
+        ),
+        (
             CC!("BUSI", 2230),
             ("Business Communication".into(), Some(3), Discretion),
         ),
@@ -488,6 +512,58 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("BUSI", 3710),
             ("Legal Environment of Business".into(), Some(3), Both),
+        ),
+        (
+            CC!("BUSI", 3902),
+            (
+                "Student International Business Council 2".into(),
+                Some(1),
+                Both,
+            ),
+        ),
+        (
+            CC!("BUSI", 3903),
+            (
+                "Student International Business Council 3".into(),
+                Some(1),
+                Both,
+            ),
+        ),
+        (
+            CC!("BUSI", 3904),
+            (
+                "Student International Business Council 4".into(),
+                Some(1),
+                Both,
+            ),
+        ),
+        (
+            CC!("BUSI", 3905),
+            (
+                "Student International Business Council 5".into(),
+                Some(1),
+                Both,
+            ),
+        ),
+        (
+            CC!("BUSI", 3906),
+            (
+                "Student International Business Council 6".into(),
+                Some(1),
+                Both,
+            ),
+        ),
+        (
+            CC!("BUSI", 4250),
+            (
+                "International & Global Environment Busin".into(),
+                Some(3),
+                Spring,
+            ),
+        ),
+        (
+            CC!("BUSI", 4450),
+            ("Business Plan Development".into(), Some(3), Discretion),
         ),
         (
             CC!("BUSI", 4550),
@@ -513,10 +589,67 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("BUSI", 4900),
             ("Strategic Management".into(), Some(3), Both),
         ),
+        (
+            CC!("CENG", 2010),
+            ("Chemical Engineering Fundamentals".into(), Some(3), Fall),
+        ),
+        (CC!("CENG", 3050), ("Separations".into(), Some(3), Spring)),
+        (
+            CC!("CENG", 3250),
+            ("Chemical Engineering Thermodynamics".into(), Some(3), Fall),
+        ),
+        (
+            CC!("CENG", 3300),
+            ("Unit Operations".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CENG", 3350),
+            ("Chemical Engineering Laboratory I".into(), Some(2), Fall),
+        ),
+        (
+            CC!("CENG", 4080),
+            ("Chemical Process Dymamics & Control".into(), Some(3), Fall),
+        ),
+        (
+            CC!("CENG", 4210),
+            ("Reactor Design".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CENG", 4350),
+            ("Chemical Engineering Laboratory II".into(), Some(3), Fall),
+        ),
         (CC!("CENG", 4600), ("Plant Design I".into(), Some(3), Fall)),
         (
             CC!("CENG", 4610),
             ("Plant Design II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CENG", 4810),
+            (
+                "Non-Ideal Reactor Design & Catalysis".into(),
+                Some(3),
+                Discretion,
+            ),
+        ),
+        (
+            CC!("CENG", 4820),
+            ("Bioprocess Engineering".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("CENG", 4830),
+            ("Food Process Engineering".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("CENG", 4850),
+            ("Chem Engr Process Simulation".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("CENG", 4860),
+            ("Adv Chem Engr Thermodynamics".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("CENG", 4870),
+            ("Moleclr Sim for Chem Engrs".into(), Some(3), Discretion),
         ),
         (
             CC!("CHEM", 1010),
@@ -620,6 +753,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Physical Chemistry II".into(), Some(3), Fall),
         ),
         (
+            CC!("CHEM", 4201),
+            ("Physical Chemistry II Lab".into(), Some(1), Fall),
+        ),
+        (
             CC!("CHEM", 4350),
             ("Advanced Organic Chemistry I".into(), Some(3), Discretion),
         ),
@@ -628,11 +765,19 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Topics in Biochemistry".into(), Some(3), Fall),
         ),
         (
+            CC!("CHEM", 4451),
+            ("Topics in Biochemistry Lab".into(), Some(1), Fall),
+        ),
+        (
             CC!("CHEM", 4650),
             ("Organometallic Chemistry".into(), Some(3), Discretion),
         ),
         (CC!("CHEM", 4801), ("Research I".into(), Some(1), Both)),
+        (CC!("CHEM", 4802), ("Research I".into(), Some(1), Both)),
+        (CC!("CHEM", 4803), ("Research I".into(), Some(1), Both)),
         (CC!("CHEM", 4811), ("Research II".into(), Some(1), Both)),
+        (CC!("CHEM", 4812), ("Research II".into(), Some(1), Both)),
+        (CC!("CHEM", 4813), ("Research II".into(), Some(1), Both)),
         (
             CC!("CHEM", 4900),
             ("Chemistry & Biochem Colloquium".into(), Some(1), Both),
@@ -658,6 +803,14 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Senior Comprehensive Exam".into(), None, Both),
         ),
         (
+            CC!("CIVL", 2000),
+            ("Computing in Civil Engineering".into(), Some(1), Fall),
+        ),
+        (
+            CC!("CIVL", 2310),
+            ("Water Quality Engineering".into(), Some(3), Spring),
+        ),
+        (
             CC!("CIVL", 3010),
             (
                 "Soil Mechanics & Civil Eng Materials Lab".into(),
@@ -673,9 +826,40 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
                 Fall,
             ),
         ),
+        (CC!("CIVL", 3120), ("Soil Mechanics".into(), Some(3), Fall)),
+        (
+            CC!("CIVL", 3230),
+            ("Hydraulic Engineering".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CIVL", 3310),
+            ("Environmental Engineering".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CIVL", 3510),
+            ("Structural Analysis".into(), Some(3), Fall),
+        ),
         (
             CC!("CIVL", 3550),
             ("Buidling Cmpt & System Design".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("CIVL", 4140),
+            ("Foundation Engineering".into(), Some(3), Spring),
+        ),
+        (
+            CC!("CIVL", 4160),
+            ("Transport Engineering".into(), Some(3), Fall),
+        ),
+        (CC!("CIVL", 4210), ("Hydrology".into(), Some(3), Fall)),
+        (
+            CC!("CIVL", 4320),
+            ("Environmental Engineering II".into(), Some(3), Fall),
+        ),
+        (CC!("CIVL", 4510), ("Steel Design".into(), Some(3), Spring)),
+        (
+            CC!("CIVL", 4530),
+            ("Reinforced Concrete".into(), Some(3), Fall),
         ),
         (
             CC!("CIVL", 4700),
@@ -684,6 +868,11 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("CRIM", 1000),
             ("Introduction to Crime & Justice".into(), Some(3), Both),
+        ),
+        (CC!("CRIM", 3000), ("Criminal Law".into(), Some(3), Spring)),
+        (
+            CC!("CRIM", 3050),
+            ("Criminal Procedure".into(), Some(3), Both),
         ),
         (
             CC!("CRIM", 3100),
@@ -694,8 +883,28 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Crime Analysis".into(), Some(3), Discretion),
         ),
         (
+            CC!("CRIM", 3220),
+            ("Religion & Crime".into(), Some(3), Discretion),
+        ),
+        (
             CC!("CRIM", 3300),
             ("Juvenile Delinquency".into(), Some(3), Fall),
+        ),
+        (
+            CC!("CSCI", 1140),
+            ("Introduction to Computer Science I".into(), Some(4), Both),
+        ),
+        (
+            CC!("CSCI", 2000),
+            ("Programming Short Course".into(), Some(2), Discretion),
+        ),
+        (
+            CC!("CSCI", 2150),
+            (
+                "Introduction to Computer Science II".into(),
+                Some(4),
+                Spring,
+            ),
         ),
         (
             CC!("CSCI", 2300),
@@ -706,8 +915,82 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ),
         ),
         (
+            CC!("CSCI", 2560),
+            (
+                "Discrete Mathematical Structures II".into(),
+                Some(3),
+                Spring,
+            ),
+        ),
+        (
+            CC!("CSCI", 3100),
+            ("Database Systems".into(), Some(4), Fall),
+        ),
+        (
+            CC!("CSCI", 3500),
+            ("Algorithm Design & Analysis".into(), Some(4), Spring),
+        ),
+        (
+            CC!("CSCI", 3570),
+            ("Theory of Automata".into(), Some(3), Fall),
+        ),
+        (
+            CC!("CSCI", 3600),
+            ("Concepts of Programming Languages".into(), Some(4), Fall),
+        ),
+        (
+            CC!("CSCI", 3800),
+            ("Artificial Intelligence".into(), Some(4), Discretion),
+        ),
+        (
+            CC!("CSCI", 4200),
+            ("Computer Architecture".into(), Some(4), Fall),
+        ),
+        (
+            CC!("CSCI", 4400),
+            ("Operating Systems & Networking".into(), Some(4), Spring),
+        ),
+        (
+            CC!("CSCI", 4790),
+            ("Computer Science Internship".into(), Some(1), Both),
+        ),
+        (
+            CC!("CSCI", 4900),
+            (
+                "Computer Sci Comprehensive Exam Review".into(),
+                Some(1),
+                Spring,
+            ),
+        ),
+        (
+            CC!("CSCI", 4920),
+            ("Software Engineering".into(), Some(3), Fall),
+        ),
+        (
             CC!("CSCI", 4930),
             ("Computer Science Senior Capstone".into(), Some(2), Spring),
+        ),
+        (
+            CC!("CSCI", "COMP"),
+            ("Senior Comprehensive Exam".into(), None, Spring),
+        ),
+        (
+            CC!("DANC", 1010),
+            ("Introduction to Dance".into(), Some(1), Discretion),
+        ),
+        (
+            CC!("DANC", 2020),
+            ("Musical Theatre Dance".into(), Some(2), Discretion),
+        ),
+        (CC!("DANC", 2040), ("Ballet I".into(), Some(2), Discretion)),
+        (CC!("DANC", 2050), ("Ballet II".into(), Some(2), Discretion)),
+        (CC!("DANC", 2055), ("Jazz I".into(), Some(2), Discretion)),
+        (CC!("DANC", 2065), ("Jazz II".into(), Some(2), Discretion)),
+        (CC!("DANC", 2080), ("Tap I".into(), Some(2), Discretion)),
+        (CC!("DANC", 2085), ("Tap II".into(), Some(2), Discretion)),
+        (
+            CC!("DANC", 3500),
+            ("Dance Pedagogy".into(), Some(2), Discretion),
         ),
         (
             CC!("DANC", 3800),
@@ -738,12 +1021,52 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Environmental Economics".into(), Some(3), Fall),
         ),
         (
+            CC!("ECON", 3060),
+            ("Money & Banking".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ECON", 3090),
+            ("Macroeconomic Activity".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ECON", 3100),
+            ("Intermediate Microeconomic Theory".into(), Some(3), Fall),
+        ),
+        (
+            CC!("ECON", 3120),
+            (
+                "Public Finance & Fiscal Policy".into(),
+                Some(3),
+                Infrequently,
+            ),
+        ),
+        (
+            CC!("ECON", 3150),
+            ("International Economics".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ECON", 3200),
+            (
+                "Managerial Economics & Pricing Theory".into(),
+                Some(3),
+                Fall,
+            ),
+        ),
+        (
             CC!("ECON", 3260),
             ("Catholic Social Teaching".into(), Some(3), Spring),
         ),
         (
             CC!("ECON", 4010),
             ("Seminar in Economic Development".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ECON", 4110),
+            ("History of Economic Thought".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ECON", 4160),
+            ("Labor Economics".into(), Some(3), Infrequently),
         ),
         (
             CC!("EDUC", 2220),
@@ -778,12 +1101,106 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Modified Teaching Experience".into(), Some(5), Both),
         ),
         (
+            CC!("EENG", 2010),
+            (
+                "Introduction to Digital Electronics".into(),
+                Some(2),
+                Spring,
+            ),
+        ),
+        (
+            CC!("EENG", 2020),
+            ("Digital Electronics Laboratory".into(), Some(1), Spring),
+        ),
+        (
+            CC!("EENG", 2060),
+            ("Linear Circuit Analysis I".into(), Some(3), Fall),
+        ),
+        (
+            CC!("EENG", 3060),
+            ("Circuits Laboratory I".into(), Some(1), Fall),
+        ),
+        (
+            CC!("EENG", 3070),
+            ("Circuits Laboratory II".into(), Some(1), Spring),
+        ),
+        (
+            CC!("EENG", 3080),
+            ("Electronics Laboratory I".into(), Some(1), Fall),
+        ),
+        (
+            CC!("EENG", 3130),
+            ("Linear Circuit Analysis II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EENG", 3140),
+            ("Signals & Systems".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 3160),
+            ("Electric & Magnetic Fields".into(), Some(3), Discretion),
+        ),
+        (CC!("EENG", 3210), ("Electronics I".into(), Some(3), Fall)),
+        (CC!("EENG", 4010), ("Electric Drives".into(), Some(2), Fall)),
+        (
+            CC!("EENG", 4020),
+            ("Electric Drives Lab".into(), Some(1), Discretion),
+        ),
+        (
+            CC!("EENG", 4050),
+            ("Control Systems I".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EENG", 4060),
+            ("Control Systems Laboratory".into(), Some(1), Spring),
+        ),
+        (
+            CC!("EENG", 4090),
+            ("Applied Electromagnetics".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 4210),
+            ("Electronics II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EENG", 4220),
+            ("Electronics Laboratory II".into(), Some(1), Spring),
+        ),
+        (
+            CC!("EENG", 4510),
+            ("Computer Hardware".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 4520),
+            ("Embedded Systems".into(), Some(2), Discretion),
+        ),
+        (
+            CC!("EENG", 4530),
+            ("Embedded Systems Laboratory".into(), Some(1), Spring),
+        ),
+        (
             CC!("EENG", 4600),
             ("Electrical Engin Design I".into(), Some(3), Fall),
         ),
         (
             CC!("EENG", 4610),
             ("Electrical Engin Design II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EENG", 4810),
+            ("Microwave Systems".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 4820),
+            ("Communication Systems".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 4910),
+            ("Power Electronics".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("EENG", 4940),
+            ("Digital Signal Processing".into(), Some(3), Discretion),
         ),
         (
             CC!("ENGL", 1000),
@@ -859,23 +1276,60 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ),
         ),
         (
+            CC!("ENGL", 3050),
+            (
+                "Colonial & Revolutionary Lit, 1650-1820".into(),
+                Some(3),
+                Discretion,
+            ),
+        ),
+        (
             CC!("ENGL", 3060),
             ("Classical Mythology".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("ENGL", 3070),
+            (
+                "Romanticism & Amer Renaissance 1820-1865".into(),
+                Some(3),
+                Discretion,
+            ),
         ),
         (CC!("ENGL", 3110), ("The Novel".into(), Some(3), Discretion)),
         (
             CC!("ENGL", 3120),
             ("Short Story".into(), Some(3), Discretion),
         ),
+        (CC!("ENGL", 3130), ("Poetry".into(), Some(3), Discretion)),
         (CC!("ENGL", 3140), ("The Play".into(), Some(3), Discretion)),
         (CC!("ENGL", 3150), ("Film".into(), Some(3), Discretion)),
+        (
+            CC!("ENGL", 3200),
+            ("Loomings Practicum III".into(), Some(1), Both),
+        ),
+        (
+            CC!("ENGL", 3201),
+            ("Loomings Practicum IV".into(), Some(1), Both),
+        ),
         (
             CC!("ENGL", 3250),
             ("Creative Writing".into(), Some(3), Fall),
         ),
         (
+            CC!("ENGL", 3260),
+            ("Advanced Composition".into(), Some(3), Infrequently),
+        ),
+        (
             CC!("ENGL", 3270),
             ("Writing Fiction".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ENGL", 3357),
+            (
+                "Young Adult Literature in Language Arts".into(),
+                Some(2),
+                Discretion,
+            ),
         ),
         (
             CC!("ENGL", 4010),
@@ -884,6 +1338,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("ENGL", 4020),
             ("Victorian Literature".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("ENGL", 4040),
+            ("Modern Amer Lit 1890-1945".into(), Some(3), Discretion),
         ),
         (
             CC!("ENGL", 4050),
@@ -926,6 +1384,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Creative Writing II".into(), Some(3), Discretion),
         ),
         (
+            CC!("ENGL", 4500),
+            ("Modern Catholic Fiction".into(), Some(3), Discretion),
+        ),
+        (
             CC!("ENGL", 4910),
             ("Language & Literature Seminar".into(), Some(3), Both),
         ),
@@ -934,18 +1396,44 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("STEM Fund of Robitcs & Makerlabs".into(), Some(3), Fall),
         ),
         (
+            CC!("ENGR", 1200),
+            ("Introduction to Engineering".into(), Some(2), Fall),
+        ),
+        (
             CC!("ENGR", 1500),
             ("Technical Drawing".into(), Some(2), Spring),
         ),
+        (
+            CC!("ENGR", 1520),
+            (
+                "Intro to Engineering Design Laboratory".into(),
+                Some(1),
+                Spring,
+            ),
+        ),
+        (
+            CC!("ENGR", 2000),
+            ("Computer Applications in Engineering".into(), Some(2), Fall),
+        ),
         (CC!("ENGR", 2300), ("Statics".into(), Some(3), Fall)),
+        (CC!("ENGR", 2310), ("Dynamics".into(), Some(3), Spring)),
         (
             CC!("ENGR", 2320),
             ("Mechanics of Materials".into(), Some(3), Spring),
         ),
         (
+            CC!("ENGR", 3150),
+            ("Statistical Analysis of Data".into(), Some(3), Both),
+        ),
+        (
             CC!("ENGR", 3170),
             ("Engineering Economy & Society".into(), Some(3), Both),
         ),
+        (
+            CC!("ENGR", 3250),
+            ("Thermodynamics".into(), Some(3), Spring),
+        ),
+        (CC!("ENGR", 3300), ("Fluid Mechanics".into(), Some(3), Fall)),
         (
             CC!("ENGR", 3400),
             ("Materials Laboratory".into(), Some(2), Fall),
@@ -955,12 +1443,76 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Thermofluids Laboratory".into(), Some(2), Spring),
         ),
         (
+            CC!("ENGR", 3500),
+            ("Materials Science".into(), Some(3), Fall),
+        ),
+        (
+            CC!("ENGR", 3600),
+            ("Heat & Mass Transfer".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ENGR", 4150),
+            ("Design Engineering Experiments".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("ENGR", 4840),
+            ("Quality Engineerg".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("ENTR", 2100),
+            ("Entrepreneurial Principles".into(), Some(3), Both),
+        ),
+        (
+            CC!("ENTR", 3100),
+            ("Entrepreneurial Venture Planning".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ENTR", 3110),
+            ("Entrepreneurial Accounting & Finance".into(), Some(3), Fall),
+        ),
+        (
+            CC!("ENTR", 3120),
+            (
+                "Entrepreneurial Management & Marketing".into(),
+                Some(3),
+                Spring,
+            ),
+        ),
+        (
+            CC!("ENTR", 4100),
+            ("Entrepreneurial Social Ventures".into(), Some(3), Spring),
+        ),
+        (
+            CC!("ENTR", 4900),
+            ("Entrepreneurial Practicum".into(), Some(3), Both),
+        ),
+        (
+            CC!("ESLG", 2040),
+            ("Listening & Speaking".into(), Some(4), Spring),
+        ),
+        (
+            CC!("ESLG", 2050),
+            ("Intermediate Composition".into(), Some(3), Spring),
+        ),
+        (
             CC!("ESLG", 2220),
             ("Advanced Composition & Research".into(), Some(3), Fall),
         ),
         (
             CC!("ESLG", 2930),
             ("Public Speaking".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EVCA", 3100),
+            ("Youth Ministry & Catechesis I".into(), Some(3), Fall),
+        ),
+        (
+            CC!("EVCA", 3150),
+            ("Youth Ministry & Catechesis II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("EVCA", 4700),
+            ("Missionary Practicum".into(), Some(1), Both),
         ),
         (
             CC!("EXSC", 1100),
@@ -1003,6 +1555,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Varsity Sport Activity".into(), Some(1), Both),
         ),
         (
+            CC!("EXSC", 1112),
+            ("Water Safety Instructor".into(), Some(1), Discretion),
+        ),
+        (
             CC!("EXSC", 1114),
             ("Aikido (FITNESS)".into(), Some(1), Both),
         ),
@@ -1030,9 +1586,26 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("First Aid & Personal Safety".into(), Some(2), Both),
         ),
         (
+            CC!("EXSC", 2240),
+            ("Structural Human Anatomy".into(), Some(3), Fall),
+        ),
+        (
             CC!("EXSC", 2263),
             (
                 "Care & Prevention of Athletic Injuries".into(),
+                Some(3),
+                Both,
+            ),
+        ),
+        (CC!("EXSC", 3303), ("Basic Nutrition".into(), Some(3), Both)),
+        (
+            CC!("EXSC", 3310),
+            ("Intro to Personal Training".into(), Some(3), Fall),
+        ),
+        (
+            CC!("EXSC", 3357),
+            (
+                "Tests & Measure Health & Exsc Science".into(),
                 Some(3),
                 Both,
             ),
@@ -1062,12 +1635,53 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Principles of Finance".into(), Some(3), Both),
         ),
         (
+            CC!("FINC", 3300),
+            ("Principles of Banking".into(), Some(3), Fall),
+        ),
+        (
+            CC!("FINC", 3950),
+            ("Enterprise Risk Management".into(), Some(3), Spring),
+        ),
+        (
+            CC!("FINC", 4100),
+            ("Corporate Finance".into(), Some(3), Fall),
+        ),
+        (
+            CC!("FINC", 4300),
+            ("Bank Management".into(), Some(3), Spring),
+        ),
+        (CC!("FINC", 4330), ("Bank Strategy".into(), Some(3), Spring)),
+        (
+            CC!("FINC", 4650),
+            ("Financial Spreadsheet Modeling".into(), Some(3), Spring),
+        ),
+        (
+            CC!("FINC", 4790),
+            ("Finance Internship".into(), Some(1), Both),
+        ),
+        (
+            CC!("FINC", 4900),
+            ("International Finance".into(), Some(3), Fall),
+        ),
+        (
+            CC!("FINC", 4910),
+            ("Investment & Portfolio Analysis".into(), Some(3), Spring),
+        ),
+        (
             CC!("FINC", 4940),
             (
                 "History Financial Institutions & Markets".into(),
                 Some(3),
                 Spring,
             ),
+        ),
+        (
+            CC!("FINC", 4950),
+            ("Advanced Corporate Finance".into(), Some(3), Spring),
+        ),
+        (
+            CC!("FINC", 6590),
+            ("Financial Management".into(), Some(3), Both),
         ),
         (
             CC!("FREN", 1000),
@@ -1078,12 +1692,24 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Second Semester French".into(), Some(4), Spring),
         ),
         (
+            CC!("FREN", 2010),
+            ("Intermediate French".into(), Some(4), Discretion),
+        ),
+        (
+            CC!("FREN", 3010),
+            ("French Phonetics".into(), Some(3), Discretion),
+        ),
+        (
             CC!("FREN", 3040),
             (
                 "Introduction to French Literature".into(),
                 Some(3),
                 Discretion,
             ),
+        ),
+        (
+            CC!("FREN", 3300),
+            ("Food in France".into(), Some(3), Discretion),
         ),
         (
             CC!("FREN", 3500),
@@ -1138,6 +1764,10 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("History of French Cinema".into(), Some(3), Discretion),
         ),
         (
+            CC!("FREN", 4710),
+            ("Directed Readings I".into(), Some(3), Discretion),
+        ),
+        (
             CC!("GNST", 1110),
             ("Learning Community Lab".into(), Some(2), Fall),
         ),
@@ -1153,6 +1783,22 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("GNST", 3200),
             ("Catholic Worldview Fellowship".into(), Some(3), Summer),
+        ),
+        (
+            CC!("GRBK", 1750),
+            ("Great Books: Ancient World".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GRBK", 2750),
+            ("Great Books: Medieval World".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GRBK", 2850),
+            ("Great Books: Renaissance World".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GRBK", 3750),
+            ("Great Books: Modern World".into(), Some(3), Spring),
         ),
         (
             CC!("GREK", 1000),
@@ -1615,6 +2261,14 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("College Physics I Lab".into(), Some(1), Fall),
         ),
         (
+            CC!("PHYS", 2010),
+            ("College Physics II".into(), Some(3), Spring),
+        ),
+        (
+            CC!("PHYS", 2011),
+            ("College Physics Lab II".into(), Some(1), Spring),
+        ),
+        (
             CC!("PHYS", 2100),
             ("Classical Physics I".into(), Some(3), Fall),
         ),
@@ -1651,6 +2305,7 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Modern Physics Lab II".into(), Some(1), Spring),
         ),
         (CC!("PHYS", 4100), ("Mechanics I".into(), Some(3), Fall)),
+        (CC!("PHYS", 4110), ("Mechanics II".into(), Some(3), Spring)),
         (
             CC!("PHYS", 4200),
             ("Mathematical Methods for Physics".into(), Some(3), Fall),
@@ -1660,9 +2315,14 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("PHYS", 4301),
             ("Optics Laboratory".into(), Some(1), Spring),
         ),
+        (CC!("PHYS", 4400), ("Thermodynamics".into(), Some(3), Fall)),
         (
             CC!("PHYS", 4600),
             ("Electricity & Magnetism I".into(), Some(3), Fall),
+        ),
+        (
+            CC!("PHYS", 4610),
+            ("Electricity & Magnetism II".into(), Some(3), Spring),
         ),
         (
             CC!("PHYS", 4800),

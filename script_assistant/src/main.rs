@@ -16,6 +16,9 @@ pub mod courses;
 #[path = "../../src/schedule.rs"]
 pub mod schedule;
 
+#[path = "../../src/transparency.rs"]
+pub mod transparency;
+
 #[path = "../../src/prereqs.rs"]
 pub mod prereqs;
 
