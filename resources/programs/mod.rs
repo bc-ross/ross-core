@@ -9,6 +9,32 @@ mod prog_bio_bs;
 mod prog_biochem_ba;
 mod prog_biochem_bs;
 mod prog_chem_ba;
+mod prog_chem_bs;
+mod prog_cheng_bs;
+mod prog_cive_bs;
+mod prog_classl_ba;
+mod prog_classlg_ba;
+mod prog_classlgh_ba;
+mod prog_compsci_ba;
+mod prog_compsci_bs;
+mod prog_crim_ba;
+mod prog_econ_ba;
+mod prog_eled_ba;
+mod prog_eleng_bs;
+mod prog_eng_ba;
+mod prog_engphys_bs;
+mod prog_ength_ba;
+mod prog_evca_nes_ba;
+mod prog_evca_ymc_ba;
+mod prog_exsci_c_ba;
+mod prog_exsci_ghc_ba;
+mod prog_exsci_sm_ba;
+mod prog_exsci_tpeh_ba;
+mod prog_fin_ba;
+mod prog_fin_bank_ba;
+mod prog_french_ba;
+mod prog_graphd_ba;
+mod prog_hist_ba;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -23,6 +49,32 @@ pub fn programs() -> Vec<Program> {
         prog_bio_ba::prog(),
         prog_bio_bs::prog(),
         prog_chem_ba::prog(),
+        prog_chem_bs::prog(),
+        prog_cheng_bs::prog(),
+        prog_cive_bs::prog(),
+        prog_classlgh_ba::prog(),
+        prog_classlg_ba::prog(),
+        prog_classl_ba::prog(),
+        prog_compsci_ba::prog(),
+        prog_compsci_bs::prog(),
+        prog_crim_ba::prog(),
+        prog_econ_ba::prog(),
+        prog_eled_ba::prog(),
+        prog_eleng_bs::prog(),
+        prog_engphys_bs::prog(),
+        prog_ength_ba::prog(),
+        prog_eng_ba::prog(),
+        prog_evca_nes_ba::prog(),
+        prog_evca_ymc_ba::prog(),
+        prog_exsci_c_ba::prog(),
+        prog_exsci_ghc_ba::prog(),
+        prog_exsci_sm_ba::prog(),
+        prog_exsci_tpeh_ba::prog(),
+        prog_fin_ba::prog(),
+        prog_fin_bank_ba::prog(),
+        prog_french_ba::prog(),
+        prog_graphd_ba::prog(),
+        prog_hist_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
