@@ -5,11 +5,22 @@ use crate::schedule::Schedule;
 use crate::{SAVEFILE_VERSION, TEMPLATE_PNG};
 use anyhow::{Result, bail};
 use savefile::prelude::*;
+use umya_spreadsheet::Spreadsheet;
 use umya_spreadsheet::reader::xlsx;
 
 pub fn read_file(fname: &PathBuf) -> Result<Schedule> {
     let workbook = xlsx::read(fname)?;
+    let sched = load_sched(&workbook)?;
+    Ok(sched)
+}
 
+pub fn read_vec(buf: &[u8]) -> Result<Schedule> {
+    let workbook = xlsx::read_reader(std::io::Cursor::new(buf), true)?; // true??
+    let sched = load_sched(&workbook)?;
+    Ok(sched)
+}
+
+fn load_sched(workbook: &Spreadsheet) -> Result<Schedule> {
     let sheet = workbook
         .get_sheet_by_name("Internals")
         .ok_or_else(|| anyhow::anyhow!("Sheet 'Internals' not found"))?;
