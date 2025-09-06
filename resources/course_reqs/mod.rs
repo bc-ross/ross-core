@@ -31,8 +31,11 @@ mod stem_grbk;
 mod stem_grek;
 mod stem_jour;
 mod stem_latn;
+mod stem_math;
 mod stem_mcom;
+mod stem_meng;
 mod stem_mgmt;
+mod stem_mils;
 mod stem_mktg;
 
 pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
@@ -65,8 +68,11 @@ pub fn prereqs() -> HashMap<CourseCode, CourseReq> {
         .chain(stem_grek::prereqs().into_iter())
         .chain(stem_jour::prereqs().into_iter())
         .chain(stem_latn::prereqs().into_iter())
+        .chain(stem_math::prereqs().into_iter())
         .chain(stem_mcom::prereqs().into_iter())
+        .chain(stem_meng::prereqs().into_iter())
         .chain(stem_mgmt::prereqs().into_iter())
+        .chain(stem_mils::prereqs().into_iter())
         .chain(stem_mktg::prereqs().into_iter())
         .collect()
 }
