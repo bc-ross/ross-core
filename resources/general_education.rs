@@ -307,6 +307,7 @@ pub fn geneds() -> Vec<GenEd> {
                     CC!("SOCI", 2350),
                     CC!("SOCI", 3205),
                     CC!("SOCI", 3450),
+                    CC!("GRBK", 2850)
                 ],
             },
         },
