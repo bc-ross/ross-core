@@ -143,6 +143,8 @@ fn add_prereq_for_course<'a>(
                 let constraint = credits_before + big_m - (big_m, cur);
                 ctx.model.add_ge(constraint, standing_credits);
             }
+            // Semester 0 cannot satisfy standing prereqs
+            ctx.model.add_eq(ctx.vars[course_idx][0], 0);
         }
         _ => unimplemented!("Only PreCourse, CoCourse, And, Or, Standing supported"),
     }
