@@ -31,16 +31,19 @@ impl<'a> ModelBuilderContext<'a> {
         // Add incoming courses as semester 0
         let mut all_codes = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
+        let mut reqd_codes = std::collections::HashSet::new();
         let mut forced_codes = std::collections::HashMap::new();
         // Add incoming courses first
         for code in &sched.incoming {
             all_codes.insert(code.clone());
+            reqd_codes.insert(code.clone());
         }
         // Add planned courses and their prereqs
         for (idx, sem) in sched.courses.iter().enumerate() {
             for code in sem {
                 all_codes.insert(code.clone());
                 forced_codes.insert(code.clone(), idx);
+                reqd_codes.insert(code.clone());
                 queue.push_back(code.clone());
             }
         }
@@ -50,6 +53,7 @@ impl<'a> ModelBuilderContext<'a> {
                 for sem in &prog.semesters {
                     for code in sem {
                         all_codes.insert(code.clone());
+                        reqd_codes.insert(code.clone());
                         queue.push_back(code.clone());
                     }
                 }
@@ -182,11 +186,7 @@ impl<'a> ModelBuilderContext<'a> {
                 }
                 None => (0, CourseReq::NotRequired),
             };
-            let required = if sched.incoming.contains(code) {
-                true
-            } else {
-                sched.courses.iter().flatten().any(|c| c == code)
-            };
+            let required = reqd_codes.contains(code);
             let forced = sched
                 .incoming
                 .contains(code)
