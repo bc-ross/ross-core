@@ -162,19 +162,14 @@ pub fn generate_schedule(
         .filter(|p| programs.contains(&p.name.as_str()))
         .collect();
 
-    let mut combined_semesters: Vec<Semester> = vec![];
-    for prog in programs.iter() {
-        for (idx, sem) in prog.semesters.iter().enumerate() {
-            if let Some(this_sem) = combined_semesters.get_mut(idx) {
-                this_sem.extend_from_slice(sem);
-            } else {
-                combined_semesters.push(sem.clone());
-            }
-        }
-    }
+    let max_sems = programs
+        .iter()
+        .map(|p| p.semesters.len())
+        .max()
+        .unwrap_or(0);
 
     let mut sched = Schedule {
-        courses: combined_semesters,
+        courses: vec![Vec::new(); max_sems],
         programs: programs.iter().map(|x| x.name.to_owned()).collect(),
         incoming: incoming.unwrap_or_default(),
         catalog,

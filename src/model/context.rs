@@ -31,17 +31,20 @@ impl<'a> ModelBuilderContext<'a> {
         // Add incoming courses as semester 0
         let mut all_codes = std::collections::HashSet::new();
         let mut queue = std::collections::VecDeque::new();
+        let mut forced_codes = std::collections::HashMap::new();
         // Add incoming courses first
         for code in &sched.incoming {
             all_codes.insert(code.clone());
         }
-        // // Add planned courses and their prereqs
-        // for sem in &sched.courses {
-        //     for code in sem {
-        //         all_codes.insert(code.clone());
-        //         queue.push_back(code.clone());
-        //     }
-        // }
+        // Add planned courses and their prereqs
+        for (idx, sem) in sched.courses.iter().enumerate() {
+            for code in sem {
+                all_codes.insert(code.clone());
+                forced_codes.insert(code.clone(), idx);
+                queue.push_back(code.clone());
+            }
+        }
+
         for pname in &sched.programs {
             if let Some(prog) = sched.catalog.programs.iter().find(|p| &p.name == pname) {
                 for sem in &prog.semesters {
@@ -184,7 +187,11 @@ impl<'a> ModelBuilderContext<'a> {
             } else {
                 sched.courses.iter().flatten().any(|c| c == code)
             };
-            let forced = sched.incoming.contains(code).then(|| 0);
+            let forced = sched
+                .incoming
+                .contains(code)
+                .then(|| 0)
+                .or_else(|| forced_codes.get(code).map(|x| *x));
             courses.push(Course {
                 code: code.clone(),
                 credits,
