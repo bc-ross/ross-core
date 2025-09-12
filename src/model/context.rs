@@ -9,6 +9,7 @@ pub struct Course {
     pub credits: i64,
     pub required: bool,
     pub prereqs: CourseReq,
+    pub forced: Option<usize>, // If Some(semester), this course must be scheduled in that semester
 }
 
 pub struct ModelBuilderContext<'a> {
@@ -34,11 +35,21 @@ impl<'a> ModelBuilderContext<'a> {
         for code in &sched.incoming {
             all_codes.insert(code.clone());
         }
-        // Add planned courses and their prereqs
-        for sem in &sched.courses {
-            for code in sem {
-                all_codes.insert(code.clone());
-                queue.push_back(code.clone());
+        // // Add planned courses and their prereqs
+        // for sem in &sched.courses {
+        //     for code in sem {
+        //         all_codes.insert(code.clone());
+        //         queue.push_back(code.clone());
+        //     }
+        // }
+        for pname in &sched.programs {
+            if let Some(prog) = sched.catalog.programs.iter().find(|p| &p.name == pname) {
+                for sem in &prog.semesters {
+                    for code in sem {
+                        all_codes.insert(code.clone());
+                        queue.push_back(code.clone());
+                    }
+                }
             }
         }
         while let Some(code) = queue.pop_front() {
@@ -173,11 +184,13 @@ impl<'a> ModelBuilderContext<'a> {
             } else {
                 sched.courses.iter().flatten().any(|c| c == code)
             };
+            let forced = sched.incoming.contains(code).then(|| 0);
             courses.push(Course {
                 code: code.clone(),
                 credits,
                 required,
                 prereqs,
+                forced,
             });
         }
 
