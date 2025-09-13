@@ -69,7 +69,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             CC!("EENG", 4210),
             And(vec![
                 PreCourse(CC!("EENG", 3210)),
-                CoCourse(CC!("EENG", 3090)),
+                CoCourse(CC!("EENG", 4220)),
             ]),
         ),
         (CC!("EENG", 4220), PreCourse(CC!("EENG", 3080))),
