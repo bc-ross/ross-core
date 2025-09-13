@@ -122,7 +122,7 @@ fn embed_schedule_in_sheet(sheet: &mut Worksheet, sched: &Schedule) -> Result<()
     Ok(())
 }
 
-pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
+fn gen_schedule(sched: &Schedule) -> Result<Workbook> {
     let mut workbook = Workbook::new();
 
     let schedule_sheet = workbook.add_worksheet().set_name("Schedule")?;
@@ -135,6 +135,16 @@ pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
     #[cfg(not(debug_assertions))]
     internal_sheet.set_hidden(true);
 
+    Ok(workbook)
+}
+
+pub fn save_schedule(fname: &PathBuf, sched: &Schedule) -> Result<()> {
+    let mut workbook = gen_schedule(sched)?;
     workbook.save(fname)?;
     Ok(())
+}
+
+pub fn export_schedule(sched: &Schedule) -> Result<Vec<u8>> {
+    let mut workbook = gen_schedule(sched)?;
+    Ok(workbook.save_to_buffer()?)
 }

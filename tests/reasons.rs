@@ -24,6 +24,7 @@ fn test_reasons() -> Result<()> {
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
         Some(vec![CC!("PHYS", 4200), CC!("THEO", 1100)]), // None,
+        None,
     )?;
     sched.validate()?;
 

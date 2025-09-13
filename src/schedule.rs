@@ -154,6 +154,7 @@ pub fn generate_schedule(
     programs: Vec<&str>,
     catalog: Catalog,
     incoming: Option<Semester>,
+    forced: Option<Vec<Semester>>,
 ) -> Result<Schedule> {
     // (catalog: )
     let programs: Vec<&Program> = catalog
@@ -162,23 +163,33 @@ pub fn generate_schedule(
         .filter(|p| programs.contains(&p.name.as_str()))
         .collect();
 
-    let mut combined_semesters: Vec<Semester> = vec![];
-    for prog in programs.iter() {
-        for (idx, sem) in prog.semesters.iter().enumerate() {
-            if let Some(this_sem) = combined_semesters.get_mut(idx) {
-                this_sem.extend_from_slice(sem);
-            } else {
-                combined_semesters.push(sem.clone());
+    let max_sems = programs
+        .iter()
+        .map(|p| p.semesters.len())
+        .max()
+        .unwrap_or(0);
+
+    let mut semesters = vec![Vec::new(); max_sems];
+    if let Some(forced) = forced {
+        for (idx, sem) in forced.into_iter().enumerate() {
+            match semesters.iter_mut().enumerate().find(|(i, _)| *i == idx) {
+                Some((_, this_sem)) => {
+                    this_sem.extend(sem);
+                }
+                None => {
+                    semesters.push(sem);
+                }
             }
         }
     }
 
     let mut sched = Schedule {
-        courses: combined_semesters,
+        courses: semesters,
         programs: programs.iter().map(|x| x.name.to_owned()).collect(),
         incoming: incoming.unwrap_or_default(),
         catalog,
     };
+
     sched.reduce()?;
     println!("Is schedule valid? {}", sched.is_valid()?);
     Ok(sched)

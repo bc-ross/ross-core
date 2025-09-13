@@ -27,6 +27,12 @@ fn test_ross() -> Result<()> {
             .ok_or(anyhow!("no catalogs found"))?
             .clone(),
         Some(vec![CC!("PHYS", 4200), CC!("THEO", 1100)]), // None,
+        Some(vec![
+            vec![CC!("MATH", 1250)],
+            vec![],
+            vec![],
+            vec![CC!("PHIL", 3250)],
+        ]),
     )?;
     sched.validate_unchecked()?;
 
