@@ -1,11 +1,14 @@
 #![allow(unused_imports)]
 
-use crate::prereqs::{
-    CourseReq::{self, *},
-    Grade, GradeLetter, GradeQualifier,
-};
 use crate::schedule::CourseCode;
 use crate::{CC, GR};
+use crate::{
+    prereqs::{
+        CourseReq::{self, *},
+        Grade, GradeLetter, GradeQualifier,
+    },
+    schedule::CourseCodeSuffix,
+};
 
 pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
     vec![
@@ -14,14 +17,20 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             CC!("FREN", 2010),
             Or(vec![
                 PreCourse(CC!("FREN", 1020)),
-                PreCourse(CC!("FREN", "E1020")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(1020, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3010),
             Or(vec![
                 PreCourse(CC!("FREN", 1020)),
-                PreCourse(CC!("FREN", "E1020")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(1020, "EXAM".into()),
+                }),
             ]),
         ),
         (CC!("FREN", 3040), PreCourse(CC!("FREN", 2010))),
@@ -30,42 +39,60 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             CC!("FREN", 3510),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3610),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3620),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3630),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3640),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (
             CC!("FREN", 3650),
             Or(vec![
                 PreCourse(CC!("FREN", 2010)),
-                PreCourse(CC!("FREN", "E2010")),
+                PreCourse(CourseCode {
+                    stem: "FREN".into(),
+                    code: CourseCodeSuffix::Unique(2010, "EXAM".into()),
+                }),
             ]),
         ),
         (CC!("FREN", 4710), Instructor),

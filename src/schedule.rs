@@ -26,7 +26,7 @@ pub enum CourseTermOffering {
 pub enum CourseCodeSuffix {
     Number(usize),
     Special(String),
-    Unique(usize),
+    Unique(usize, String),
 }
 
 impl PartialOrd for CourseCodeSuffix {
@@ -34,9 +34,9 @@ impl PartialOrd for CourseCodeSuffix {
         use CourseCodeSuffix::*;
         match (self, other) {
             (Number(x), Number(y))
-            | (Number(x), Unique(y))
-            | (Unique(x), Number(y))
-            | (Unique(x), Unique(y)) => Some(x.cmp(y)),
+            | (Number(x), Unique(y, _))
+            | (Unique(x, _), Number(y))
+            | (Unique(x, _), Unique(y, _)) => Some(x.cmp(y)),
             (Special(_), _) | (_, Special(_)) => None,
         }
     }
@@ -65,7 +65,7 @@ impl Display for CourseCodeSuffix {
         match self {
             CourseCodeSuffix::Number(num) => write!(f, "{num}"),
             CourseCodeSuffix::Special(s) => write!(f, "{s}"),
-            CourseCodeSuffix::Unique(id) => write!(f, "{id}"),
+            CourseCodeSuffix::Unique(id, sect) => write!(f, "{id}-{sect}"),
         }
     }
 }

@@ -169,7 +169,7 @@ fn second_stage_sched(
             let code = &flat_courses2[i].0.code;
             let val = match &code.code {
                 crate::schedule::CourseCodeSuffix::Number(n)
-                | crate::schedule::CourseCodeSuffix::Unique(n) => *n as i64,
+                | crate::schedule::CourseCodeSuffix::Unique(n, _) => *n as i64,
                 crate::schedule::CourseCodeSuffix::Special(x) => {
                     if x.as_str() == "COMP" {
                         1000000 // Assign a high value for COMP courses
