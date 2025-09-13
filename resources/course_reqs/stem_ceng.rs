@@ -52,7 +52,7 @@ pub fn prereqs() -> Vec<(CourseCode, CourseReq)> {
             CC!("CENG", 4210),
             And(vec![
                 PreCourse(CC!("CENG", 2010)),
-                PreCourse(CC!("MATH", 2100)),
+                PreCourse(CC!("MATH", 3100)),
                 CoCourse(CC!("ENGR", 3600)),
             ]),
         ),
