@@ -2018,6 +2018,30 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Beginning Greek II".into(), Some(4), Spring),
         ),
         (
+            CC!("GREK", 2120),
+            (
+                "Greek Literature in Translation".into(),
+                Some(3),
+                Discretion,
+            ),
+        ),
+        (
+            CC!("GREK", 3110),
+            ("Greek Prose Authors I".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GREK", 3120),
+            ("Greek Prose Authors II".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GREK", 4110),
+            ("Greek Poets I".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("GREK", 4120),
+            ("Greek Poets II".into(), Some(3), Discretion),
+        ),
+        (
             CC!("HIST", 1100),
             ("World Civilization to 1500".into(), Some(3), Both),
         ),
@@ -2187,8 +2211,29 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         ),
         (CC!("JOUR", 2620), ("Media Writing I".into(), Some(4), Both)),
         (
+            CC!("JOUR", 3225),
+            ("Publication Practicum I".into(), Some(2), Both),
+        ),
+        (
             CC!("JOUR", 3300),
             ("Media Writing II".into(), Some(3), Both),
+        ),
+        (CC!("JOUR", 3350), ("Copy Editing".into(), Some(1), Spring)),
+        (
+            CC!("JOUR", 3370),
+            ("Multimedia Storytelling".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("JOUR", 4220),
+            ("Publication Practicum 2".into(), Some(2), Both),
+        ),
+        (
+            CC!("JOUR", 4300),
+            ("Adv Report/Print".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("JOUR", 4340),
+            ("Feature Writing".into(), Some(3), Discretion),
         ),
         (CC!("JOUR", 4750), ("Media Law".into(), Some(3), Discretion)),
         (
@@ -2264,7 +2309,15 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("MCOM", 1030),
             ("Introduction to Cinema".into(), Some(3), Fall),
         ),
+        (
+            CC!("MCOM", 1500),
+            ("Digital Media Foundations".into(), Some(3), Both),
+        ),
         (CC!("MCOM", 1610), ("Layout & Design".into(), Some(3), Both)),
+        (
+            CC!("MCOM", 2000),
+            ("Strategic Communications".into(), Some(3), Both),
+        ),
         (
             CC!("MCOM", 2500),
             ("Web Design I".into(), Some(3), Discretion),
@@ -2278,8 +2331,24 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             ("Digital Photography I".into(), Some(4), Fall),
         ),
         (
+            CC!("MCOM", 3225),
+            ("Publication Practicum 1".into(), Some(2), Both),
+        ),
+        (
             CC!("MCOM", 3310),
             ("Art of Presentation".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MCOM", 3320),
+            ("Advertising Principles".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MCOM", 3325),
+            ("Publication Practicum 1".into(), Some(2), Both),
+        ),
+        (
+            CC!("MCOM", 3330),
+            ("Public Relations".into(), Some(3), Fall),
         ),
         (
             CC!("MCOM", 3600),
@@ -2289,14 +2358,111 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
             CC!("MCOM", 3610),
             ("Digital Photography II".into(), Some(4), Discretion),
         ),
+        (
+            CC!("MCOM", 3680),
+            ("Sports Broadcasting I".into(), Some(3), Both),
+        ),
+        (CC!("MCOM", 4090), ("Senior Seminar".into(), Some(1), Both)),
+        (
+            CC!("MCOM", 4220),
+            ("Publication Practicum 2".into(), Some(2), Both),
+        ),
+        (
+            CC!("MCOM", 4330),
+            ("Advanced Publ Rel".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MCOM", 4680),
+            ("Sports Broadcasting II".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MCOM", "COMP"),
+            ("Senior Comprehensive Exam".into(), None, Both),
+        ),
         (CC!("MENG", 4700), ("Senior Seminar".into(), Some(1), Fall)),
         (
             CC!("MGMT", 2250),
             ("Prin of Business Management".into(), Some(3), Both),
         ),
         (
+            CC!("MGMT", 2550),
+            ("Teams & Leaders".into(), Some(2), Discretion),
+        ),
+        (
             CC!("MGMT", 3250),
             ("International Management & Culture".into(), Some(3), Both),
+        ),
+        (
+            CC!("MGMT", 3400),
+            (
+                "Enterprise Management: Innovation & Chng".into(),
+                Some(3),
+                Spring,
+            ),
+        ),
+        (
+            CC!("MGMT", 3500),
+            ("Organizational Behavior & Theory".into(), Some(3), Fall),
+        ),
+        (
+            CC!("MGMT", 3510),
+            (
+                "Managing Non-Profit Organizations".into(),
+                Some(3),
+                Discretion,
+            ),
+        ),
+        (
+            CC!("MGMT", 3550),
+            ("Community Leadership".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 3660),
+            ("Information & Decision Management".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MGMT", 4450),
+            ("Business Plan Development".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 4500),
+            ("Human Resource Management".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MGMT", 4560),
+            (
+                "Ethics Compliance & Social Responsibiity".into(),
+                Some(3),
+                Fall,
+            ),
+        ),
+        (
+            CC!("MGMT", 4660),
+            ("Operations & Logistics Management".into(), Some(3), Fall),
+        ),
+        (
+            CC!("MGMT", 4720),
+            ("Business Organizational Law".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 4730),
+            ("Human Resource Law".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 4740),
+            ("Sales & Finance Law".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 4750),
+            ("Project Management".into(), Some(3), Discretion),
+        ),
+        (
+            CC!("MGMT", 4780),
+            ("Experiential Learning Activity".into(), None, Both),
+        ),
+        (
+            CC!("MGMT", 4890),
+            ("Global Business Strategy".into(), Some(3), Discretion),
         ),
         (
             CC!("MILS", 1160),
@@ -2313,6 +2479,56 @@ pub fn courses() -> HashMap<CourseCode, (String, Option<u32>, CourseTermOffering
         (
             CC!("MKTG", 3100),
             ("Principles of Marketing".into(), Some(3), Both),
+        ),
+        (
+            CC!("MKTG", 3650),
+            ("Digital Marketing".into(), Some(3), Spring),
+        ),
+        (CC!("MKTG", 3750), ("Sport Marketing".into(), Some(3), Fall)),
+        (
+            CC!("MKTG", 3810),
+            ("Consumer Behavior".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MKTG", 3880),
+            ("Promotional Marketing".into(), Some(3), Fall),
+        ),
+        (CC!("MKTG", 4460), ("Brand Strategy".into(), Some(3), Fall)),
+        (
+            CC!("MKTG", 4470),
+            ("Services Marketing".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MKTG", 4480),
+            ("Innovations in Marketing".into(), Some(3), Fall),
+        ),
+        (
+            CC!("MKTG", 4650),
+            ("Social Media & Content Marketing".into(), Some(3), Fall),
+        ),
+        (
+            CC!("MKTG", 4750),
+            ("Revenue Generation in Sport".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MKTG", 4780),
+            ("Experiential Learning Activity".into(), None, Both),
+        ),
+        (
+            CC!("MKTG", 4790),
+            ("Marketing Internship".into(), Some(1), Both),
+        ),
+        (
+            CC!("MKTG", 4810),
+            ("International Marketing".into(), Some(3), Spring),
+        ),
+        (
+            CC!("MKTG", 4830),
+            ("Marketing Research & Analytics".into(), Some(3), Fall),
+        ),
+        (
+            CC!("MKTG", 4850),
+            ("Marketing Strategy".into(), Some(3), Spring),
         ),
         (
             CC!("MUSC", 1100),

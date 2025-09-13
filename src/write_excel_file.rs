@@ -1,4 +1,4 @@
-use crate::schedule::Schedule;
+use crate::schedule::{CourseCode, CourseCodeSuffix, Schedule};
 use crate::{SAVEFILE_VERSION, TEMPLATE_PNG};
 use anyhow::Result;
 use rust_xlsxwriter::{Format, FormatAlign, Image, Workbook, Worksheet};
@@ -25,7 +25,17 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
         )?;
     }
 
-    for (row_idx, val) in sched.incoming.iter().enumerate() {
+    for (row_idx, mut val) in sched.incoming.iter().enumerate() {
+        let val_storage: CourseCode;
+        if let CourseCodeSuffix::Unique(s, c) = &val.code {
+            if c == "EXAM" {
+                val_storage = CourseCode {
+                    stem: val.stem.clone(),
+                    code: CourseCodeSuffix::Number(*s),
+                };
+                val = &val_storage;
+            }
+        }
         sheet.write_string((row_idx + 1) as u32, 0, val.to_string())?;
         sheet.write_number_with_format(
             (row_idx + 1) as u32,
@@ -49,7 +59,17 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
     }
 
     for (col_idx, field) in sched.courses.iter().enumerate() {
-        for (row_idx, val) in field.iter().enumerate() {
+        for (row_idx, mut val) in field.iter().enumerate() {
+            let val_storage: CourseCode;
+            if let CourseCodeSuffix::Unique(s, c) = &val.code {
+                if c == "EXAM" {
+                    val_storage = CourseCode {
+                        stem: val.stem.clone(),
+                        code: CourseCodeSuffix::Number(*s),
+                    };
+                    val = &val_storage;
+                }
+            }
             sheet.write_string(
                 (row_idx + 1) as u32,
                 ((col_idx + 1) * 2) as u16,

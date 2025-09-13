@@ -49,6 +49,16 @@ fn main() {
     for gened in general_education::geneds() {
         new_courses.extend(gened.all_course_codes());
     }
+    new_courses = new_courses
+        .into_iter()
+        .filter(|c| {
+            if let schedule::CourseCodeSuffix::Unique(_, s) = &c.code {
+                s != "EXAM"
+            } else {
+                true
+            }
+        })
+        .collect();
 
     let old_assoc_values = courses::courses();
     let courses_json = serde_json::to_string_pretty(
