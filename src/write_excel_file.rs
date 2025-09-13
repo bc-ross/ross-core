@@ -26,26 +26,24 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
     }
 
     for (row_idx, mut val) in sched.incoming.iter().enumerate() {
-        let val_storage: CourseCode;
+        let mut credits: Option<Result<u32>> = None;
         if let CourseCodeSuffix::Unique(s, c) = &val.code {
             if c == "EXAM" {
-                val_storage = CourseCode {
-                    stem: val.stem.clone(),
-                    code: CourseCodeSuffix::Number(*s),
-                };
-                val = &val_storage;
+                credits = Some(Ok(0));
             }
         }
         sheet.write_string((row_idx + 1) as u32, 0, val.to_string())?;
         sheet.write_number_with_format(
             (row_idx + 1) as u32,
             1,
-            sched
-                .catalog
-                .courses
-                .get(val)
-                .map(|(_, x, _)| x.unwrap_or(0))
-                .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
+            credits.unwrap_or_else(|| {
+                sched
+                    .catalog
+                    .courses
+                    .get(val)
+                    .map(|(_, x, _)| x.unwrap_or(0))
+                    .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))
+            })?,
             &center_format,
         )?;
 
@@ -60,14 +58,10 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
 
     for (col_idx, field) in sched.courses.iter().enumerate() {
         for (row_idx, mut val) in field.iter().enumerate() {
-            let val_storage: CourseCode;
+            let mut credits: Option<Result<u32>> = None;
             if let CourseCodeSuffix::Unique(s, c) = &val.code {
                 if c == "EXAM" {
-                    val_storage = CourseCode {
-                        stem: val.stem.clone(),
-                        code: CourseCodeSuffix::Number(*s),
-                    };
-                    val = &val_storage;
+                    credits = Some(Ok(0));
                 }
             }
             sheet.write_string(
@@ -78,12 +72,14 @@ fn pretty_print_sched_to_sheet(sched: &Schedule, sheet: &mut Worksheet) -> Resul
             sheet.write_number_with_format(
                 (row_idx + 1) as u32,
                 ((col_idx + 1) * 2 + 1) as u16,
-                sched
-                    .catalog
-                    .courses
-                    .get(val)
-                    .map(|(_, x, _)| x.unwrap_or(0))
-                    .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))?,
+                credits.unwrap_or_else(|| {
+                    sched
+                        .catalog
+                        .courses
+                        .get(val)
+                        .map(|(_, x, _)| x.unwrap_or(0))
+                        .ok_or(anyhow::anyhow!("Course lookup not found: {}", val))
+                })?,
                 &center_format,
             )?;
 
