@@ -37,6 +37,7 @@ mod prog_french_ba;
 mod prog_graphd_ba;
 mod prog_hist_ba;
 mod prog_jmc_ba;
+mod prog_man_ba;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -79,6 +80,7 @@ pub fn programs() -> Vec<Program> {
         prog_graphd_ba::prog(),
         prog_hist_ba::prog(),
         prog_jmc_ba::prog(),
+        prog_man_ba::prog(),
         prog_phys_ba::prog(),
     ]
 }
