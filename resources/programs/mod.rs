@@ -40,6 +40,7 @@ mod prog_jmc_ba;
 mod prog_man_ba;
 mod prog_mark_ba;
 mod prog_math_ba;
+mod prog_mech_e_bs;
 mod prog_phys_ba;
 
 pub fn programs() -> Vec<Program> {
@@ -85,6 +86,7 @@ pub fn programs() -> Vec<Program> {
         prog_man_ba::prog(),
         prog_mark_ba::prog(),
         prog_math_ba::prog(),
+        prog_mech_e_bs::prog(),
         prog_phys_ba::prog(),
     ]
 }
